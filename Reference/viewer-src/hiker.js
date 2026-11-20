@@ -132,12 +132,19 @@ export function makeHiker(id,avatar){
     const g=mergeGeometries(parts,false);for(const p of parts)p.dispose();geometries.push(g);
     const mesh=new T.Mesh(g,material);mesh.receiveShadow=true;bone.add(mesh);
   }
-  function pose(phase,motion){
+  let seated=false;
+  function pose(phase,motion,sit=false){
+    seated=sit;
     const wave=Math.sin(phase);
-    body.position.y=.014*motion*(1-Math.cos(2*phase));
+    body.position.y=sit?-.43:.014*motion*(1-Math.cos(2*phase));
     body.rotation.z=.023*wave*motion;head.rotation.y=-.032*wave*motion;
     for(let i=0;i<joints.length;i++){
       const j=joints[i],stride=wave*j.side*motion;
+      if(sit){
+        j.thigh.rotation.x=1.65;j.shin.rotation.x=-1.23;j.foot.rotation.x=-.42;
+        j.arm.rotation.x=.31;j.forearm.rotation.x=.91;
+        continue;
+      }
       j.thigh.rotation.x=.47*stride;
       j.shin.rotation.x=-.025-.46*Math.max(0,Math.cos(phase)*j.side)*motion;
       j.foot.rotation.x=-.20*stride-j.shin.rotation.x*.27;
@@ -146,5 +153,5 @@ export function makeHiker(id,avatar){
     }
   }
   pose(0,0);
-  return {root,height:root.scale.y*1.79,pose,dispose(){for(const g of geometries)g.dispose();material.dispose();}};
+  return {root,get height(){return root.scale.y*(seated?1.36:1.79);},get seated(){return seated;},pose,dispose(){for(const g of geometries)g.dispose();material.dispose();}};
 }

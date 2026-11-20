@@ -182,7 +182,7 @@ def build_exterior_site():
                 if abs(y-ry)<9.8: idx=3
                 elif (-26 < x < (min(.1,(y-1)*.76) if y<1 else .1) and -26<y<32):idx=2
                 elif -1<x<60 and ry+9.8<y<roadside_line(x)+1:idx=1
-                elif x< -27 or x>45 or y>38 or y<-22:idx=0
+                elif x< -27 or x>45 or y>38 or y<-22 or (x>=0 and y>26):idx=0
                 else:idx=1
                 indices.append(idx)
     # Subtract the measured stepped foundation in plan from every intersecting cell.
@@ -606,12 +606,14 @@ def build_exterior_site():
     # shows the second gravel area reaching past both hanging seats to a drain.
     pad_x,pad_y=24.85,55.4
     pad_rx,pad_ry=9.65,13.0
-    v=[pos(pad_x,pad_y,zpat+OZ)];fs=[]
+    pad=(pad_x,pad_y,pad_rx,pad_ry)
+    def gravel_height(x):return zpat+OZ+.0015*(x-25.3)
+    v=[pos(pad_x,pad_y,gravel_height(pad_x))];fs=[]
     for i in range(67):
         ang=math.tau*i/66
-        v.append(pos(pad_x+pad_rx*math.cos(ang),pad_y+pad_ry*math.sin(ang),zpat+OZ+.002))
+        x=pad_x+pad_rx*math.cos(ang)
+        v.append(pos(x,pad_y+pad_ry*math.sin(ang),gravel_height(x)))
         if i:fs.append((0,i,i+1))
-    uvmesh('Rear gravel fire circle',v,fs,pea_gravel,1.48)
     helper('WalkSurface_FireCircleGravel',v,fs)
     # Keep this material exclusive to the liner; the viewer attaches flames
     # to the center of its mesh. IMG_0773, April 2026, shows its rusty interior
@@ -650,24 +652,27 @@ def build_exterior_site():
                 faces.extend((4*h+i,4*h+(i+1)%4,4*h+4+(i+1)%4,4*h+4+i) for i in range(4))
             push(block_rng.choice(block_finishes),verts,faces)
             push(cap_stone,verts[12:16],[(0,1,2,3)])
+    def rim(k):return .016+.008*math.sin(k*math.tau/66*3.0+.7)
     for j in range(66):
         a,b=v[j+1],v[j+2]
-        push(edging,[(x,y,z+dz) for (x,y,z),dz in [(a,-.055),(b,-.055),(b,.025),(a,.025)]],[(0,1,2,3)])
+        push(edging,[(x,y,z+dz) for (x,y,z),dz in [(a,-.055),(b,-.055),(b,rim(j+1)),(a,rim(j))]],[(0,1,2,3)])
     apron=[];quads=[];drain_x=38.55
     for j in range(33):
         yy=45.35+(63.65-45.35)*j/32
         edge_x=pad_x+pad_rx*math.sqrt(1-((yy-pad_y)/pad_ry)**2)
-        apron.extend([pos(edge_x-.025,yy,zpat+OZ-.006),pos(drain_x,yy,zpat+OZ-.006)])
+        apron.extend([pos(edge_x-.035,yy,gravel_height(edge_x)-.008),pos(drain_x,yy,gravel_height(drain_x)-.008)])
         if j:quads.append((2*j-2,2*j-1,2*j+1,2*j))
-    uvmesh('Pergola · gravel shoulder beside the fire circle',apron,quads,pea_gravel,1.48)
+    nearby_feet=[(26.525+side*1.92,63.8+end*2.22,.16,.47) for side in (-1,1) for end in (-1,1)]
+    nearby_feet.extend([(35.,54.1+side*5.125,.19,.53) for side in (-1,1)])
+    garden_gravel(site_group,pea_gravel,pad,gravel_height,drain_x,center,nearby_feet)
     helper('WalkSurface_PergolaGravel',apron,quads)
     dark_channel=mat('Yard drain · dark slot','#353c38',.25,.68)
     for xx in (drain_x-.16,drain_x+.16):
-        prism(galvanized,pos(xx,45.35,zpat+OZ-.004),pos(xx,63.65,zpat+OZ-.004),.012,.013)
-    plank(dark_channel,drain_x-.16,drain_x+.16,45.35,63.65,zpat+OZ-.020,zpat+OZ-.013)
+        prism(galvanized,pos(xx,45.35,gravel_height(drain_x)-.005),pos(xx,63.65,gravel_height(drain_x)-.005),.012,.013)
+    plank(dark_channel,drain_x-.16,drain_x+.16,45.35,63.65,gravel_height(drain_x)-.022,gravel_height(drain_x)-.015)
     for j in range(133):
         yy=45.35+18.3*j/132
-        prism(galvanized,pos(drain_x-.15,yy,zpat+OZ-.004),pos(drain_x+.15,yy+.055,zpat+OZ-.004),.017,.012)
+        prism(galvanized,pos(drain_x-.15,yy,gravel_height(drain_x)-.005),pos(drain_x+.15,yy+.055,gravel_height(drain_x)-.005),.017,.012)
     # The stack in IMG_3353 sits uphill of the long grate. Its sloped ends and
     # split faces remain recognizable through the open backs of the hanging seats.
     split_wood=mat('Firewood · weathered split face','#9a856d',.01,.93)
@@ -701,16 +706,28 @@ def build_exterior_site():
         t=math.radians(deg);cx=center.x+1.62*math.cos(t);cy=center.y+1.62*math.sin(t)
         forward=Vector((-math.cos(t),-math.sin(t),0));side=Vector((-forward.y,forward.x,0));origin=Vector((cx,cy,zpat))
         def chair(a,b,h):return origin+side*a+forward*b+Vector((0,0,h))
+        # Sink both pairs of feet into the gravel's slight crossfall.
         for a in (-.27,.27):
-            prism(pale,chair(a,.28,.03),chair(a,.23,.57),.065)
-            prism(oak,chair(a,-.35,.02),chair(a,.22,.38),.069)
+            prism(pale,chair(a,.28,-.009),chair(a,.23,.57),.065)
+            prism(oak,chair(a,-.35,-.009),chair(a,.22,.38),.069)
             prism(pale,chair(a,-.37,.55),chair(a,.34,.57),.092,.045)
+        for b,h in ((-.34,.065),(.22,.33),(-.33,.56)):
+            prism(oak,chair(-.27,b,h),chair(.27,b,h),.055,.052)
         for i in range(6):
             yp=-.25+i*.104
             prism(pale,chair(-.25,yp,.31+i*.013),chair(.25,yp,.31+i*.013),.089,.031)
         for i in range(6):
             a=-.23+i*.092
-            prism(pale,chair(a,-.22,.31),chair(a*1.17,-.45,.84+.08*(1-abs(a)/.23)),.078,.032)
+            # The fan back has individually rounded slat tops (IMG_0773).
+            top=.84+.08*(1-(a/.255)**2)
+            outline=[(-.039,.31),(.039,.31),(.039,top-.022),(.031,top-.007),(.016,top),(0,top+.003),(-.021,top-.002),(-.034,top-.011),(-.039,top-.022)]
+            verts=[]
+            for depth in (-.015,.015):
+                for edge,h in outline:
+                    t=(h-.31)/(top-.31)
+                    verts.append(chair(a*(1+.17*t)+edge,-.22-.23*t+depth,h))
+            n=len(outline)
+            push(pale,verts,[tuple(reversed(range(n))),tuple(range(n,2*n))]+[(k,(k+1)%n,(k+1)%n+n,k+n) for k in range(n)])
         blocker('YardChair%02d'%j,chair(0,-.47,.01),chair(0,.34,.01),.64,.92)
     picnic_table(ties,site_group,zone,blocker)
     # Horizontal crown centers are local maxima of nearby high unclassified lidar
@@ -930,12 +947,27 @@ def build_exterior_site():
     from mathutils.bvhtree import BVHTree
     forest_floor=BVHTree.FromPolygons([v.co for v in land.data.vertices],
                                        [list(f.vertices) for f in land.data.polygons])
+    dress_garden_ground(site_group,pad,gravel_height,drain_x,forest_floor,local)
+    # The 2025 leaf-off ortho places the deck and a woodland edge behind the
+    # house. Sentinel-2 only supplies a broad summer density, never plant positions.
+    vegetation=json.loads((base_dir/'Woodland context'/'Summer vegetation.json').read_text())
+    def summer_cover(x,y):
+        e,n=eastnorth(x,y)
+        col=math.floor((e-vegetation['west'])/vegetation['cell'])
+        row=math.floor((vegetation['north']-n)/vegetation['cell'])
+        grid=vegetation['values']
+        value=grid[row][col] if 0<=row<len(grid) and 0<=col<len(grid[0]) else vegetation['nodata']
+        return .5 if value==vegetation['nodata'] else sclip((value-40)/45)
     understory=random.Random(579)
     frond_mats=[mat('Woodland ferns · '+name,tint) for name,tint in
                 [('deep green','#355333'),('leaf green','#506f37'),('new growth','#708343')]]
-    for attempt in range(125):
-        x=understory.uniform(-34,59);y=understory.uniform(41,85)
-        if -7<x<53 and y<79:continue
+    for attempt in range(235):
+        x=understory.uniform(-34,57);y=understory.uniform(38.5,83)
+        # Keep both beds, the deck exit, timber stack and clear travel lanes open.
+        if math.hypot((x-pad_x)/(pad_rx+3.8),(y-pad_y)/(pad_ry+3.8))<1:continue
+        if 27<x<44.3 and y<66:continue
+        if -12<x<19 and y<55:continue
+        if understory.random()>.10+.73*summer_cover(x,y)**2:continue
         probe=Vector(wpos(x,y,2.0))
         base,normal,index,_=forest_floor.ray_cast(probe,(0,0,-1),4.0)
         if base is None or land.data.polygons[index].material_index!=0 or normal.z<.63:continue
@@ -956,15 +988,15 @@ def build_exterior_site():
         # Each pinna folds around a rib on an arched frond, so nearby low woodland
         # catches side light even when viewed across the slope.
         scale=understory.uniform(.25,.48)
-        for j in range(6):
-            theta=math.tau*j/6+understory.uniform(-.40,.40)
+        for j in range(5):
+            theta=math.tau*j/5+understory.uniform(-.40,.40)
             length=scale*understory.uniform(.63,1.2)
             direction=Vector((math.cos(theta),math.sin(theta),0))
             across=Vector((-direction.y,direction.x,0))
             def blade(t):
                 return base+direction*(length*t)+Vector((0,0,length*(1.65*t-1.13*t*t)))
-            for k in range(1,11):
-                t=k/12;rib=blade(t)
+            for k in range(1,8):
+                t=k/8.5;rib=blade(t)
                 breadth=length*.20*(math.sin(t*math.pi)**.71)*(1-.28*t)
                 for side in (-1,1):
                     tip=rib+across*(side*breadth)+direction*(.052*length)

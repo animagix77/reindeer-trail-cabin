@@ -237,7 +237,7 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     carry[k]=obj;obj.visible=false;palm.add(obj);
   }
   let held=null,inFlight=null,body=null,currentView='property',message='Gather loose wood at the foot of the woodpile.';
-  let lastDrop=null;
+  let lastDrop=null,reportedState;
   let offeringFood=false;
   let nearPit=false,nearStockpile=false,canToss=false,nearby=[],lastReport='';
   const forward=v(),toward=v(),lastFuel={twigs:-1,sticks:-1,logs:-1};
@@ -264,7 +264,7 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
   function notify(text){
     if(text!==undefined)message=text;
     const changed=token();if(changed===lastReport)return;
-    lastReport=changed;onChange(snapshot());
+    lastReport=changed;reportedState=snapshot();onChange(reportedState);
   }
   function measure(){
     const yard=body&&floorLabel.test(body.label);
@@ -380,5 +380,5 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     notify();
     return Boolean(inFlight);
   }
-  return {view,update,snapshot,pickUp,takeSplitLog,putBack,toss};
+  return {view,update,snapshot,pickUp,takeSplitLog,putBack,toss,targets:anchors,get state(){return reportedState;}};
 }

@@ -207,6 +207,7 @@ exec(compile((work/'Front entry junction.py').read_text(),'Front entry junction.
 exec(compile((work/'Media details.py').read_text(),'Media details.py','exec'),globals())
 exec(compile((work/'Roadside wall.py').read_text(),'Roadside wall.py','exec'),globals())
 exec(compile((work/'Front yard paving.py').read_text(),'Front yard paving.py','exec'),globals())
+exec(compile((work/'Rear clearing.py').read_text(),'Rear clearing.py','exec'),globals())
 exec(compile((work/'Exterior site.py').read_text(),'Exterior site.py','exec'),globals())
 exec(compile((work/'Deck barbecue.py').read_text(),'Deck barbecue.py','exec'),globals())
 exec(compile((work/'Surrounding woods.py').read_text(),'Surrounding woods.py','exec'),globals())

@@ -11,7 +11,8 @@ import {installEntryDoors} from './entry-doors.js';
 import {installWildlife} from './wildlife.js';
 import {activityControls} from './activity-controls.js';
 import {installWoodSplitting} from './wood-splitting.js';
-import {installFirewoodControls} from './firewood-controls.js';
+import {installWorldActions} from './world-actions.js';
+import {installTourInterface} from './tour-interface.js';
 import {installFirewood} from './firewood.js';
 import {installTourFires} from './fires.js';
 import {installWelcome} from './welcome.js';
@@ -38,7 +39,7 @@ const woodland=installWoodlandSound();
 const flashlightButton=element('flashlight');
 let flashlight,floodlights,hallReflections,flashlightOn=false;
 let lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
-let renderer;
+let renderer,worldActions;
 let activeView='outside';
 // Positions use glTF Y-up: Blender [x,y,z] maps to [x,z,-y].
 const starts={};
@@ -109,6 +110,11 @@ function nextFrame(t) {
     yaw+=turn*turnSpeed*dt;
     camera.rotation.set(pitch,yaw,0,'YXZ');
   }
+  if(worldActions?.seated){
+    render();
+    if(turn)schedule();else lastTime=0;
+    return;
+  }
   let sideways=axes.x;
   let forward=on('KeyW','ArrowUp')-on('KeyS','ArrowDown')-axes.y;
   const norm=Math.max(1,Math.hypot(sideways,forward));
@@ -126,6 +132,7 @@ function nextFrame(t) {
   const wanted=body.y+body.eye;
   camera.position.x=body.x;camera.position.z=body.z;
   const travel=Math.hypot(body.x-oldX,body.z-oldZ);
+  tourInterface.walked(travel);
   bob=gait.update(travel,dt,speed<1.1,left=>woodland.footstep(footSurface(),left),reducedMotion.matches);
   if(!travel && Math.abs(bob)<.0003)bob=0;
   camera.position.y=THREE.MathUtils.lerp(eyeHeight,wanted,1-Math.exp(-15*dt))+bob;
@@ -138,8 +145,9 @@ function usableTarget(target) {
   return target===document.body || target===canvas || target.matches?.('button');
 }
 window.addEventListener('keydown',e=>{
-  if(sceneControls.contains(e.target) || party.open || propertyMap.open || welcome.open || waterNotes.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
+  if(sceneControls.contains(e.target) || party.open || propertyMap.open || welcome.open || waterNotes.open || tourInterface.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
   e.preventDefault();
+  if(worldActions?.seated && /^(Key[WS]|Arrow(Up|Down))$/.test(e.code))return;
   held.add(e.code);
   if(!frame) nextFrame(performance.now());
 });
@@ -158,7 +166,7 @@ function steer(e) {
   schedule();
 }
 stick.addEventListener('pointerdown',e=>{
-  if(!walking() || stickPointer!==null) return;
+  if(!walking() || worldActions?.seated || stickPointer!==null) return;
   stickPointer=e.pointerId;stick.setPointerCapture(e.pointerId);
   e.preventDefault();steer(e);
 });
@@ -174,14 +182,15 @@ function hint() {
   return touchControls.matches?'Move with the pad · Drag to look':'Drag to look';
 }
 function updateLookControls(){
-  element('walk-keys').hidden=!walking() || touchControls.matches;
+  element('walk-keys').hidden=!walking() || worldActions?.seated || touchControls.matches;
   element('look-gesture').textContent=hint();
   element('lock').hidden=!walking() || !canvas.requestPointerLock;
   element('lock').textContent=document.pointerLockElement===canvas?'Release mouse':'Mouse look';
-  element('stick').hidden=!walking() || !matchMedia('(any-pointer: coarse)').matches;
+  element('stick').hidden=!walking() || worldActions?.seated || !matchMedia('(any-pointer: coarse)').matches;
   let label='Cabin view. Drag or use the arrow keys to look around.';
   if(walking()) label=touchControls.matches?'Walk with the movement pad and drag to look around.':
     'Walk forward with W and back with S. Turn left with A and right with D. The arrow keys also walk and turn. Drag to look around.';
+  if(worldActions?.seated)label='Seated by the fire. Drag to look around. Use Stand up to walk again.';
   canvas.setAttribute('aria-label',label);
 }
 touchControls.addEventListener('change',updateLookControls);
@@ -260,7 +269,6 @@ function changeView(view) {
   locationPicker.value=view;
   activities.close();
   reset();
-  woodControls.destination(view);
   updateLookControls();
   flashlightButton.hidden=!walking();
   canvas.focus({preventScroll:true});
@@ -270,6 +278,7 @@ window.addEventListener('hashchange',()=>{
   if(sceneCanRender) changeView(viewFromAddress());
 });
 function reset() {
+  worldActions?.leave();
   const preset=starts[activeView];
   stopWalking();
   body=spawnBody(preset);
@@ -338,10 +347,6 @@ const activities=activityControls({
   grill:()=>grill,herd:()=>wildlife,schedule,
   lid:on=>grill?.open(on)
 });
-const woodControls=installFirewoodControls({
-  pickUp:kind=>firewood?.pickUp(kind),toss:()=>firewood?.toss(),putBack:()=>firewood?.putBack(),
-  stopMovement(){stopWalking();pointers.clear();},render
-});
 const propertyMap=installPropertyMap({
   stopMovement(){stopWalking();pointers.clear();},
   destinations(){
@@ -360,7 +365,9 @@ const party=installParty({
   stop(){stopWalking();pointers.clear();},
   getPose(){
     const round=n=>Math.round(n*100)/100;
-    return {view:activeView,x:round(body?.x??0),y:round(body?.y??0),z:round(body?.z??0),yaw:round(yaw)};
+    const seated=worldActions?.seated;
+    return {view:activeView,x:round(body?.x??0),y:round(body?.y??0),z:round(body?.z??0),
+      yaw:round(seated?worldActions.seatHeading:yaw),...(seated?{seated:true,seat:worldActions.seatId}:{})};
   },
   joined({index,people}){
     history.replaceState(null,'','#'+tourAreas.outside.slug+party.suffix);
@@ -397,6 +404,7 @@ const party=installParty({
         if(!floor || Math.abs(floor.y-guest.y)>.25)continue;
         const others=[...occupied,...party.neighbors()];
         if(others.some(p=>p.view!=='property'&&Math.abs(p.y-floor.y)<.8&&Math.hypot(x-p.x,z-p.z)<.74))continue;
+        worldActions?.leave();
         body=floor;camera.position.set(body.x,body.y+body.eye,body.z);
         yaw=Math.atan2(body.x-guest.x,body.z-guest.z);pitch=0;look();return;
       }
@@ -424,8 +432,13 @@ const welcome=installWelcome({
     canvas.focus({preventScroll:true});
   }
 });
+const tourInterface=installTourInterface({
+  stopMovement(){stopWalking();pointers.clear();},
+  resume(){if(sceneCanRender)schedule();},
+  isOutside:()=>outdoorsFloor(body?.label)
+});
 function render(firstFrame=false){
-  if(!sceneCanRender || (firstFrame!==true && (propertyMap.open || welcome.open || waterNotes.open)))return;
+  if(!sceneCanRender || (firstFrame!==true && (propertyMap.open || welcome.open || waterNotes.open || tourInterface.open)))return;
   const seconds=performance.now()/1000;
   const outside=outdoorsFloor(body?.label);
   lighting?.update(camera.position,activeView,seconds,camera,outside);
@@ -435,14 +448,13 @@ function render(firstFrame=false){
   const animateWood=firewood?.update(body,activeView,seconds,activities.offeringFood);
   const animateFire=fires?.update(camera,activeView,seconds);
   woodland.update(camera,outside,walking(),ringCenter,fires?.energy??0);
-  sceneControls.setNearFire(Boolean(body && ringCenter && camera.position.distanceToSquared(ringCenter)<49 &&
-    Math.abs(camera.position.y-ringCenter.y)<2.8));
   const animateLeaves=surfaces?.update(camera,activeView,seconds,outside);
   const animateTree=treeLights?.update(camera,activeView,seconds,canvas.height);
   const animateGuests=party.update(seconds);
   const animateDoors=entryDoors?.update(camera,walking(),seconds);
   const animateGrill=grill?.update(camera,activeView,seconds);
   const animateDeer=wildlife?.update(camera,activeView,seconds);
+  worldActions?.update();
   hallReflections?.update(camera,walking(),seconds,lighting?.daylight??1);
   const cinematic=film && walking();
   const adapting=cinematic?film.render(world,camera,lighting,outside,seconds):false;
@@ -476,6 +488,9 @@ element('far').addEventListener('click',()=>zoom(1/.78));
 canvas.addEventListener('keydown',e=>{
   if(!sceneCanRender || e.metaKey || e.ctrlKey || e.altKey)return;
   switch(e.key){
+    case 'PageUp': case 'PageDown':
+      pitch=THREE.MathUtils.clamp(pitch+(e.key==='PageUp'?.12:-.12),-1.47,1.47);
+      look();break;
     case '+': case '=': zoom(.78);break;
     case '-': zoom(1/.78);break;
     case 'Home': reset();break;
@@ -507,7 +522,11 @@ async function show() {
   gltf.scene.traverse(object=>{
     if(/^WalkSpawn_Outside/i.test(object.name)) {
       const anchor=object.getWorldPosition(new THREE.Vector3());
-      starts.outside={eye:[anchor.x,anchor.y+1.59,anchor.z],target:[-1.911,4.36,-3.548],fov:65};
+      // Face the walk up to the porch, with the garage to the left of the first flight.
+      const step=gltf.scene.getObjectByName('WalkSurface_RetainerTread04');
+      const aim=new THREE.Box3().setFromObject(step).getCenter(new THREE.Vector3());
+      aim.y+=.92;
+      starts.outside={eye:[anchor.x,anchor.y+1.59,anchor.z],target:aim.toArray(),fov:65};
       object.visible=false;
     }
     if(!object.isMesh) return;
@@ -539,7 +558,7 @@ async function show() {
   }
   wildlife=installWildlife(world,walkSpace,camera,{onChange:activities.setDeer});
   fires=installTourFires(world,gltf.scene);
-  firewood=installFirewood(world,gltf.scene,walkSpace,camera,fires,woodControls.set,kind=>party.fuel(kind));
+  firewood=installFirewood(world,gltf.scene,walkSpace,camera,fires,undefined,kind=>party.fuel(kind));
   woodSplit=installWoodSplitting(world,gltf.scene,walkSpace,{
     camera,schedule,takeSplitLog:()=>firewood.takeSplitLog(),
     handsBusy(){const wood=firewood.snapshot();return wood.held || wood.inFlight || activities.offeringFood;},
@@ -548,6 +567,15 @@ async function show() {
   });
   walkSpace.dynamicBlocker=woodSplit.blocksStep;
   grill=installGrill(world,gltf.scene,activities.setGrill);
+  worldActions=installWorldActions({
+    model:gltf.scene,canvas,camera,space:walkSpace,firewood,activities,sceneControls,
+    getBody:()=>body,neighbors:party.neighbors,seatOccupied:party.seatOccupied,schedule,
+    seat(next,heading){
+      stopWalking();body=next;camera.position.set(body.x,body.y+body.eye,body.z);
+      if(heading!=null){yaw=heading;pitch=-.1;}
+      updateLookControls();look();
+    }
+  });
   entryDoors=installEntryDoors(gltf.scene,()=>{renderer.shadowMap.needsUpdate=true;});
   for(const [key,area] of Object.entries(tourAreas)){
     if(!starts[key])throw Error('Missing walking start for '+area.label);

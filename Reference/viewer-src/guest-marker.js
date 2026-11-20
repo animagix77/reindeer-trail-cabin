@@ -89,13 +89,13 @@ export function guestMarker(name,id,avatar='man'){
       const message=String(value??'').slice(0,360).trim();if(!message)return;
       pages=wrap(bubble,message);showPage(0,performance.now());
     },
-    update(dt,walking){
+    update(dt,walking,seated=false){
       const step=Math.min(.20,Math.max(0,Number.isFinite(dt)?dt:0));
       const goal=walking?1:0;
-      if(goal || motion>.001){
+      if(seated!==hiker.seated || goal || motion>.001){
         motion=T.MathUtils.damp(motion,goal,walking?12:15,step);stride+=step*7.6*motion;
         if(!walking && motion<.002){motion=0;stride=0;}
-        hiker.pose(stride,motion);
+        hiker.pose(stride,motion,seated);
       }
       if(page!==-1){
         const now=performance.now();

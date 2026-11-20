@@ -126,6 +126,12 @@ export function installTourLighting(scene,renderer,model,arrival) {
     [16,7,1.92,0xffe7c8,10,3.5],[26.25,5.65,2.02,0xffedda,6,2.7],
     [30,2.8,1.96,0xffe2b8,8,3],[30,32,2.0,0xffd5a2,6,3.4]
   ].map(([x,y,z,color,power,range])=>({p:fromPlan(x,y,z),color,power,range}));
+  // Soft sunset bounce from the upper gravel landing onto the first flight.
+  // Reuse a local lamp slot so the driveway costs no extra lights per frame.
+  const middleStep=model.getObjectByName('WalkSurface_RetainerTread04');
+  const stepBounce={p:new THREE.Box3().setFromObject(middleStep).getCenter(new THREE.Vector3())
+    .add(new THREE.Vector3(1.1,1.25,.65)),color:0xffc88e,power:0,range:3.7};
+  zones.push(stepBounce);
   const cafeLights=installCafeLights(scene,model);
   const lamps=Array.from({length:3},()=>{const l=new THREE.PointLight(0xffffff,0,4,2);scene.add(l);return l;});
   let zoneKey=null,stateKey='',lampGain=1,daylight=1,lowSun=0;
@@ -169,6 +175,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
     renderer.toneMappingExposure=1.05+.16*lowSun;
     const availableLight=a.day*a.light;
     daylight=a.direction.y>0?availableLight:0;
+    stepBounce.power=4.8*lowSun*daylight;
     roomGain=.105+.36*availableLight;
     skyGain=.065+.78*availableLight+.13*a.blueHour*(1-a.clouds);
     metalGain=.075+1.24*availableLight+.16*a.blueHour*(1-a.clouds);
@@ -212,14 +219,14 @@ export function installTourLighting(scene,renderer,model,arrival) {
       weatherFX.update(eye,!walking,seconds,renderer.domElement.height);
       const k=mode+'|'+(model.userData.lightRevision||0);
       if(k!==stateKey){renderer.shadowMap.needsUpdate=true;stateKey=k;}
-      const nearest=walking?zones.map((z,i)=>[i,z.p.distanceToSquared(eye)]).filter(([,d])=>d<58)
+      const nearest=walking?zones.map((z,i)=>[i,z.p.distanceToSquared(eye)]).filter(([i,d])=>d<58 && zones[i].power>.01)
         .sort((a,b)=>a[1]-b[1]).slice(0,3).map(pair=>pair[0]):[];
       const key=nearest.join('/');
       if(key!==zoneKey) {
         zoneKey=key;
         lamps.forEach((l,i)=>{
           const z=zones[nearest[i]];
-          l.intensity=z?z.power*lampGain:0;
+          l.intensity=z?z.power*(z===stepBounce?1:lampGain):0;
           if(z){l.position.copy(z.p);l.color.set(z.color);l.distance=z.range;}
         });
       }

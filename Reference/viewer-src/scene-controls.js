@@ -3,11 +3,10 @@ import {installSceneEnvironment} from './scene-environment.js';
 export function installSceneControls({setConditions,share,setFurnace,setFirePit,setSound,stopMovement}) {
   const get=id=>document.getElementById(id);
   const environment=installSceneEnvironment({setConditions,share});
-  const panel=get('scene-panel'), furnace=get('scene-furnace');
-  const pit=get('scene-fire');
+  const panel=get('scene-panel');
   const sound=get('scene-sound'), soundState=get('scene-sound-status');
   const mutePreference='reindeer-woodland-sound';
-  let burning=false,nearPit=false;
+  let burning=false,furnaceOn=true;
   let wantsSound=true, soundRevision=0, soundStateName='ready';
   try { wantsSound=localStorage.getItem(mutePreference)!=='off'; } catch {}
 
@@ -15,7 +14,7 @@ export function installSceneControls({setConditions,share,setFurnace,setFirePit,
     soundStateName=state;
     sound.setAttribute('aria-checked',String(wantsSound));
     const messages={
-      ready:['Ready','Sound is enabled and will start with your first interaction.'],
+      ready:['On','Sound is enabled and will start with your first interaction.'],
       on:['On','Woodland ambience, fire and footsteps are on.'],
       off:['Off','Woodland ambience, fire and footsteps are muted.'],
       unavailable:['Unavailable','This browser could not play audio. Select Sound to retry.']
@@ -53,44 +52,28 @@ export function installSceneControls({setConditions,share,setFurnace,setFirePit,
     void changeSound(wantsSound);
   });
 
-  function syncFire() {
-    pit.textContent=burning?'Put out fire':'Light fire';
-    pit.title=burning?'Extinguish the outdoor fire pit':'Start the outdoor fire pit';
-    pit.setAttribute('aria-pressed',String(burning));
-  }
-  function changeFire() {
+  function toggleFire(){
     burning=!burning;
-    syncFire();
     setFirePit(burning);
+  }
+  function toggleFurnace(){
+    furnaceOn=!furnaceOn;
+    setFurnace(furnaceOn);
   }
   panel.addEventListener('focusin',stopMovement);
   panel.addEventListener('keydown',e=>{
     if(e.key==='Escape')get('view').focus({preventScroll:true});
   });
   get('scene-stars').addEventListener('click',environment.stargaze);
-  furnace.addEventListener('click',()=>{
-    const on=furnace.getAttribute('aria-checked')!=='true';
-    furnace.setAttribute('aria-checked',String(on));
-    get('scene-furnace-status').textContent=on?'On':'Off';
-    setFurnace(on);
-  });
-  pit.addEventListener('click',changeFire);
-  document.addEventListener('keydown',event=>{
-    if(nearPit && event.code==='KeyE' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey &&
-       (event.target===document.body || event.target===get('view'))){
-      event.preventDefault();changeFire();
-    }
-  });
-  syncFire();
   return {
     contains:target=>panel.contains(target),
     conditions:environment.settings,solo:environment.solo,
-    snapshot(){return {...environment.snapshot(),furnace:furnace.getAttribute('aria-checked')==='true',fire:burning};},
+    snapshot(){return {...environment.snapshot(),furnace:furnaceOn,fire:burning};},
     apply(s,guest){
       environment.apply(s,guest);
-      if((furnace.getAttribute('aria-checked')==='true')!==s.furnace)furnace.click();
-      if(burning!==s.fire)changeFire();
+      if(furnaceOn!==s.furnace)toggleFurnace();
+      if(burning!==s.fire)toggleFire();
     },
-    setNearFire(near){nearPit=near;}
+    toggleFurnace,toggleFire,isFireLit:()=>burning,isFurnaceOn:()=>furnaceOn
   };
 }

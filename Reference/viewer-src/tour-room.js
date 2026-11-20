@@ -7,6 +7,8 @@ const validId=s=>typeof s==='string' && /^[a-z0-9_-]{1,80}$/i.test(s);
 const validName=s=>typeof s==='string' && s.trim().length>0 && s.length<=28;
 const validAvatar=a=>a==='man'||a==='woman';
 const validPose=p=>p && typeof p.view==='string' && /^[a-z]{1,18}$/.test(p.view) &&
+  (p.seated===undefined || typeof p.seated==='boolean') &&
+  (p.seat==null || (Number.isInteger(p.seat) && p.seat>=0 && p.seat<4)) &&
   [p.x,p.y,p.z,p.yaw].every(n=>Number.isFinite(n) && Math.abs(n)<500);
 const weatherPreset=w=>['clear','rain','snow','cloudy'].includes(w);
 const validReport=r=>r==null || (['ready','loading','stale','unavailable'].includes(r.status) &&

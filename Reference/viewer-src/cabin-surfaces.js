@@ -69,9 +69,11 @@ vec2 patchHash(vec2 id){
 vec4 patchSample(vec2 id,vec2 uv,vec2 dx,vec2 dy){
   vec2 seed=patchHash(id);float a=floor(seed.x*4.)*1.5707963;
   vec2 cs=vec2(cos(a),sin(a));mat2 rot=mat2(cs.x,cs.y,-cs.y,cs.x);
-  return textureGrad(map,rot*uv+seed*5.17,rot*dx,rot*dy);
+  vec2 aspect=vec2(1.,photoRowScale);
+  return textureGrad(map,(rot*uv)*aspect+seed*5.17,(rot*dx)*aspect,(rot*dy)*aspect);
 }
-vec4 groundPhoto(vec2 uv){
+vec4 groundPhoto(vec2 metricUV){
+  vec2 uv=metricUV/vec2(1.,photoRowScale);
   vec2 skew=vec2(uv.x+.57735*uv.y,1.15470*uv.y)*.73;
   vec2 id=floor(skew),f=fract(skew),dx=dFdx(uv),dy=dFdy(uv);
   float upper=step(1.,f.x+f.y);
@@ -82,10 +84,12 @@ vec4 groundPhoto(vec2 uv){
 }`;
 function addRelief(m,type,substitute){
   const profile=surfaces[type];
+  // Rotate the rectified gravel in metre space before projecting it into the source photo.
+  const rowScale=m.name.startsWith('Fire circle · pale')?'3.7':'1.0';
   const previous=m.onBeforeCompile,key=m.customProgramCacheKey();
   m.onBeforeCompile=(shader,renderer)=>{
     previous.call(m,shader,renderer);
-    if(profile.scatter)shader.fragmentShader=shader.fragmentShader.replace('#include <map_pars_fragment>','#include <map_pars_fragment>\n#ifdef USE_MAP\n'+tileNoise+'\n#endif');
+    if(profile.scatter)shader.fragmentShader=shader.fragmentShader.replace('#include <map_pars_fragment>','#include <map_pars_fragment>\n#ifdef USE_MAP\nconst float photoRowScale='+rowScale+';\n'+tileNoise+'\n#endif');
     shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`
       float photoHeight=0.;
       #ifdef USE_MAP
@@ -118,7 +122,7 @@ function addRelief(m,type,substitute){
           roughnessFactor=sqrt(sqrt(alpha*alpha+variance));
         #endif`);
   };
-  m.customProgramCacheKey=()=>key+'|surface-'+type+'-'+Number(substitute);
+  m.customProgramCacheKey=()=>key+'|surface-'+type+'-'+Number(substitute)+'-'+rowScale;
   m.needsUpdate=true;
 }
 

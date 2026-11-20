@@ -66,8 +66,8 @@ export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snap
   }
   function pose(id,p){
     const m=markers.get(id);if(!m||!p)return;
-    if(m.chip&&(m.target?.view!==p.view||!m.chip.title)){
-      m.chip.title='Meet '+m.displayName+' where they are standing';
+    if(m.chip&&(m.target?.view!==p.view||m.target?.seated!==p.seated||!m.chip.title)){
+      m.chip.title='Meet '+m.displayName+(p.seated?' by the fire':' where they are standing');
       m.chip.disabled=p.view==='property';
       m.chip.setAttribute('aria-label',m.chip.title);
     }
@@ -133,6 +133,13 @@ export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snap
   lobby();
   return {
     neighbors,
+    seatOccupied(seat,resolveTie=false){
+      for(const [id,guest] of markers){
+        // Peers can choose at the same instant. Both sides use the same ID order.
+        if(guest.target?.seated && guest.target.seat===seat && (!resolveTie || id<own))return true;
+      }
+      return false;
+    },
     initial(){if(invite)open();},
     get open(){return dialog.open;},
     get suffix(){const value=active||invite;return value?'?room='+value:'';},
@@ -156,7 +163,7 @@ export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snap
             animated=true;
           }
         }
-        if(m.update(dt,walking))animated=true;
+        if(m.update(dt,walking&&!t?.seated,Boolean(t?.seated)))animated=true;
       }
       return animated;
     }

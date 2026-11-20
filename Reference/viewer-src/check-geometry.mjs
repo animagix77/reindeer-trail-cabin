@@ -5,6 +5,7 @@ import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {WalkSpace} from './walking.js';
 import {checkFirewood} from './check-firewood.mjs';
+import {checkWorldActions} from './check-world-actions.mjs';
 
 const bytes=await fs.readFile(process.argv[2]);
 assert.equal(bytes.readUInt32LE(8),bytes.length,'GLB is incomplete');
@@ -224,6 +225,7 @@ assert.equal(traverseRoute('Tree nook to loft',stairRoute).label,'WalkSurface_Lo
 assert.equal(traverseRoute('Loft down to tree nook',[...stairRoute].reverse(),2.21).label,'WalkSurface_MainFloor_west');
 traverseRoute('Woodpile to the fire ring between the chairs',[[34.65,46.92],[32.,46.2],[30.4,47.6],[30.1,50.6],[29.1,52.5]],-1.11);
 checkFirewood(scene,walks);
+checkWorldActions(scene,walks);
 const survey=JSON.parse(await fs.readFile(new URL('../model-geometry.json',import.meta.url),'utf8'));
 const boundary=survey.boundary.map(([e,n])=>{
   const de=(e-516342.65)/feet, dn=(n-4612447.5)/feet;
