@@ -523,9 +523,16 @@ async function show() {
     const eye=gltf.scene.getObjectByName('TourEye_'+key);
     const target=gltf.scene.getObjectByName('TourLook_'+key);
     if(eye && target){
+      const position=eye.getWorldPosition(new THREE.Vector3());
+      const aim=target.getWorldPosition(new THREE.Vector3());
+      if(key==='entry'){
+        // The roadside photo was taken behind the retaining wall. Start on the walk to the door.
+        const towardDoor=aim.clone().sub(position);
+        towardDoor.y=0;
+        position.addScaledVector(towardDoor.normalize(),1.22);
+      }
       starts[key]={
-        eye:eye.getWorldPosition(new THREE.Vector3()).toArray(),
-        target:target.getWorldPosition(new THREE.Vector3()).toArray(),
+        eye:position.toArray(),target:aim.toArray(),
         fov:({entry:55,hall:68})[key] || 66
       };
     }
