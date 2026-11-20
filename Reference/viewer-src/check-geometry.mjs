@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {WalkSpace} from './walking.js';
+import {checkFirewood} from './check-firewood.mjs';
 
 const bytes=await fs.readFile(process.argv[2]);
 assert.equal(bytes.readUInt32LE(8),bytes.length,'GLB is incomplete');
@@ -28,7 +29,7 @@ const stripped=Buffer.concat([header,padded,binary]);
 const data=await new GLTFLoader().parseAsync(stripped.buffer.slice(stripped.byteOffset,stripped.byteOffset+stripped.length),'');
 const scene=data.scene;
 scene.updateMatrixWorld(true);
-const walks=new WalkSpace(),land=[],frontWalk=[],roofs=[],walls=[],entrance=[];
+const walks=new WalkSpace(),land=[],frontWalk=[],roofs=[],walls=[],entrance=[],nookWalls=[];
 let primitives=0,triangles=0;
 scene.traverse(o=>{
   if(!o.isMesh)return;
@@ -52,6 +53,7 @@ scene.traverse(o=>{
   triangles+=corners/3;
   if(/^Walk(Surface|Block)_/.test(name))walks.add(o,name);
   if(/^Wooded terrain/.test(name))land.push(o);
+  if(/^(Tree alcove · |Master pier return)/.test(name))nookWalls.push(o);
   if(/^(Front walk ·|Driveway steps ·|Exterior details · Weathered timber ties)/.test(name))frontWalk.push(o);
   if(/^Roof · (north pitch to entry valleys|entry cross gable shingles)/.test(name))roofs.push(o);
   if(/^(Exterior · wall 3|Entry wall · continuous cedar gable)/.test(name))walls.push(o);
@@ -67,6 +69,35 @@ function hits(objects,from,direction){
   ray.set(from,direction);
   return ray.intersectObjects(objects,false);
 }
+// Both faces of the pergola carry bulbs, with a direct run to the deck and a
+// longer return by the picnic table. Check the rendered filaments in plan.
+const filaments=[];
+scene.traverse(mesh=>{
+  if(!mesh.isMesh || mesh.material.name!=='String bulbs · amber filament')return;
+  const pos=mesh.geometry.getAttribute('position');
+  for(let i=0;i<pos.count;i++){
+    const p=new T.Vector3().fromBufferAttribute(pos,i).applyMatrix4(mesh.matrixWorld);
+    filaments.push(new T.Vector2(p.x,p.z));
+  }
+});
+function lampsAlong(start,end,tolerance=.025){
+  const projected=([x,y])=>{const p=at(x,y,0);return new T.Vector2(p.x,p.z);};
+  const a=projected(start),line=projected(end).sub(a),length=line.length();
+  line.normalize();
+  const stations=[];
+  for(const bulb of filaments){
+    const delta=bulb.clone().sub(a),d=delta.dot(line);
+    if(d<.04 || d>length-.04 || Math.abs(delta.cross(line))>tolerance)continue;
+    if(stations.every(existing=>Math.abs(existing-d)>.035))stations.push(d);
+  }
+  return stations.length;
+}
+for(const x of [34.71,35.29]){
+  assert(lampsAlong([x,48.325],[x,59.875])>=4,'Missing lights along the pergola timber');
+}
+assert(lampsAlong([40.70,35.84],[34.71,48.325])>=5,'Missing direct pergola-to-deck lights');
+assert.equal(lampsAlong([13.25,54.4],[23.30,35.84]),7,'Expected seven pendants on the flue-side span');
+for(const name of ['Deck','Picnic','Pergola'])assert(scene.getObjectByName('FestoonPool_'+name),'Missing outdoor lamp anchor '+name);
 let spawns=0;
 for(const name of names.filter(n=>n.startsWith('TourEye_'))){
   const v=scene.getObjectByName(name).getWorldPosition(new T.Vector3());
@@ -93,6 +124,50 @@ for(const x of [23,28,33,40]){
     assert(hitsHere.some(i=>Math.abs(i.distance-feet)<.003),'Gap in front cladding at '+[x,h]);
   }
 }
+// The plaster projection beside the loft stairs meets the stone pier. Cast
+// rays at both ends of each new face, including the plaster-to-stone seam.
+const xAxis=at(1,0,0).sub(at(0,0,0)).normalize();
+for(const h of [.15,1.0,1.85,2.17]){
+  for(const y of [15.29,16.85,18.13]){
+    const hit=hits(nookWalls,at(20.25,y,h),xAxis)[0];
+    assert(hit && Math.abs(hit.distance-.50*feet)<.003 && hit.object.userData.part.startsWith('Tree alcove · stair-side plaster'),
+      'Missing plaster beside the tree at '+[y,h]);
+  }
+  for(const x of [20.77,20.99,21.01,22.5,23.0,23.04,23.43]){
+    const hit=hits(nookWalls,at(x,18.65,h),inward.clone().negate())[0];
+    const finish=x<23.02?'Tree alcove · living-room plaster':'Master pier return';
+    assert(hit && Math.abs(hit.distance-.50*feet)<.003 && hit.object.userData.part.startsWith(finish),
+      'Open living-room corner or pier face at '+[x,h]);
+  }
+}
+// The photographed stair-side route and the passage to the primary barn door
+// must both work using the browser's real walker and clearance radius.
+function traverseRoute(label,points,startingHeight=0){
+  const first=at(...points[0],startingHeight+1.59);
+  let body=walks.spawn(first.x,first.z,first.y,2.88+startingHeight);
+  assert(body,label+' has no starting floor');
+  for(const [x,y] of points.slice(1)){
+    const target=at(x,y,0),dx=target.x-body.x,dz=target.z-body.z;
+    const n=Math.ceil(Math.hypot(dx,dz)/.025);
+    for(let i=0;i<n;i++)body=walks.move(body,dx/n,dz/n);
+    assert(Math.hypot(body.x-target.x,body.z-target.z)<.025,label+' obstructed at '+[x,y]);
+  }
+  return body;
+}
+// The dedicated view should see the decorated face around the finished
+// projection, the way the stair-side tree appears in the December photographs.
+const treeEye=scene.getObjectByName('TourEye_tree').getWorldPosition(new T.Vector3());
+for(const h of [.47,1.06,1.68]){
+  const target=at(19.00,16.88,h),sight=target.clone().sub(treeEye).normalize();
+  assert(!hits(nookWalls,treeEye,sight).some(hit=>hit.distance<treeEye.distanceTo(target)),
+    'The plaster projection hides the tree from its own viewpoint at height '+h);
+}
+traverseRoute('Primary door around the stone pier',[[25.35,20.16],[24.7,18.8],[24.7,12.75],[22.28,12.75]]);
+const stairRoute=[[25.35,20.16],[19.9,19.56],[16.94,19.35],[16.94,16.83],[15.65,16.83],[9.05,16.83],[7.85,16.83],[7.85,19.55]];
+assert.equal(traverseRoute('Tree nook to loft',stairRoute).label,'WalkSurface_LoftLanding');
+assert.equal(traverseRoute('Loft down to tree nook',[...stairRoute].reverse(),2.21).label,'WalkSurface_MainFloor_west');
+traverseRoute('Woodpile to the fire ring between the chairs',[[34.65,46.92],[32.,46.2],[30.4,47.6],[30.1,50.6],[29.1,52.5]],-1.11);
+checkFirewood(scene,walks);
 const survey=JSON.parse(await fs.readFile(new URL('../model-geometry.json',import.meta.url),'utf8'));
 const boundary=survey.boundary.map(([e,n])=>{
   const de=(e-516342.65)/feet, dn=(n-4612447.5)/feet;
@@ -126,5 +201,5 @@ assert(paved>.63,'Paving should cover roughly two-thirds of the developed fronta
 for(const [x,y,expected] of [[21.38,-20.7,hardFinishes[1]],[21.38,-17,hardFinishes[1]],[28,-15.9,hardFinishes[2]]]){
   assert.equal(hits(land,at(x,y,10),down)[0]?.object.material.name,expected,'Frontage finish at '+[x,y]);
 }
-console.log(`Checked ${primitives} mesh primitives, ${triangles.toLocaleString()} triangles and ${spawns} authored walk starts. Entry valleys, doorway, siding and front ground checks passed.`);
+console.log(`Checked ${primitives} mesh primitives, ${triangles.toLocaleString()} triangles and ${spawns} authored walk starts. Entry, front ground, pergola and deck lighting, tree nook closure, primary passage and loft stair checks passed.`);
 console.log('Developed frontage paving',Math.round(paved*1000)/10+'%',counts);

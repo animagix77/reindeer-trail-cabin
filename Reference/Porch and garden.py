@@ -277,4 +277,6 @@ def hanging_pergola(timber, dark, chain, cushion, group, zone, tube, blocker, ro
             obj=mesh('Garden · tufted canvas basket cushion',verts,faces,cushion,group)
             for face in obj.data.polygons:face.use_smooth=True
         round_blocker('HangingBasket'+str(i+1),pos(x+.13,y,ground-.02),.477,.516,1.72)
-    return pos(x,far_y,beam+.03)
+    # End and face attachment points on the top timber, in winding order.
+    return [pos(x+dx,y,beam+.040) for dx,y in
+            ((-.29,near_y-.65),(-.29,far_y+.65),(.29,far_y+.65),(.29,near_y-.65))]

@@ -232,7 +232,7 @@ for key,name,eye,target,lens in [
  ('living','Living room · toward the sofa and loft',(19.90,19.56,1.52),(6.80,27.04,1.52),20),
  ('','Living room · storage table',(16.4,24.85,1.05),(5.7,23.6,.73),23),
  ('entry','Front entry · from the road approach',(31,-22.0,terrainZ(*eastnorth(31,-22.0))-main+1.59),(31,0,1.08),23),
- ('tree','Christmas tree · beside the loft stairs',(25.35,20.16,1.55),(18.50,16.96,.94),23),
+ ('tree','Christmas tree · beside the loft stairs',(22.00,21.65,1.607),(18.30,16.85,.86),23),
  ('vault','Kitchen vault · from the living room',(13.35,22.25,1.59),(40.3,20.80,1.66),24),
  ('kitchen','Kitchen · counter runs',(30.05,24.58,1.59),(38.7,18.55,1.25),18),
  ('kitchenwork','Kitchen · island work face',(36.50,16.78,1.45),(33.40,20.25,.69),22),

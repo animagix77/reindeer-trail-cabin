@@ -110,7 +110,26 @@ function deerRange(space){
     }
     return nodes[next[from.n]]||null;
   }
-  return {ground,safeGround,point,toward};
+  function escape(start,visitor,bias) {
+    // Seek reachable cover along a route that starts away from the visitor.
+    // Different flight bearings fan the herd out even on a narrow clearing.
+    const from=start.p,heading=Math.atan2(from.x-visitor.x,from.z-visitor.z)+bias;
+    let best=start,score=0;
+    const queue=[start],seen=new Set([start.n]),initialDistance=horizontal(from,visitor);
+    for(let i=0;i<queue.length;i++){
+      const a=queue[i],dx=a.p.x-from.x,dz=a.p.z-from.z,length=Math.hypot(dx,dz);
+      const gain=horizontal(a.p,visitor)-initialDistance;
+      const value=gain+.75*(dx*Math.sin(heading)+dz*Math.cos(heading))-.8*Math.abs(length-5);
+      if(value>score){best=a;score=value;}
+      if(length>6)continue;
+      for(const k of a.edges){
+        const b=nodes[k];if(!b||seen.has(k)||horizontal(b.p,visitor)<initialDistance-.28)continue;
+        seen.add(k);queue.push(b);
+      }
+    }
+    return best;
+  }
+  return {ground,safeGround,point,toward,escape};
 }
 function mouthPose(size,goalY){
   function position(t) {
@@ -151,10 +170,12 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
     set.add(deer.object,shadow);deer.object.position.copy(h.p);
     const yaw=[.74,-1.82,.91][i];deer.object.rotation.y=yaw;
     herd.push({...deer,shadow,id:i,home:h.p,goal:h,p:deer.object.position,yaw,speed:0,stride:i*.31,
-      lower:.12,chew:0,eat:0,change:4+i,stanceAngle:null,lockKey:null});
+      lower:.12,chew:0,eat:0,change:4+i,stanceAngle:null,lockKey:null,
+      shy:[.20,.92,.58][i],trust:0,fleeUntil:0,waryUntil:0,calmUntil:0,replan:0});
   }
   const herdCenter=V(),to=V(),forward=V(),right=V(),offering=V(),muzzle=V(),handForward=V();
-  let near=false,holding=null,handOwner=null,heldMesh=null,blockedTime=0,message='Choose food to offer the herd.',clock=null,time=0,nextId=0;
+  let near=false,holding=null,handOwner=null,heldMesh=null,blockedTime=0,message='Choose food and stand still. Let the deer come to you.',clock=null,time=0,nextId=0;
+  let still=0,visitorSpeed=0,lastVisitor=null;
   function notify(msg){
     if(msg!==undefined)message=msg;
     onChange({near,holding,inventory:{...inventory},message});
@@ -193,11 +214,10 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
     if(!inventory[kind]){notify('Your basket is out of '+labels[kind]+'.');return false;}
     poseHand();
     const nearby=[...herd].sort((a,b)=>horizontal(a.p,offering)-horizontal(b.p,offering));
-    const diner=nearby.find(d=>stance(d,offering,true));
-    if(!diner){notify('Face open ground so a deer has room to approach your hand.');return false;}
-    returnHeld();inventory[kind]--;holding=kind;handOwner=diner;blockedTime=0;
+    if(!nearby.some(d=>stance(d,offering,true))){notify('Face open ground so a deer has room to approach your hand.');return false;}
+    returnHeld();inventory[kind]--;holding=kind;still=0;blockedTime=0;
     heldMesh=food[kind].clone();palm.add(heldMesh);poseHand();
-    notify('Hold still. A deer is approaching your '+labels[kind]+'.');return true;
+    notify('Stand still with the '+labels[kind]+'. A curious deer may come closer.');return true;
   }
   function toss(kind){
     if(!Object.hasOwn(stock,kind)||!near)return false;
@@ -275,9 +295,11 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
       const meal=holding;palm.remove(heldMesh);heldMesh=null;holding=null;handOwner=null;palm.visible=false;
       notify('A deer ate the '+labels[meal]+' from your hand.');
     }
+    d.trust=Math.min(1,d.trust+(item ? .16 : .32));
+    if(!item)d.calmUntil=time+4.5;
     d.lockKey=null;d.stanceAngle=null;d.eat=0;d.chew=1.4;d.change=time+2.3;
   }
-  function advance(d,goal,aim,dt,feeding){
+  function advance(d,goal,aim,dt,feeding,fleeing=false){
     const here=range.point(d.p.x,d.p.z,.60);if(!here)return;
     const direct=horizontal(d.p,aim)<1.05 && [.2,.4,.6,.8].every(t=>
       range.safeGround(T.MathUtils.lerp(d.p.x,aim.x,t),T.MathUtils.lerp(d.p.z,aim.z,t))!==null);
@@ -297,11 +319,19 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
           to.x+=.07*Math.sin(other.yaw);to.z+=.07*Math.cos(other.yaw);
         }
       }
+      if(near && !feeding && !fleeing){
+        const x=d.p.x-camera.position.x,z=d.p.z-camera.position.z;
+        const gap=Math.hypot(x,z);
+        if(gap>.01 && gap<2.25){
+          const weight=Math.min(2.2,(2.25-gap)*1.9);
+          to.x+=x/gap*weight;to.z+=z/gap*weight;
+        }
+      }
       to.normalize();
     }
     const targetYaw=moving?Math.atan2(to.x,to.z):d.yaw;
-    const delta=wrap(targetYaw-d.yaw);d.yaw+=clamp(delta,-dt*2.65,dt*2.65);
-    const speed=moving?Math.min(feeding?1.08:.46,Math.max(.11,distance*1.9))*Math.max(.10,Math.cos(delta)):0;
+    const delta=wrap(targetYaw-d.yaw);const turnRate=fleeing?5.2:2.65;d.yaw+=clamp(delta,-dt*turnRate,dt*turnRate);
+    const speed=moving?Math.min(fleeing?2.7:feeding?.87:.46,Math.max(.11,distance*1.9))*Math.max(.10,Math.cos(delta)):0;
     d.speed=damp(d.speed,speed,6,dt);
     const step=Math.min(dirLength,d.speed*dt,distance);
     const dx=to.x*step,dz=to.z*step;
@@ -323,25 +353,65 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
     if(cameraNow!==camera)camera=cameraNow;
     const wasNear=near;near=Boolean(inYard(mode));
     if(near!==wasNear){
-      if(!near)returnHeld();
-      notify(near?'Choose food to offer the herd.':'Visit the backyard to feed the deer.');
+      if(!near){returnHeld();lastVisitor=null;still=0;visitorSpeed=0;}
+      notify(near?'Choose food, then hold it out or toss it. Give the herd room.':'Visit the backyard to feed the deer.');
     }
     const visible=mode!=='property'&&horizontal(camera.position,look)<18;
     set.visible=visible;
-    const dt=clock===null?0:clamp(seconds-clock,0,.10);clock=seconds;
-    if(!visible){palm.visible=false;return false;}
+    const elapsed=clock===null?0:Math.max(0,seconds-clock);clock=seconds;
+    const dt=Math.min(.10,elapsed);
+    // An apple dropped just before leaving the yard still lands while away.
+    updateFood(elapsed);
+    if(!visible){lastVisitor=null;still=0;visitorSpeed=0;palm.visible=false;return false;}
     // Indoors the deer can be glimpsed through a window. Run the wildlife
     // animation loop while a visitor is outdoors or interacting with food.
     const localY=(-S*(camera.position.x-4.65)+C*(camera.position.z+8.5))/feet;
     if(!near && localY<25){palm.visible=false;return false;}
-    time+=dt;updateFood(dt);if(holding)poseHand();
+    time+=dt;if(holding)poseHand();
     herdCenter.set(0,0,0);for(const a of herd)herdCenter.add(a.p);herdCenter.divideScalar(herd.length);
+    const visitor=camera.position;
+    const travel=near&&lastVisitor?horizontal(lastVisitor,visitor):0;
+    visitorSpeed=damp(visitorSpeed,dt>0&&travel<.85?travel/dt:0,8,dt);
+    still=near&&visitorSpeed<.12?still+dt:0;
+    if(near){if(!lastVisitor)lastVisitor=V();lastVisitor.copy(visitor);}else lastVisitor=null;
+
+    const alarmed=herd.filter(d=>{
+      if(!near)return false;
+      const gap=horizontal(d.p,visitor);
+      // A deer that elects to approach tolerates a quiet hand. Walking
+      // into its space still startles it, even after previous feedings.
+      if(visitorSpeed<.33 && ((d===handOwner && holding) || d.calmUntil>time))return false;
+      const approaching=visitorSpeed>.12 || !wasNear || travel>.85;
+      return (approaching && gap<1.35+.48*d.shy) ||
+        (visitorSpeed>.33 && gap<2.05+1.5*d.shy+.38*visitorSpeed-.35*d.trust);
+    });
+    let scattered=false;
+    for(const d of herd){
+      const danger=alarmed.includes(d) || alarmed.some(a=>horizontal(a.p,d.p)<3.5+d.shy);
+      if(!danger)continue;
+      if(d.fleeUntil<=time)scattered=true;
+      if(d.replan<=time || d.fleeUntil<=time){
+        const here=range.point(d.p.x,d.p.z,.6);
+        if(here)d.goal=range.escape(here,visitor,[-.74,.67,.15][d.id]);
+        d.replan=time+1.15;
+      }
+      d.fleeUntil=time+1.8+.75*d.shy;d.waryUntil=d.fleeUntil+2+3*d.shy;
+      d.change=d.waryUntil;d.chew=0;
+    }
+    if(handOwner && (handOwner.fleeUntil>time || visitorSpeed>.33)){handOwner=null;blockedTime=0;}
+    if(scattered)notify(holding?'The herd scattered. Keep your hand still and give them time.':'The deer startled and scattered. Give them space to settle.');
+    if(holding && !handOwner && still>1.7){
+      const candidates=herd.filter(d=>d.shy<.8 && d.waryUntil<=time &&
+        still>1.7+2*d.shy-d.trust && horizontal(d.p,visitor)<12 && stance(d,offering,true));
+      candidates.sort((a,b)=>(a.shy-a.trust-b.shy+b.trust)*4+horizontal(a.p,visitor)-horizontal(b.p,visitor));
+      if(candidates.length){handOwner=candidates[0];notify('A curious deer is coming closer. Keep your hand steady.');}
+    }
     const handDeer=holding?handOwner:null;
     const occupied=new Set(handDeer?[handDeer]:[]);
     for(const item of items)if(item.landed){
-      if(!item.owner||occupied.has(item.owner)){
+      if(!item.owner||occupied.has(item.owner)||item.owner.waryUntil>time){
         item.owner=null;
-        for(const d of item.diners)if(!occupied.has(d)&&(!item.owner||horizontal(d.p,item.end)<horizontal(item.owner.p,item.end)))item.owner=d;
+        for(const d of item.diners)if(d.waryUntil<=time&&!occupied.has(d)&&(!item.owner||horizontal(d.p,item.end)<horizontal(item.owner.p,item.end)))item.owner=d;
       }if(item.owner)occupied.add(item.owner);
     }
     for(const d of herd){
@@ -358,7 +428,9 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
         }
       }
       let lower=0,turn=0,arrived=false;
-      if(feed){
+      if(d.fleeUntil>time){
+        advance(d,d.goal,d.goal.p,dt,false,true);
+      }else if(feed){
         const error=horizontal(d.p,feed.aim);d.change=time+2;
         if(error>.045)advance(d,feed.node,feed.aim,dt,true);
         else d.speed=damp(d.speed,0,9,dt);
@@ -366,6 +438,9 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
           d.yaw+=wrap(feed.angle-d.yaw)*(1-Math.exp(-6*dt));arrived=true;
           lower=feed.lower;
         }
+      }else if(near && (d.waryUntil>time || (horizontal(d.p,visitor)<4.5+1.3*d.shy && visitorSpeed>.15))){
+        d.speed=damp(d.speed,0,9,dt);
+        turn=clamp(wrap(Math.atan2(visitor.x-d.p.x,visitor.z-d.p.z)-d.yaw),-.7,.7);
       }else{
         if(time>=d.change){
           // Three home patches at the woods' edge. Low frequency cohesion and

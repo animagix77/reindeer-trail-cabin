@@ -1,6 +1,6 @@
-// Short locally synthesized stereo loops. An AudioContext is created and
-// resumed only by the sound switch. No recordings or network fetches.
+// Locally synthesized woodland ambience and close-up footfalls.
 import * as THREE from 'three';
+import {soleSound} from './footsteps.js';
 import {atmosphere} from './tour-sky.js';
 
 const tau=2*Math.PI;
@@ -73,11 +73,29 @@ function channel(ctx,kind,channelIndex){
   for(let i=0;i<edge;i++){const fade=i/edge;samples[i]*=fade;samples[samples.length-1-i]*=fade;}
   return samples;
 }
+// A short block resonance follows the metal impact. On a good strike, a second,
+// higher transient gives the split a distinct dry crack.
+function splittingSound(ctx,solid){
+  const rate=22050,buf=ctx.createBuffer(1,Math.ceil(rate*.34),rate),samples=buf.getChannelData(0);
+  const rng=random(solid?5941:3151);
+  let previous=0;
+  for(let i=0;i<samples.length;i++){
+    const t=i/rate,white=rng()*2-1,fiberTime=t-.022;
+    const impulse=(white-previous)*Math.exp(-t*152);
+    const block=Math.sin(tau*(solid?113:170)*t)*Math.exp(-t*24)
+      +.31*Math.sin(tau*281*t)*Math.exp(-t*40);
+    const crack=solid && fiberTime>0 ? white*Math.exp(-fiberTime*88)*(.72+.28*Math.cos(910*fiberTime)) : 0;
+    previous=white;
+    samples[i]=Math.tanh(.60*impulse+.54*block+.91*crack)*Math.min(1,i/9);
+  }
+  return buf;
+}
 export function installWoodlandSound() {
   let audio=null,bus,muffle,pan,enabled=false,revision=0;
-  let hour=14,weather='clear',day=1;
+  let hour=16.25,weather='clear',day=1;
   const tracks={},right=new THREE.Vector3(),toward=new THREE.Vector3(),up=new THREE.Vector3(0,1,0);
-  const last={};
+  const last={},steps=new Map(),impacts=new Map();
+  let stepNumber=0;
   function init(){
     const Context=globalThis.AudioContext||globalThis.webkitAudioContext;
     if(!Context)throw Error('Web Audio is unavailable.');
@@ -129,6 +147,29 @@ export function installWoodlandSound() {
         if(token===revision)enabled=false;
         return false;
       }
+    },
+    footstep(surface,left){
+      if(!enabled || audio?.state!=='running' || hidden())return;
+      const variant=stepNumber++%5,key=surface+variant;
+      if(!steps.has(key))steps.set(key,soleSound(audio,surface,variant));
+      const src=audio.createBufferSource();src.buffer=steps.get(key);
+      src.playbackRate.value=.96+Math.random()*.09;
+      const pan=audio.createStereoPanner?.();
+      if(pan){pan.pan.value=left?-.12:.12;src.connect(pan);pan.connect(bus);}
+      else src.connect(bus);
+      src.onended=()=>{src.disconnect();pan?.disconnect();};
+      src.start();
+    },
+    strike(strength){
+      if(!enabled || audio?.state!=='running' || hidden())return;
+      const solid=strength>.6;
+      if(!impacts.has(solid))impacts.set(solid,splittingSound(audio,solid));
+      const source=audio.createBufferSource(),gain=audio.createGain();
+      source.buffer=impacts.get(solid);source.playbackRate.value=.97+.07*Math.random();
+      gain.gain.value=.36+.59*strength;
+      source.connect(gain);gain.connect(bus);
+      source.onended=()=>{source.disconnect();gain.disconnect();};
+      source.start();
     },
     conditions(settings){
       hour=settings.hour??hour;weather=settings.weather??weather;day=atmosphere(hour,weather).day;

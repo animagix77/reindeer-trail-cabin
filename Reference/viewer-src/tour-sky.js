@@ -8,59 +8,108 @@ const skies={
   snow:{clouds:.88,light:.64,fog:.021}
 };
 export function validWeather(weather){return Object.hasOwn(skies,weather);}
+const color=hex=>new THREE.Color(hex);
 
-// A representative local solar path. East is +X and north is -Z in the tour.
+// A representative equinox solar path at Smallwood. East is +X and north is -Z.
 export function atmosphere(hour,weather) {
-  const weatherData=skies[weather];
-  const angle=(hour-12)*Math.PI/12;
-  const latitude=41.67*Math.PI/180;
+  const weatherData=skies[weather],cover=weatherData.clouds;
+  const angle=(hour-12)*Math.PI/12,latitude=41.67*Math.PI/180;
   const direction=new THREE.Vector3(-Math.sin(angle),Math.cos(latitude)*Math.cos(angle),Math.sin(latitude)*Math.cos(angle)).normalize();
-  const day=smooth(-.11,.19,direction.y);
-  const twilight=1-smooth(.015,.30,Math.abs(direction.y+.015));
-  const zenith=new THREE.Color('#17223f').lerp(new THREE.Color('#317ab9'),day);
-  const horizon=new THREE.Color('#323e59').lerp(new THREE.Color('#d9e4e7'),day);
-  horizon.lerp(new THREE.Color('#eeb29b'),twilight*.70);
-  zenith.lerp(new THREE.Color('#545982'),twilight*.48);
-  const cloudTint=new THREE.Color('#24334b').lerp(new THREE.Color(weather==='rain'?'#8f9caa':'#dbe1e8'),day);
-  cloudTint.lerp(new THREE.Color('#bd9d97'),twilight*.43);
-  zenith.lerp(cloudTint,weatherData.clouds*.64);
-  horizon.lerp(cloudTint,weatherData.clouds*.71);
-  const sunTint=new THREE.Color('#ffae74').lerp(new THREE.Color('#fff0d3'),smooth(.02,.46,direction.y));
-  const skyTint=new THREE.Color('#778bad').lerp(new THREE.Color('#fff6e8'),day);
-  skyTint.lerp(new THREE.Color('#c3cee1'),day*weatherData.clouds*.74);
-  return {direction,day,twilight,zenith,horizon,cloudTint,sunTint,skyTint,...weatherData};
+  const alt=direction.y,day=smooth(-.11,.19,alt);
+  const twilight=1-smooth(.015,.30,Math.abs(alt+.015));
+  const golden=smooth(-.095,.035,alt)*(1-smooth(.085,.38,alt));
+  const blueHour=smooth(-.235,-.115,alt)*(1-smooth(-.065,.055,alt));
+  const zenith=color('#12213c').lerp(color('#337bb3'),day)
+    .lerp(color('#536baa'),golden*.64).lerp(color('#344e91'),blueHour*.84);
+  const horizon=color('#323f56').lerp(color('#d9e7ed'),day)
+    .lerp(color('#d8ac9b'),golden*.65).lerp(color('#8193ba'),blueHour*.91);
+  const cloudTint=color('#28354a').lerp(color(weather==='rain'?'#929faf':'#e2e9ee'),day)
+    .lerp(color('#dba9a0'),golden*.56).lerp(color('#737d9d'),blueHour*.75);
+  zenith.lerp(cloudTint,cover*.61);
+  horizon.lerp(cloudTint,cover*.65);
+  const sunTint=color('#ff985c').lerp(color('#fff1d9'),smooth(.025,.48,alt))
+    .lerp(color('#ecf1fa'),cover*.45);
+  const skyTint=color('#8ba4cc').lerp(color('#e3eeff'),day)
+    .lerp(color('#b4c4e4'),golden*.66).lerp(color('#a6b9ed'),blueHour*.85);
+  const groundTint=color('#646b81').lerp(color('#b3a28f'),day)
+    .lerp(color('#c49c84'),golden*.62).lerp(color('#696b88'),blueHour*.70);
+  return {direction,day,twilight,golden,blueHour,zenith,horizon,cloudTint,sunTint,skyTint,groundTint,...weatherData};
 }
+
+// Project the view ray through curved cloud layers. The bottom layer has pooled
+// cumulus and the upper layer has long, thinner filaments. Stars use this same field.
+export const cloudField=`
+  float skyHash(vec2 p){
+    vec3 q=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973));
+    q+=dot(q,q.yzx+33.33);
+    return fract((q.x+q.y)*q.z);
+  }
+  float skyNoise(vec2 p){
+    vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+    return mix(mix(skyHash(i),skyHash(i+vec2(1,0)),f.x),
+               mix(skyHash(i+vec2(0,1)),skyHash(i+1.),f.x),f.y);
+  }
+  float cloudShape(vec2 p){
+    mat2 turn=mat2(.81,-.59,.59,.81);
+    float a=.52*skyNoise(p);
+    p=turn*p*2.03+17.5;a+=.26*skyNoise(p);
+    p=turn*p*2.07+8.1;a+=.14*skyNoise(p);
+    p=turn*p*2.11+25.7;return a+.08*skyNoise(p);
+  }
+  vec2 skyCloudLayers(vec3 d,float cover){
+    float up=max(0.,d.y);
+    vec2 p=d.xz*(3.6/(up+sqrt(up*up+.032)))+vec2(17.6,9.8);
+    float shape=cloudShape(p);
+    float bank=smoothstep(.735-.50*cover,.895-.47*cover,shape);
+    vec2 wisps=mat2(.36,-.93,.93,.36)*p;
+    wisps*=vec2(.69,2.3);
+    float veil=.64*skyNoise(wisps)+.36*skyNoise(wisps*2.7+shape*1.8);
+    float cirrus=smoothstep(.51-.12*cover,.83-.10*cover,veil);
+    return vec2(bank,cirrus)*smoothstep(-.03,.065,d.y);
+  }
+  float cloudTransmission(vec3 d,float cover){
+    vec2 layer=skyCloudLayers(d,cover);
+    return (1.-layer.x*.96)*(1.-layer.y*.35);
+  }
+`;
 
 export function createSky(scene) {
   const uniforms={
-    sunDirection:{value:new THREE.Vector3()},
-    zenith:{value:new THREE.Color()},horizon:{value:new THREE.Color()},cloudTint:{value:new THREE.Color()},
-    cloudCover:{value:0},day:{value:1},twilight:{value:0}
+    sunDirection:{value:new THREE.Vector3()},zenith:{value:new THREE.Color()},horizon:{value:new THREE.Color()},
+    cloudTint:{value:new THREE.Color()},sunTint:{value:new THREE.Color()},
+    cloudCover:{value:0},day:{value:1},golden:{value:0},blueHour:{value:0}
   };
   const sky=new THREE.Mesh(new THREE.SphereGeometry(400,32,16),new THREE.ShaderMaterial({
     uniforms,side:THREE.BackSide,depthWrite:false,fog:false,
     vertexShader:'varying vec3 direction;void main(){direction=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader:`varying vec3 direction;
-      uniform vec3 sunDirection,zenith,horizon,cloudTint;
-      uniform float cloudCover,day,twilight;
-      float hash(vec2 p) {return fract(sin(dot(p,vec2(127.1,311.7)))*4375.611);}
-      float noise(vec2 p) {
-        vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f);
-        return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y);
-      }
+      uniform vec3 sunDirection,zenith,horizon,cloudTint,sunTint;
+      uniform float cloudCover,day,golden,blueHour;
+      ${cloudField}
       void main(){
         vec3 d=normalize(direction);
-        float up=max(0.,d.y);
-        vec3 color=mix(horizon,zenith,pow(up,.5));
-        float sunDot=max(dot(d,sunDirection),0.);
+        float up=max(0.,d.y),sunDot=max(dot(d,sunDirection),0.);
         float moonDot=max(dot(d,-sunDirection),0.);
-        color+=vec3(1.,.40,.14)*twilight*pow(sunDot,5.)*.67;
-        color+=vec3(1.,.82,.59)*day*(pow(sunDot,28.)*.38+smoothstep(.99985,.99998,sunDot)*3.8);
-        color+=vec3(.68,.75,.86)*(1.-day)*(pow(moonDot,110.)*.07+smoothstep(.99975,.99993,moonDot)*1.6);
-        vec2 p=d.xz/(up+.23)*2.8;
-        float n=.57*noise(p)+.29*noise(p*2.09+17.)+.14*noise(p*4.1+31.);
-        float cloud=smoothstep(.77-.53*cloudCover,.97-.45*cloudCover,n);
-        color=mix(color,cloudTint*(.73+.53*n),cloud*mix(.55,.96,cloudCover)*smoothstep(-.06,.13,d.y));
+        float clearFraction=1.-.83*cloudCover;
+        float lowAir=exp(-5.1*up);
+        vec3 color=mix(horizon,zenith,1.-exp(-2.75*up));
+        float towardsSun=smoothstep(-.28,.97,dot(d,sunDirection));
+        color+=clearFraction*lowAir*(golden*(.12+.88*towardsSun)*vec3(.88,.29,.057)
+                                  +blueHour*towardsSun*vec3(.31,.094,.043));
+        color+=clearFraction*(day+blueHour*.24)*sunTint*
+               (pow(sunDot,11.)*.17+pow(sunDot,85.)*.24+pow(sunDot,650.)*.31);
+        vec2 layers=skyCloudLayers(d,cloudCover);
+        float silver=pow(sunDot,9.)*(1.-layers.x)*(.6+.4*up);
+        vec3 silverColor=mix(vec3(.92,1.,1.03),vec3(1.67,.75,.36),golden);
+        vec3 cloudLight=cloudTint*(.71+.25*(1.-layers.x)+.10*up)
+                     +silverColor*silver*day*clearFraction*.68;
+        color=mix(color,cloudTint*(.98+.26*towardsSun),layers.y*(.20+.21*cloudCover));
+        color=mix(color,cloudLight,layers.x*(.88+.09*cloudCover));
+        float transmission=(1.-layers.x*.985)*(1.-layers.y*.45);
+        float disc=smoothstep(.999972,.999994,sunDot);
+        color+=transmission*clearFraction*smoothstep(-.025,.035,sunDirection.y)*sunTint*disc*5.5;
+        color+=transmission*(1.-day)*vec3(.65,.75,.94)*
+               (pow(moonDot,115.)*.064+smoothstep(.99990,.99997,moonDot)*1.45);
         gl_FragColor=vec4(color,1.);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -71,10 +120,10 @@ export function createSky(scene) {
     place(eye,visible){sky.visible=visible;if(visible)sky.position.copy(eye);},
     set(a){
       uniforms.sunDirection.value.copy(a.direction);
-      for(const key of ['zenith','horizon','cloudTint'])uniforms[key].value.copy(a[key]);
+      for(const key of ['zenith','horizon','cloudTint','sunTint'])uniforms[key].value.copy(a[key]);
       uniforms.cloudCover.value=a.clouds;
-      uniforms.day.value=a.day;
-      uniforms.twilight.value=a.twilight;
-    }
+      for(const key of ['day','golden','blueHour'])uniforms[key].value=a[key];
+    },
+    dispose(){sky.removeFromParent();sky.geometry.dispose();sky.material.dispose();}
   };
 }

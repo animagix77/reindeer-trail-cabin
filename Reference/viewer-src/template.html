@@ -24,22 +24,8 @@ header,#views,.dock{z-index:2}
 @media(max-width:2220px){#views button[data-view]{display:none}.view-picker{display:flex}#views{border-radius:20px}}
 @media (max-width:790px) and (min-height:471px){#views{top:94px;left:clamp(18px,4.5vw,70px)}}
 
-#views{z-index:4;max-width:calc(100vw - 32px)}
-#scene-toggle{color:#244734;background:#eef3ed}
-#scene-toggle[aria-expanded=true],#scene-toggle:hover{background:#d9e7da}
-#scene-panel{position:absolute;top:calc(100% + 8px);right:0;width:min(292px,calc(100vw - 36px));box-sizing:border-box;
-  padding:16px 18px 9px;border:1px solid #bdc9c0;border-radius:17px;background:#fdfefd;color:#203d30;
-  box-shadow:0 8px 28px #152a2338;font-size:.9rem;text-align:left;max-height:calc(100dvh - 130px);overflow:auto;overscroll-behavior:contain}
-.time-setting{display:grid;grid-template-columns:1fr auto;align-items:center;row-gap:5px;margin-bottom:6px}
-#scene-clock{font-variant-numeric:tabular-nums;color:#42624f}
-#scene-hour{grid-column:1/-1;width:100%;margin:0;min-height:30px;accent-color:#396448;cursor:pointer}
-.scene-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #e2e9e2;min-height:46px}
-#scene-panel :is(select,button){font:inherit;font-weight:600;font-size:.84rem;min-height:33px;background:#edf3ed;color:#254932;border:0;border-radius:10px;padding:5px 10px;cursor:pointer}
-#scene-panel button[aria-checked=true]{background:#305749;color:white}
-#nearby-fire{color:#773b18;background:#f6e8d9}
-@media(max-width:790px) and (min-height:471px){#scene-panel{left:0;right:auto;max-height:calc(100dvh - 155px)}}
 @media(max-width:350px){.view-picker{gap:.2rem;padding-left:.2rem}.view-picker select{max-width:47vw}}
-@media(max-height:470px){#scene-panel{max-height:calc(100dvh - 76px)}}
+
 
 #activity{position:absolute;z-index:3;bottom:100px;right:clamp(14px,4vw,65px);width:min(310px,calc(100vw - 28px));padding:13px 15px;background:#fafcf9f5;color:#253c34;border:1px solid #c3cbc2;border-radius:16px;box-shadow:0 4px 22px #101b1833;max-height:calc(100dvh - 180px);overflow:auto}
 .activity-title,.activity-actions,.activity-choice{display:flex;align-items:center;justify-content:space-between;gap:5px}
@@ -80,7 +66,7 @@ header,#views,.dock{z-index:2}
 .map-key{display:inline-block;width:18px;vertical-align:middle;margin-right:5px;border-top:3px solid #ae7a16}.map-key.footprint{border-color:#717c73;border-top-style:dashed}.map-key.road{border-color:#217895;border-top-style:dashed}
 #map-credit{border-top:1px solid #d9e0d5;margin:14px 0 0;padding-top:12px;font-size:.72rem;line-height:1.5;color:#54675b}
 @media(max-width:610px){#property-map{width:calc(100vw - 20px);max-height:calc(100dvh - 18px);padding:14px;border-radius:15px}.map-layout{display:flex;flex-direction:column;gap:10px}.map-figure,.map-options{width:100%}.map-figure{order:1}.map-options{display:contents}.map-imagery{order:0}.map-imagery legend{position:absolute;clip-path:inset(100%);width:1px;height:1px;overflow:hidden}.map-imagery label{flex:0 0 90px}.map-heading{margin-bottom:9px}#property-map .map-layers{order:2;margin:2px 0 0;width:100%}.map-layers label{min-height:32px;padding:5px 0}.map-layers small{display:inline;margin-left:6px}#map-credit{order:3;margin:0;padding-top:7px;width:100%}}
-@media(max-width:425px){.view-picker select{max-width:39vw}.view-picker{gap:.26rem;padding-left:.3rem}#map-toggle,#scene-toggle{padding:7px 9px}}
+@media(max-width:425px){.view-picker select{max-width:39vw}.view-picker{gap:.26rem;padding-left:.3rem}#map-toggle{padding:7px 9px}}
 @media(min-width:611px) and (max-height:600px){#property-map{width:min(690px,calc(100vw - 26px));max-height:calc(100dvh - 12px);padding:12px 16px}.map-layout{grid-template-columns:minmax(0,min(60vh,440px)) minmax(185px,1fr)}.map-heading{margin-bottom:7px}}
 #welcome{width:min(1030px,calc(100vw - 48px));max-width:100vw;max-height:calc(100dvh - 40px);padding:0;margin:auto;overflow:auto;overscroll-behavior:contain;color:#29372d;background:#f7f2e7;border:1px solid #eeeadd;border-radius:12px;box-shadow:0 25px 90px #0b1a1266}
 #welcome::backdrop{background:#16251ce6}
@@ -92,31 +78,227 @@ header,#views,.dock{z-index:2}
 #welcome-start{margin-top:10px;background:#29472f;color:#fffdf3;padding:12px 19px;border-radius:7px;display:inline-flex;gap:20px;align-items:center;min-height:45px}
 #welcome-start:hover{background:#173621}#welcome-start span+span{font-size:1.15rem;line-height:1}
 #welcome-close{position:absolute;right:12px;top:12px;width:35px;height:35px;min-width:35px;min-height:35px;display:grid;place-content:center;line-height:1;padding:0;border-radius:50%;background:#f6f3e8ee;color:#293e2d;font-size:1.4rem}
-#welcome button:focus-visible{outline:3px solid #9a672d;outline-offset:3px}#scene-panel .welcome-revisit{border-top:1px solid #d5ded3;display:flex;justify-content:flex-start;padding-top:5px}
-#scene-panel #welcome-again{background:none;padding-left:0;text-decoration:underline;text-underline-offset:.2em;font-weight:550;color:#365441}
+#welcome button:focus-visible{outline:3px solid #9a672d;outline-offset:3px}
+
 @media(max-width:680px){#welcome{width:min(475px,calc(100vw - 18px));max-height:calc(100dvh - 18px)}.welcome-layout{display:flex;flex-direction:column}.welcome-photo{order:-1;position:static;width:100%;height:clamp(100px,24dvh,195px);min-height:0;object-position:50% 75%}.welcome-copy{padding:19px 22px 22px;font-size:.93rem;line-height:1.45}.welcome-copy .welcome-location{margin-bottom:7px;font-size:.72rem}#welcome-title{font-size:clamp(2.45rem,10vw,3.35rem);margin-bottom:14px}.welcome-copy p{margin-bottom:10px}#welcome-start{margin-top:4px}}
 @media(min-width:681px) and (max-height:490px){#welcome{max-height:calc(100dvh - 10px)}.welcome-copy{padding:20px 26px;font-size:.88rem;line-height:1.38}.welcome-copy .welcome-location{margin-bottom:7px}#welcome-title{font-size:3rem;margin-bottom:12px}#welcome-start{margin-top:0}}
-#party{width:min(405px,calc(100vw - 24px));max-height:calc(100dvh - 30px);padding:24px;border:1px solid #b9c9b9;color:#243c30;background:#f8faf5;border-radius:18px;box-shadow:0 14px 85px #12231955}#party::backdrop{background:#14261e72}#party h2{font:400 2.15rem/1.12 "Baskervville",Georgia,serif;letter-spacing:-.04em;margin:0 0 14px}#party-close{position:absolute;right:12px;top:10px;font-size:1.5rem}#party p{font-size:.9rem;line-height:1.5}#party label{display:block;font-size:.83rem;font-weight:650;margin:12px 0 4px}#party input{width:100%;min-width:0;font:inherit;background:white;color:#233a30;border:1px solid #b7c7b9;padding:9px 12px;border-radius:8px}#party .pair{display:flex;gap:6px;align-items:center}#party button.action{background:#345842;color:#fff;border-radius:9px;white-space:nowrap}#party-people{display:flex;flex-wrap:wrap;gap:4px}#party-people :is(span,button){min-height:28px;font-size:.78rem;padding:4px 8px;color:#365940;background:#e6ede2;border-radius:20px}#party-log{margin-top:12px;max-height:min(25vh,170px);overflow:auto;overflow-wrap:anywhere}#party-log p{margin:3px 0}#party-status{color:#47614c;margin:10px 0 0}#party-status:empty{display:none}#party-leave{display:block;margin:8px 0 -6px auto;font-size:.8rem;color:#614b42}#party-toggle{background:#edf3eb}
+#party{width:min(425px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:clamp(15px,4.8vw,24px);overflow:auto;overscroll-behavior:contain;border:1px solid #b9c9b9;color:#243c30;background:#f8faf5;border-radius:18px;box-shadow:0 14px 85px #12231955}
+#party::backdrop{background:#14261e72}#party h2{font:400 clamp(1.7rem,5vw,2.15rem)/1.12 "Baskervville",Georgia,serif;letter-spacing:-.04em;margin:0 30px 12px 0}
+#party-close{position:absolute;right:12px;top:10px;min-width:36px;min-height:36px;padding:0;font-size:1.5rem}
+#party p{font-size:.9rem;line-height:1.45}#party-note{margin:0 0 14px}#party-status{margin:12px 0 0}#party-status:empty{display:none}
+#party label,#party legend{display:block;font-size:.85rem;font-weight:650;padding:0;margin:10px 0 5px}
+#party input:not([type=radio]){display:block;width:100%;min-width:0;max-width:100%;font:inherit;color:#233a30;background:white;border:1px solid #a8b9aa;padding:10px 12px;border-radius:8px}
+#party .pair{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:stretch}
+#party button.action{background:#345842;color:white;border-radius:9px;white-space:nowrap}#party-start{width:100%;margin-top:14px}
+#party fieldset{padding:0;border:0;margin:8px 0 0;min-width:0}.party-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+#party .party-choice{position:relative;display:flex;align-items:center;gap:8px;padding:6px 9px;margin:0;border:1px solid #bdcaba;border-radius:10px;background:#fff;cursor:pointer}
+#party .party-choice:has(:checked){background:#e6eee4;border-color:#42664c;box-shadow:inset 0 0 0 1px #42664c}
+#party .party-choice:focus-within{outline:2px solid #3d624a;outline-offset:2px}.party-choice input{accent-color:#355b43;width:16px;height:16px;flex:none;margin:0}
+.party-choice img{width:clamp(29px,7vw,42px);height:44px;object-fit:contain;align-self:end}
+#party-people{display:grid;gap:5px}.party-person{display:flex;gap:5px;align-items:center;min-width:0}
+.party-person>span,.party-person>button{min-width:0;min-height:29px;font-size:.8rem;line-height:1.35;padding:5px 8px;text-align:left;overflow-wrap:anywhere;color:#365940;border-radius:7px;background:#e9eee5}
+.party-person>.place{margin-left:auto;background:transparent;color:#385846;text-decoration:underline;white-space:nowrap}
+#party-log{max-height:150px;overflow:auto;overscroll-behavior:contain;margin:12px 0 5px;padding:2px 3px}
+#party-log:empty{display:none}#party-log p{margin:3px 0;overflow-wrap:anywhere}#party-solo,#party-leave{margin:8px 0 0;padding:6px 0;background:transparent;text-decoration:underline}
+#party [hidden]{display:none}#party input:focus-visible,#party button:focus-visible{outline:2px solid #3d624a;outline-offset:2px}
+@media(max-width:350px){#party .party-choice{padding:4px;gap:4px}.party-choice img{width:26px}}
 @media(max-width:460px){.view-picker select{max-width:33vw}.view-picker{gap:2px;padding-left:4px}#views{max-width:calc(100vw - 16px);left:8px}#views>button{font-size:.8rem;padding:4px 7px}}
-</style></head><body><main><canvas id="view" class="view" tabindex="0" aria-label="Interactive model. Drag or use arrow keys to orbit. Use plus and minus to zoom. Home resets the view."></canvas><header><h1>The Reindeer Trail</h1><p>Smallwood, NY · Property model</p></header><nav aria-label="Choose a viewpoint" id="views" hidden><button data-view="property" aria-pressed="true">Property</button><button data-view="outside" aria-pressed="false">Driveway</button><button data-view="path" aria-pressed="false">Front path</button><button data-view="entry" aria-pressed="false">Front entry</button><button data-view="porch" aria-pressed="false">Covered porch</button><button data-view="grill" aria-pressed="false">Deck barbecue</button><button data-view="cook" aria-pressed="false">Cook at the grill</button><button data-view="yard" aria-pressed="false">Fire pit</button><button data-view="stars" aria-pressed="false">Stargazing</button><button data-view="deer" aria-pressed="false">Backyard deer</button><button data-view="hall" aria-pressed="false">Front hall</button><button data-view="frontbed" aria-pressed="false">Front bedroom</button><button data-view="master" aria-pressed="false">Master &amp; bath</button><button data-view="bath" aria-pressed="false">Bathroom</button><button data-view="primary" aria-pressed="false">Master bedroom</button><button data-view="vault" aria-pressed="false">Kitchen vault</button><button data-view="kitchen" aria-pressed="false">Kitchen</button><button data-view="kitchenwork" aria-pressed="false">Island worktop</button><button data-view="living" aria-pressed="false">Living room</button><button data-view="hearth" aria-pressed="false">Propane furnace</button><button data-view="bunk" aria-pressed="false">Bunk room</button><button data-view="loft" aria-pressed="false">Loft</button><button data-view="tree" aria-pressed="false">Christmas tree</button><label class="view-picker">View <select id="location" aria-label="Tour location"></select></label>
+header #welcome-again{pointer-events:auto;color:inherit;font:inherit;line-height:1.2;min-width:0;min-height:0;padding:2px;background:none;border:0;border-radius:2px;text-decoration:underline;text-decoration-color:currentColor;text-underline-offset:3px;text-shadow:inherit}
+#tour-controls{position:absolute;z-index:4;top:clamp(16px,3vw,42px);right:clamp(16px,3vw,46px);display:grid;gap:5px;justify-items:end;pointer-events:none}
+#tour-controls>*{pointer-events:auto}
+#tour-controls #views{position:static;max-width:100%;padding:4px;flex-wrap:nowrap;border-radius:14px}
+#tour-controls #views button[data-view]{display:none}
+#tour-controls .view-picker{display:flex}
+#scene-panel{display:grid;width:366px;min-width:0;max-width:100%;padding:6px 8px;gap:4px;color:#203c2c;background:#fcfcf7f5;border:1px solid #bdcabc;border-radius:13px;box-shadow:0 5px 20px #1c33231b;font-size:.77rem}
+.environment{display:grid;grid-template-columns:1.45fr 1fr;align-items:center;gap:15px;padding:0 3px}
+.time-setting{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:5px}
+#scene-panel label{font-size:.72rem;color:#485e4f}
+#scene-clock{color:#2a4533;font-weight:650;font-variant-numeric:tabular-nums}
+#scene-hour{display:block;grid-column:1/-1;width:100%;min-width:0;height:18px;margin:0;accent-color:#43684a;cursor:pointer}
+.weather-setting{display:flex;align-items:center;gap:5px}
+#scene-weather{min-width:0;flex:1;border:1px solid #d1dccf;border-radius:7px;padding:4px 2px 4px 5px;font:inherit;font-weight:600;background:#eef2ea;color:#284430;cursor:pointer}
+.scene-actions{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1.12fr) minmax(0,.92fr) minmax(0,.87fr) minmax(0,.9fr);gap:3px}
+#scene-panel button{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:30px;border:1px solid #d3ddcf;border-radius:7px;background:#f1f4ec;padding:3px 4px;color:#294030;font-size:.75rem;line-height:1.15}
+#scene-panel button:hover,#scene-weather:hover{background:#e4ebde}
+#scene-panel button[aria-checked=true],#scene-panel button[aria-current=location]{border-color:#8aa28c;background:#e0eadc}
+#scene-panel button[data-state=ready]{background:#eef2e7;border-color:#c5d2ba}
+#scene-panel button span{font-size:.63rem;font-weight:700}
+#scene-panel button[aria-pressed=true]{background:#f4e4cd;border-color:#bd9569;color:#623716}
+#scene-panel :is(select,input,button):focus-visible{outline:2px solid #375e3d;outline-offset:1px}
+@media(max-width:790px) and (min-height:471px){
+  header,.inside header{top:12px;left:14px}
+  header h1,.inside header h1{font-size:clamp(1.65rem,5vw,2.1rem)}
+  header p,.inside header p{margin:1px 0 0;font-size:.76rem}
+  #tour-controls{grid-template-columns:minmax(0,1fr);top:70px;left:10px;right:auto;width:min(352px,calc(100vw - 20px));justify-items:start;gap:4px}
+  #tour-controls #views :is(select,button){min-height:32px}
+  #tour-controls .view-picker select{max-width:42vw}
+}
+@media(max-width:460px){
+  #tour-controls #views{padding:2px 3px}
+  #tour-controls{top:65px}
+  #scene-panel{padding:5px 6px;gap:2px}
+  #scene-panel button{min-height:30px}
+}
+@media(max-height:470px) and (min-width:600px){
+  header,.inside header{top:5px;left:13px}header h1,.inside header h1{font-size:1.65rem}
+  header p,.inside header p{font-size:.69rem;margin:0}
+  #tour-controls{inset:5px 9px auto auto;gap:3px}
+  #tour-controls #views :is(button,select){min-height:28px;padding-top:1px;padding-bottom:1px}
+  #scene-panel{width:min(595px,calc(100vw - 18px));grid-template-columns:1fr 1.12fr;align-items:center;gap:9px;padding:4px 6px}
+  .environment{gap:8px}
+  #activity{bottom:62px;top:auto;max-height:calc(100dvh - 150px);overflow:auto}
+}
+
+#feeding .deer-guide{font-size:.78rem;line-height:1.35;margin:3px 0 8px;color:#405b49}
+#produce{display:flex;gap:3px;min-width:0;border:0;margin:0;padding:0}
+#produce legend{font-size:.72rem;color:#405b49;margin-bottom:3px;padding:0}
+#produce label{position:relative;min-width:0;flex:auto;cursor:pointer}
+#produce input{position:absolute;opacity:0;pointer-events:none}
+#produce label span{display:flex;justify-content:center;align-items:center;gap:3px;min-height:30px;border:1px solid #ccd8c8;border-radius:6px;background:#f2f5ec;color:#324b36;font-size:.76rem;font-weight:560}
+#produce b{font-size:.67rem;font-variant-numeric:tabular-nums}
+#produce input:checked+span{background:#e1eadc;border-color:#7c997d;color:#24452c}
+#produce input:focus-visible+span{outline:2px solid #365c3d;outline-offset:1px}
+#feeding .activity-actions{margin-top:5px}
+#activity #deer-message{font-size:.73rem;line-height:1.3;margin:5px 0 0}
+#scene-deer[aria-expanded=true]{box-shadow:inset 0 -2px #76916b}
+@media(max-width:790px){
+  .dock nav{padding:3px;gap:2px}
+  .dock nav button{min-height:33px;min-width:29px;font-size:.76rem;padding:4px 7px}
+  .dock nav .zoom{font-size:1.06rem}
+  .dock .hint{font-size:.7rem}
+}
+@media(max-width:350px){
+  #scene-panel button{font-size:.68rem;gap:2px;padding:3px 1px}
+  #scene-panel button span{font-size:.59rem}
+  .environment{grid-template-columns:minmax(0,1.32fr) minmax(0,1fr);gap:9px}
+  #activity{max-height:calc(100dvh - 245px);overflow:auto}
+  #produce label span{font-size:.66rem}
+}
+@media(max-height:470px) and (min-width:600px){#scene-panel{width:min(680px,calc(100vw - 18px));grid-template-columns:.86fr 1.14fr}}
+@media(max-width:520px){
+  main:has(#activity:not([hidden]) #feeding:not([hidden])) #activity{left:8px;right:8px;bottom:max(54px,env(safe-area-inset-bottom));width:auto;max-height:42dvh;padding:7px 10px}
+  main:has(#activity:not([hidden]) #feeding:not([hidden])) #stick{bottom:224px;left:8px;width:60px;height:60px}
+  main:has(#activity:not([hidden])) .dock .hint{display:none}
+  #feeding .deer-guide{font-size:.74rem;margin:1px 0 4px}
+  #produce legend{position:absolute;width:1px;height:1px;padding:0;clip-path:inset(50%);overflow:hidden}
+  #feeding .activity-actions{margin-top:4px}
+}
+
+/* In walking views, keep the controls legible against both snow and firelight. */
+.inside main{--hud:#17231fe8;--hud-line:#d6dec447;--ink:#faf6e9;--sub:#d2d6c9;--amber:#f1c987;color-scheme:dark}
+.inside :is(#tour-controls #views,#scene-panel,.dock nav,#activity){
+  background:linear-gradient(125deg,#24332ceF,var(--hud));border-color:var(--hud-line);
+  color:var(--ink);box-shadow:0 4px 18px #0d171d38,inset 0 1px #faf8e30d
+}
+.inside #tour-controls #views,.inside #scene-panel,.inside #activity{border-radius:10px}
+.inside :is(.view-picker,#scene-panel label,#produce legend,#feeding .deer-guide){color:var(--sub)}
+.inside :is(#scene-clock,#scene-panel button span){color:var(--amber)}
+.inside #scene-hour{accent-color:var(--amber)}
+.inside #scene-panel button,.inside #scene-weather,.inside #tour-controls select,.inside #activity select,
+.inside #activity button,.inside #produce label span{
+  color:var(--ink);background:#f4f7e80b;border-color:#d2ddc731
+}
+.inside :is(#scene-weather,#location,#activity select) option{background:#23332b;color:#faf6e9}
+.inside #tour-controls #views button,.inside .dock nav button{color:var(--ink);background:transparent}
+.inside #scene-panel :is(button,select):hover,.inside #activity button:hover,.inside #tour-controls #views button:hover,
+.inside .dock nav button:hover{background:#f4f7e826}
+.inside #scene-panel :is(button[aria-checked=true],button[aria-current=location],button[aria-pressed=true]),
+.inside #produce input:checked+span{background:#d7b98122;border-color:#e7c89175;color:#fff0d4}
+.inside #scene-panel button[data-state=ready]{background:#f4f7e80b;border-color:#d2ddc731}
+.inside #activity .primary{background:#e9c99a;color:#243127}
+.inside main :is(#scene-panel,#tour-controls,#activity,.dock) :is(input,select,button):focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.inside :is(dialog,#welcome,#property-map,#party){color-scheme:light}
+@media(forced-colors:active){.inside #scene-panel,.inside #activity,.inside #views,.inside .dock nav{background:Canvas;color:CanvasText}}
+
+#firewood-hud{position:absolute;z-index:3;right:clamp(12px,4vw,64px);bottom:max(88px,calc(env(safe-area-inset-bottom) + 76px));width:min(293px,calc(100vw - 22px));padding:10px 12px;border:1px solid var(--hud-line,#758779);border-radius:10px;background:linear-gradient(125deg,#25362ff5,#17231ff2);color:#faf6e9;box-shadow:0 4px 18px #0d171d40}
+#firewood-title{margin:0;font:500 1.14rem/1.14 "Baskervville","Iowan Old Style",Georgia,serif}
+#firewood-guide{margin:3px 0 0;color:#d9ddd3;font-size:.76rem;line-height:1.28}
+.firewood-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:6px}
+#firewood-hud :is(select,button){min-width:0;min-height:34px;border:1px solid #ffffff38;border-radius:7px;padding:5px 8px;font:inherit;font-size:.79rem;font-weight:550;line-height:1.1;color:#faf6e9;background:#ffffff0c}
+#firewood-hud #firewood-action{background:#e9c99a;color:#243127;font-weight:650}
+#firewood-hud #firewood-action:disabled{background:#ffffff0c;color:#c3c7bd;cursor:default}
+#firewood-hud option{background:#23332b;color:#faf6e9}
+#firewood-hud :is(button,select):focus-visible{outline:2px solid #efca8b;outline-offset:2px}
+#firewood-key{margin-left:5px;padding:1px 4px;border:1px solid currentColor;border-radius:3px;font:600 .64rem/1 system-ui}
+main:has(#activity:not([hidden])) #firewood-hud{display:none}
+@media(pointer:coarse){#firewood-key{display:none}#firewood-hud :is(select,button){min-height:40px}}
+@media(max-width:700px){#firewood-hud{right:9px;bottom:max(70px,calc(env(safe-area-inset-bottom) + 59px));width:min(270px,calc(100vw - 123px));padding:8px 9px}
+  main:has(#firewood-hud:not([hidden])) .dock .hint{display:none}}
+@media(min-width:701px) and (pointer:fine){#firewood-hud{left:clamp(12px,4vw,64px);right:auto}}
+@media(max-width:700px) and (min-height:471px){#firewood-hud[data-carrying]{top:198px;bottom:auto}}
+@media(max-height:470px){#firewood-hud{right:9px;bottom:max(47px,calc(env(safe-area-inset-bottom) + 38px));max-height:calc(100dvh - 157px);overflow:auto;padding:7px 9px}}
+#woodwork{position:absolute;z-index:4;bottom:max(82px,env(safe-area-inset-bottom));right:clamp(12px,4vw,65px);width:min(260px,calc(100vw - 24px));box-sizing:border-box;padding:12px 14px;border:1px solid #b8bc9d66;border-radius:10px;background:#18231fee;color:#f6f5e9;box-shadow:0 5px 22px #0005;max-height:48dvh;overflow:auto}
+#woodwork h2{font-size:1.02rem;margin:0;color:#fff}#woodwork .wood-heading{display:flex;align-items:center;justify-content:space-between}
+#woodwork :is(button,select){font:inherit;color:inherit;border-radius:6px;background:#324239;border:1px solid #9ba99570;min-height:34px;padding:3px 8px;font-size:.82rem}
+#woodwork #split-close{line-height:1;font-size:1.2rem;border:0;background:transparent;min-width:35px}
+#woodwork #split-action{background:#edcf96;color:#332a17;font-weight:700}#woodwork button:disabled{opacity:.54}
+#woodwork :is(button,select):focus-visible{outline:2px solid #edcf96;outline-offset:2px}
+#split-stats,.wood-actions,.wood-mode{display:flex;align-items:center;gap:6px;justify-content:space-between}
+#split-score,.wood-mode{font-size:.76rem;color:#e1e1cd}.wood-actions{justify-content:flex-start;flex-wrap:wrap}
+#split-stats{margin:7px 0}#woodwork #split-reset{white-space:nowrap;background:none;border:0;text-decoration:underline;color:#e2d4b8;font-size:.75rem}
+#split-message{font-size:.8rem;margin:.45rem 0;line-height:1.3}
+#split-meter{position:relative;height:12px;margin:12px 6px;border-radius:6px;background:linear-gradient(to right,#718076 34%,#e6bc74 34%,#e6bc74 46%,#f5dca4 46%,#f5dca4 54%,#e6bc74 54%,#e6bc74 66%,#718076 66%);}
+#split-needle{position:absolute;top:-4px;bottom:-4px;left:0;width:3px;background:white;outline:1px solid #273328;border-radius:1px;transform:translateX(-50%)}
+main:has(#woodwork:not([hidden])) #firewood-hud{display:none}
+@media(max-width:700px){
+  #woodwork:not([hidden]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 8px;left:7px;right:7px;bottom:max(53px,env(safe-area-inset-bottom));width:auto;padding:7px 10px;max-height:36dvh}
+  #woodwork .wood-heading{grid-column:1/-1}#woodwork .wood-heading button{min-height:26px}
+  #woodwork .wood-mode{justify-content:flex-start}#woodwork #split-stats{margin:0;gap:3px}
+  #woodwork :is(#split-meter,.wood-actions,#split-message){grid-column:1/-1}
+  #woodwork #split-meter{margin:7px 4px}#woodwork #split-message{margin:1px 0}
+  #woodwork #split-reset{padding:3px 1px;flex-shrink:0}#woodwork select{min-width:0;width:0;flex:1;max-width:139px}
+  main:has(#woodwork:not([hidden])) #hint{visibility:hidden}
+}
+@media(max-height:480px){#woodwork{bottom:52px;max-height:57dvh}}
+</style></head><body><main><canvas id="view" class="view" tabindex="0" aria-label="Interactive model. Drag or use arrow keys to orbit. Use plus and minus to zoom. Home resets the view."></canvas><header><h1>The Reindeer Trail</h1><p>Smallwood, NY · <button type="button" id="welcome-again" aria-haspopup="dialog" aria-controls="welcome">About the cabin</button></p></header><div id="tour-controls" hidden><nav aria-label="Choose a viewpoint" id="views" hidden><button data-view="property" aria-pressed="true">Property</button><button data-view="outside" aria-pressed="false">Driveway</button><button data-view="splitting" aria-pressed="false">Wood splitting</button><button data-view="path" aria-pressed="false">Front path</button><button data-view="entry" aria-pressed="false">Front entry</button><button data-view="porch" aria-pressed="false">Covered porch</button><button data-view="grill" aria-pressed="false">Deck barbecue</button><button data-view="cook" aria-pressed="false">Cook at the grill</button><button data-view="wood" aria-pressed="false">Woodpile</button><button data-view="yard" aria-pressed="false">Fire pit</button><button data-view="stars" aria-pressed="false">Stargazing</button><button data-view="deer" aria-pressed="false">Deer meadow</button><button data-view="hall" aria-pressed="false">Front hall</button><button data-view="frontbed" aria-pressed="false">Front bedroom</button><button data-view="master" aria-pressed="false">Master &amp; bath</button><button data-view="bath" aria-pressed="false">Bathroom</button><button data-view="primary" aria-pressed="false">Master bedroom</button><button data-view="vault" aria-pressed="false">Kitchen vault</button><button data-view="kitchen" aria-pressed="false">Kitchen</button><button data-view="kitchenwork" aria-pressed="false">Island worktop</button><button data-view="living" aria-pressed="false">Living room</button><button data-view="hearth" aria-pressed="false">Propane furnace</button><button data-view="bunk" aria-pressed="false">Bunk room</button><button data-view="loft" aria-pressed="false">Loft</button><button data-view="tree" aria-pressed="false">Christmas tree</button><label class="view-picker">View <select id="location" aria-label="Tour location"></select></label>
 <button type="button" id="map-toggle" aria-haspopup="dialog" aria-controls="property-map" aria-expanded="false">Map</button>
 <button id="party-toggle" aria-haspopup="dialog" aria-controls="party">Friends</button>
-<button id="scene-toggle" aria-controls="scene-panel" aria-expanded="false">Scene</button>
-<section id="scene-panel" aria-label="Scene settings" hidden>
-  <div class="time-setting"><label for="scene-hour">Time of day</label><output id="scene-clock" for="scene-hour">2:00 PM</output>
-  <input id="scene-hour" type="range" min="0" max="23.75" step=".25" value="14" aria-valuetext="2:00 PM"></div>
-  <div class="scene-row"><label for="scene-weather">Weather</label><select id="scene-weather"><option value="clear">Clear</option><option value="cloudy">Overcast</option><option value="rain">Rain</option><option value="snow">Snow</option></select></div>
-  <div class="scene-row"><span>Backyard night sky</span><button id="scene-stars">Stargaze</button></div>
-  <div class="scene-row"><span id="sound-label">Woodland and fire sounds</span><button id="scene-sound" role="switch" aria-checked="false" aria-labelledby="sound-label">Off</button></div>
-  <div class="scene-row"><span id="furnace-label">Propane furnace</span><button id="scene-furnace" role="switch" aria-checked="true" aria-labelledby="furnace-label">On</button></div>
-  <div class="scene-row"><span>Outdoor fire pit</span><button id="scene-fire">Start fire</button></div>
-<div class="welcome-revisit"><button type="button" id="welcome-again" aria-haspopup="dialog" aria-controls="welcome">Cabin welcome</button></div>
-</section></nav><div class="status" id="status" role="status">Opening the property model…</div><div id="stick" role="group" aria-label="Movement pad" hidden><span id="nub"></span></div><section id="activity" hidden aria-labelledby="activity-title">
+</nav>
+<section id="scene-panel" aria-label="Scene settings">
+  <div class="environment">
+    <div class="time-setting">
+      <label for="scene-hour">Time of day</label><output id="scene-clock" for="scene-hour">4:15 PM</output>
+      <input id="scene-hour" type="range" min="0" max="23.75" step=".25" value="16.25" aria-valuetext="4:15 PM">
+    </div>
+    <div class="weather-setting"><label for="scene-weather">Weather</label><select id="scene-weather">
+      <option value="clear">Clear</option><option value="cloudy">Overcast</option><option value="rain">Rain</option><option value="snow">Snow</option>
+    </select></div>
+  </div>
+  <div class="scene-actions">
+    <button type="button" id="scene-furnace" role="switch" aria-label="Propane furnace" aria-checked="true">Furnace <span id="scene-furnace-status">On</span></button>
+    <button type="button" id="scene-sound" role="switch" aria-label="Tour sound" aria-describedby="scene-sound-status" aria-checked="true">Sound <span id="scene-sound-status">Ready</span></button>
+    <button type="button" id="scene-fire" aria-pressed="false">Light fire</button>
+    <button type="button" id="scene-stars" title="Look at the backyard night sky">Stargaze</button>
+    <button type="button" id="scene-deer" aria-controls="activity" aria-expanded="false" title="Visit Deer meadow and feed the herd">Feed deer</button>
+  </div>
+</section></div>
+<section id="woodwork" aria-labelledby="split-title" hidden>
+  <div class="wood-heading"><h2 id="split-title">Splitting block</h2><button type="button" id="split-close" aria-label="Close wood splitting">×</button></div>
+  <div class="wood-mode"><label for="split-mode">Swing</label><select id="split-mode"><option value="timed">Timed</option><option value="steady">Steady · no timer</option></select></div>
+  <div id="split-stats"><span id="split-score"></span><button type="button" id="split-reset">Reset score</button></div>
+  <div id="split-meter" aria-hidden="true" hidden><i id="split-needle"></i></div>
+  <div class="wood-actions"><button type="button" id="split-action">Set round</button><button type="button" id="split-collect" hidden>Carry a piece</button></div>
+  <p id="split-message" role="status"></p>
+</section>
+<aside id="firewood-hud" aria-labelledby="firewood-title" hidden>
+  <h2 id="firewood-title">Campfire wood</h2><p id="firewood-guide" role="status"></p>
+  <div class="firewood-actions"><select id="firewood-choice" aria-label="Wood within reach" hidden></select>
+    <button type="button" id="firewood-action"><span id="firewood-label"></span><kbd id="firewood-key" aria-hidden="true"></kbd></button>
+    <button type="button" id="firewood-back" hidden>Put back</button>
+  </div>
+</aside>
+<div class="status" id="status" role="status">Opening the property model…</div><div id="stick" role="group" aria-label="Movement pad" hidden><span id="nub"></span></div><section id="activity" hidden aria-labelledby="activity-title">
   <div class="activity-title"><h2 id="activity-title"></h2><button id="activity-close" aria-label="Close activity">×</button></div>
   <div id="cooking" hidden><div class="activity-choice"><label for="recipe">Food</label><select id="recipe"><option value="steak">Steak</option><option value="chicken">Chicken</option><option value="vegetables">Vegetable skewer</option></select><button id="burners">Light grill</button></div>
   <div class="activity-actions"><button id="add-food" class="primary">Add to grill</button><button id="flip-food">Flip</button><button id="serve-food">Serve</button></div><p id="grill-message" role="status"></p></div>
-  <div id="feeding" hidden><div class="activity-choice"><label for="produce">Basket</label><select id="produce"><option value="apple" data-label="Apples">Apples</option><option value="carrot" data-label="Carrots">Carrots</option><option value="vegetables" data-label="Vegetables">Vegetables</option></select><button id="refill-basket">Refill</button></div>
-  <div class="activity-actions"><button class="primary" id="hold-food">Hold out</button><button id="toss-food">Toss</button></div><p id="deer-message" role="status"></p></div></section><div class="dock" id="tools" hidden><p class="hint" id="hint">Drag to orbit · Scroll or pinch to zoom</p><nav aria-label="Model controls"><button id="roof" aria-pressed="true">Roof</button><button id="imagery" aria-pressed="true">Aerial</button><button id="canopy" aria-pressed="false">Tree canopy</button><button id="use-grill" aria-controls="activity" aria-expanded="false" hidden>Use grill</button><button id="feed-deer" aria-controls="activity" aria-expanded="false" hidden>Feed deer</button><button id="nearby-fire" hidden>Start fire</button><button id="yard-stars" hidden>Stargaze</button><button id="lock" hidden>Mouse look</button><button id="far" class="zoom" aria-label="Zoom out">−</button><button id="near" class="zoom" aria-label="Zoom in">+</button><button id="reset">Reset view</button></nav></div></main><dialog id="welcome" aria-labelledby="welcome-title">
+  <div id="feeding" hidden>
+    <p class="deer-guide">Hold out food and stand still. Give a curious deer time to come to your hand.</p>
+    <fieldset id="produce"><legend>Food basket</legend>
+      <label><input type="radio" name="deer-food" value="apple" checked><span>Apples <b></b></span></label>
+      <label><input type="radio" name="deer-food" value="carrot"><span>Carrots <b></b></span></label>
+      <label><input type="radio" name="deer-food" value="vegetables"><span>Vegetables <b></b></span></label>
+    </fieldset>
+    <div class="activity-actions"><button class="primary" id="hold-food">Hold out</button><button id="toss-food">Toss</button><button id="refill-basket">Refill</button></div><p id="deer-message" role="status"></p></div></section><div class="dock" id="tools" hidden><p class="hint" id="hint">Drag to orbit · Scroll or pinch to zoom</p><nav aria-label="Model controls"><button id="roof" aria-pressed="true">Roof</button><button id="imagery" aria-pressed="true">Aerial</button><button id="canopy" aria-pressed="false">Tree canopy</button><button type="button" id="split-open" aria-expanded="false" aria-controls="woodwork" hidden>Split wood</button><button id="use-grill" aria-controls="activity" aria-expanded="false" hidden>Use grill</button><button id="lock" hidden>Mouse look</button><button id="far" class="zoom" aria-label="Zoom out">−</button><button id="near" class="zoom" aria-label="Zoom in">+</button><button id="reset">Reset view</button></nav></div></main><dialog id="welcome" aria-labelledby="welcome-title">
   <div class="welcome-layout">
     <div class="welcome-copy">
       <p class="welcome-location">Smallwood, New York</p>
@@ -131,7 +313,14 @@ header,#views,.dock{z-index:2}
 </dialog>
 <dialog id="party" aria-labelledby="party-title">
 <button id="party-close" type="button" aria-label="Close group chat">×</button><h2 id="party-title">Visit with friends</h2>
-<form id="party-join"><p id="party-note"></p><label for="party-name">Your name</label><div class="pair"><input id="party-name" maxlength="28" required autocomplete="off" placeholder="First name or nickname"><button id="party-start" class="action">Create group</button></div><button id="party-solo" type="button" hidden>Explore on my own</button></form>
+<form id="party-join">
+<p id="party-note"></p><label for="party-name">Your name</label>
+<input id="party-name" name="displayName" maxlength="28" required autocomplete="nickname" placeholder="First name or nickname">
+<fieldset><legend>Your avatar</legend><div class="party-choices">
+<label class="party-choice"><input type="radio" name="avatar" value="man" required><img src="%%HIKER_MAN%%" alt=""><span>Man</span></label>
+<label class="party-choice"><input type="radio" name="avatar" value="woman" required><img src="%%HIKER_WOMAN%%" alt=""><span>Woman</span></label>
+</div></fieldset><button id="party-start" type="submit" class="action">Create group</button>
+<button id="party-solo" type="button" hidden>Explore on my own</button></form>
 <div id="party-details" hidden><div id="party-people" aria-label="People in the cabin"></div>
 <label for="party-link">Invitation link</label><div class="pair"><input id="party-link" readonly><button id="party-copy" class="action">Copy</button></div>
 <div id="party-log" role="log" aria-live="polite" aria-label="Group messages"></div>

@@ -1,8 +1,15 @@
+import {installCabinSurfaces} from './cabin-surfaces.js';
+import {cabinFilm} from './cabin-film.js';
+import {walkingGait} from './footsteps.js';
+import {installTreeLights} from './tree-lights.js';
 import {installParty} from './party.js';
 import {installGrill} from './grill.js';
 import {installEntryDoors} from './entry-doors.js';
 import {installWildlife} from './wildlife.js';
 import {activityControls} from './activity-controls.js';
+import {installWoodSplitting} from './wood-splitting.js';
+import {installFirewoodControls} from './firewood-controls.js';
+import {installFirewood} from './firewood.js';
 import {installTourFires} from './fires.js';
 import {installWelcome} from './welcome.js';
 import {installPropertyMap} from './property-map.js';
@@ -36,7 +43,7 @@ const center = new THREE.Vector3();
 const camera = new THREE.PerspectiveCamera(39,1,0.03,4000);
 const world = new THREE.Scene();
 const woodland=installWoodlandSound();
-let lighting,fires,ringCenter,grill,wildlife,entryDoors;
+let lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
 let renderer,orbit,span=0,distance=1;
 
 let activeView='property';
@@ -49,42 +56,85 @@ const pointers=new Map();
 const walkSpace=new WalkSpace();
 const held=new Set();
 const axes={x:0,y:0};
-let body=null,frame=0,lastTime=0,stickPointer=null,slowFrames=0;
+const gait=walkingGait(),reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+let bob=0;
+const velocity=new THREE.Vector2();
+const finishMeshes=[],finishRay=new THREE.Raycaster(),down=new THREE.Vector3(0,-1,0);
+function footSurface(){
+  if(/Bathroom/.test(body.label))return 'tile';
+  if(/Gravel/.test(body.label))return 'gravel';
+  if(/Flagstone|WellFloor/.test(body.label))return 'pavement';
+  if(/ParcelGround|MainFloor/.test(body.label)){
+    finishRay.ray.origin.set(body.x,body.y+.24,body.z);finishRay.ray.direction.copy(down);finishRay.far=.48;
+    const hits=finishRay.intersectObjects(finishMeshes,false);
+    if(hits.length){
+      const name=hits[0].object.material.name;
+      if(/porcelain/i.test(name))return 'tile';
+      if(/asphalt|pavement|concrete/i.test(name))return 'pavement';
+      if(/gravel|crushed stone|aggregate/i.test(name))return 'gravel';
+    }
+    return /MainFloor/.test(body.label)?'wood':'leaves';
+  }
+  return 'wood';
+}
+let body=null,frame=0,lastTime=0,stickPointer=null;
+let previousFrame=0,overBudget=0,underBudget=0;
+const maxRatio=Math.min(devicePixelRatio||1,matchMedia('(pointer: coarse)').matches?1.5:2);
+function paceRenderer(time){
+  const ms=time-previousFrame;previousFrame=time;
+  if(ms<=0 || ms>750){overBudget=underBudget=0;return;}
+  overBudget=ms>37?overBudget+Math.min(ms,100):Math.max(0,overBudget-40);
+  underBudget=ms<19?underBudget+ms:0;
+  const ratio=renderer.getPixelRatio();
+  if(overBudget>650 && ratio>.72){
+    renderer.setPixelRatio(Math.max(.72,ratio*.82));overBudget=underBudget=0;
+  }else if(underBudget>8500 && ratio<maxRatio){
+    renderer.setPixelRatio(Math.min(maxRatio,ratio+.12));overBudget=underBudget=0;
+  }
+}
 const walkKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
 const walking=()=>activeView!=='property' && body!==null;
 function stopWalking() {
+  camera.position.y-=bob;bob=0;gait.reset();velocity.set(0,0);
   held.clear();axes.x=axes.y=0;stickPointer=null;
   element('nub').style.transform='';
   if(frame) cancelAnimationFrame(frame);
-  frame=0;lastTime=0;
+  frame=0;lastTime=0;previousFrame=0;
 }
 function nextFrame(t) {
   frame=0;
   if(document.hidden)return;
-  if(!walking() || (!held.size && !axes.x && !axes.y && Math.abs(camera.position.y-body.y-body.eye)<.002)){
+  if(renderer)paceRenderer(t);
+  if(!walking() || (!held.size && !axes.x && !axes.y && !bob && !velocity.lengthSq() && Math.abs(camera.position.y-body.y-body.eye)<.002)){
     lastTime=0;
     render();return;
   }
   const elapsed=lastTime?t-lastTime:16;
   const dt=Math.min(.085,Math.max(.008,elapsed/1000));
   lastTime=t;
-  slowFrames=elapsed>40?slowFrames+1:Math.max(0,slowFrames-1);
-  if(slowFrames>14 && renderer.getPixelRatio()>1) {
-    renderer.setPixelRatio(Math.max(1,renderer.getPixelRatio()-.25));
-    slowFrames=0;
-  }
   const on=(a,b)=>Number(held.has(a)||held.has(b));
   let sideways=on('KeyD','ArrowRight')-on('KeyA','ArrowLeft')+axes.x;
   let forward=on('KeyW','ArrowUp')-on('KeyS','ArrowDown')-axes.y;
   const norm=Math.max(1,Math.hypot(sideways,forward));
   const speed=/loft/i.test(body.label)?1.02:1.71;
-  sideways*=speed*dt/norm;forward*=speed*dt/norm;
-  body=walkSpace.move(body,Math.cos(yaw)*sideways-Math.sin(yaw)*forward,-Math.sin(yaw)*sideways-Math.cos(yaw)*forward);
+  sideways*=speed/norm;forward*=speed/norm;
+  const accelerating=Boolean(sideways||forward);
+  const response=1-Math.exp(-(accelerating?13:23)*dt);
+  const desiredX=Math.cos(yaw)*sideways-Math.sin(yaw)*forward;
+  const desiredZ=-Math.sin(yaw)*sideways-Math.cos(yaw)*forward;
+  velocity.x+=(desiredX-velocity.x)*response;
+  velocity.y+=(desiredZ-velocity.y)*response;
+  if(!accelerating && velocity.lengthSq()<.00025)velocity.set(0,0);
+  const oldX=body.x,oldZ=body.z,eyeHeight=camera.position.y-bob;
+  body=walkSpace.move(body,velocity.x*dt,velocity.y*dt);
   const wanted=body.y+body.eye;
   camera.position.x=body.x;camera.position.z=body.z;
-  camera.position.y=THREE.MathUtils.lerp(camera.position.y,wanted,1-Math.exp(-15*dt));
+  const travel=Math.hypot(body.x-oldX,body.z-oldZ);
+  bob=gait.update(travel,dt,speed<1.1,left=>woodland.footstep(footSurface(),left),reducedMotion.matches);
+  if(!travel && Math.abs(bob)<.0003)bob=0;
+  camera.position.y=THREE.MathUtils.lerp(eyeHeight,wanted,1-Math.exp(-15*dt))+bob;
   render();
-  if(sideways || forward || Math.abs(camera.position.y-wanted)>.002) schedule();
+  if(sideways || forward || velocity.lengthSq() || bob || Math.abs(camera.position.y-wanted)>.002) schedule();
   else lastTime=0;
 }
 function schedule(){if(!frame) frame=requestAnimationFrame(nextFrame);}
@@ -92,7 +142,7 @@ function usableTarget(target) {
   return target===document.body || target===canvas || target.matches?.('button');
 }
 window.addEventListener('keydown',e=>{
-  if(sceneControls.open || party.open || propertyMap.open || welcome.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
+  if(sceneControls.contains(e.target) || party.open || propertyMap.open || welcome.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
   e.preventDefault();
   held.add(e.code);
   if(!frame) nextFrame(performance.now());
@@ -167,14 +217,15 @@ function look() {
   render();
 }
 const viewSlugs = {
-  stars:'stargazing', entry:'front-entry', grill:'deck-grill', cook:'grilling', deer:'backyard-deer', tree:'christmas-tree', hearth:'propane-furnace', property:'property', outside:'outside', porch:'covered-porch', yard:'fire-pit', path:'front-path', hall:'front-hall', frontbed:'front-bedroom',
+  splitting:'wood-splitting', wood:'woodpile', stars:'stargazing', entry:'front-entry', grill:'deck-grill', cook:'grilling', deer:'backyard-deer', tree:'christmas-tree', hearth:'propane-furnace', property:'property', outside:'outside', porch:'covered-porch', yard:'fire-pit', path:'front-path', hall:'front-hall', frontbed:'front-bedroom',
   master:'master-and-bath', bath:'bathroom', primary:'master-bedroom', vault:'kitchen-vault', kitchenwork:'island-cooler', kitchen:'kitchen', living:'living-room', bunk:'bunk-room', loft:'loft'
 };
 const locationPicker=element('location');
 const viewButtons=[...document.querySelectorAll('[data-view]')];
 function viewFromAddress() {
   const hash=location.hash.slice(1).split('?')[0];
-  return Object.keys(interiorCameras).find(key=>viewSlugs[key]===hash) || 'property';
+  if(hash==='property')return 'property';
+  return Object.keys(interiorCameras).find(key=>viewSlugs[key]===hash) || 'outside';
 }
 function chooseView(key) {
   const hash='#'+viewSlugs[key]+party.suffix;
@@ -187,7 +238,6 @@ function walkingFov(preset,aspect) {
   return THREE.MathUtils.clamp(vertical,preset.fov,94);
 }
 function changeView(view) {
-  sceneControls.close();
   stopWalking();
   if(document.pointerLockElement===canvas) document.exitPointerLock();
   body=null;
@@ -209,6 +259,7 @@ function changeView(view) {
   reset();
   if(view==='stars')sceneControls.stargaze();
   activities.destination(view);
+  woodControls.destination(view);
   updateLookControls();
   if(body) canvas.setAttribute('aria-label','Walk with WASD or arrows. Drag to look, or enable mouse look.');
   if(inside) canvas.focus({preventScroll:true});
@@ -278,8 +329,8 @@ function resized() {
   if (span) render();
 }
 const sceneControls=installSceneControls({
-  setConditions(settings){lighting.setConditions(settings);woodland.conditions(settings);fires?.setWeather(settings.weather);party.conditions();render();},
-  async setSound(on){const enabled=await woodland.enable(on);render();return enabled;},
+  setConditions(settings){lighting.setConditions(settings);surfaces?.setWeather(settings.weather);woodland.conditions(settings);fires?.setWeather(settings.weather);party.conditions();render();},
+  async setSound(on){const enabled=await woodland.enable(on);if(span)schedule();return enabled;},
   viewStars(){chooseView('stars');},
   setFurnace(on){fires.setFurnaceOn(on);party.conditions();render();},
   setFirePit(on){fires.setFirePitOn(on);party.conditions();render();},
@@ -287,10 +338,14 @@ const sceneControls=installSceneControls({
 });
 const activities=activityControls({
   grill:()=>grill,herd:()=>wildlife,view:()=>activeView,choose:chooseView,schedule,
-  lid:on=>grill?.open(on),closeScene:()=>sceneControls.close()
+  lid:on=>grill?.open(on)
+});
+const woodControls=installFirewoodControls({
+  pickUp:kind=>firewood?.pickUp(kind),toss:()=>firewood?.toss(),putBack:()=>firewood?.putBack(),
+  gather:()=>chooseView('wood'),stopMovement(){stopWalking();pointers.clear();},render
 });
 const propertyMap=installPropertyMap({
-  stopMovement(){sceneControls.close();stopWalking();pointers.clear();},
+  stopMovement(){stopWalking();pointers.clear();},
   destinations(){
     const locations={};
     for(const key of ['entry','porch']){
@@ -304,21 +359,46 @@ const propertyMap=installPropertyMap({
 });
 const party=installParty({
   world,choose:chooseView,schedule,
-  stop(){sceneControls.close();stopWalking();pointers.clear();},
+  stop(){stopWalking();pointers.clear();},
   label:key=>viewButtons.find(b=>b.dataset.view===key)?.textContent || 'Property',
   getPose(){
     const round=n=>Math.round(n*100)/100;
     return {view:activeView,x:round(body?.x??0),y:round(body?.y??0),z:round(body?.z??0),yaw:round(yaw)};
   },
-  meet(guest){
+  joined({index,people}){
+    history.replaceState(null,'','#outside'+party.suffix);
+    changeView('outside');
+    if(!body)return;
+    // Spread arrivals across the same grade, leaving a full stride between visitors.
+    const origin=body,occupied=people.flatMap(p=>p.pose?[p.pose]:[]);
+    const candidates=[];
+    const rows=[[0,0],[-.8,-1.85],[.8,-1.85],[0,-3.1],[-1.65,-3.1],[1.65,-3.1],[-2.7,-3.6],[2.7,-3.6]];
+    for(const depth of [0,1.25,2.5,-4.4])for(const side of [-2.5,-1.25,0,1.25,2.5])rows.push([side,depth]);
+    for(const [side,depth] of rows){
+      const x=origin.x+Math.cos(yaw)*side+Math.sin(yaw)*depth;
+      const z=origin.z-Math.sin(yaw)*side+Math.cos(yaw)*depth;
+      const spot=walkSpace.spawn(x,z,origin.y+origin.eye,origin.y);
+      if(spot && spot.label===origin.label && Math.abs(spot.y-origin.y)<.60 && candidates.every(s=>Math.hypot(s.x-x,s.z-z)>.8))candidates.push(spot);
+    }
+    if(!candidates.length)return;
+    const order=candidates.slice(index).concat(candidates.slice(0,index));
+    body=order.find(s=>occupied.every(p=>Math.hypot(s.x-p.x,s.z-p.z)>.83))??order[0];
+    camera.position.set(body.x,body.y+body.eye,body.z);
+    if(index){yaw=Math.atan2(body.x-origin.x,body.z-origin.z);pitch=0;}
+    look();
+  },
+  meet(guest,{index=0,occupied=[]}={}){
     if(!Object.hasOwn(viewSlugs,guest.view))return;
     const place=()=>{
       if(!body || guest.view==='property')return;
+      stopWalking();
       for(const radius of [1.15,.8,1.55])for(let i=0;i<12;i++){
-        const angle=guest.yaw+i*Math.PI/6;
+        const angle=guest.yaw+(index-1)*Math.PI/4+i*Math.PI/6;
         const x=guest.x-radius*Math.sin(angle),z=guest.z-radius*Math.cos(angle);
         const floor=walkSpace.spawn(x,z,guest.y+(guest.view==='loft'?1:1.59),guest.y);
         if(!floor || Math.abs(floor.y-guest.y)>.25)continue;
+        const others=[...occupied,...party.neighbors()];
+        if(others.some(p=>p.view!=='property'&&Math.abs(p.y-floor.y)<.8&&Math.hypot(x-p.x,z-p.z)<.74))continue;
         body=floor;camera.position.set(body.x,body.y+body.eye,body.z);
         yaw=Math.atan2(body.x-guest.x,body.z-guest.z);pitch=0;look();return;
       }
@@ -327,15 +407,19 @@ const party=installParty({
     window.addEventListener('hashchange',()=>{if(activeView===guest.view)place();},{once:true});
     chooseView(guest.view);
   },
+  snapshotFuel:()=>fires?.fuelSnapshot(),
+  applyFuel:state=>{fires?.applyFuel(state);render();},
+  addRemoteFuel:kind=>{fires?.addFuel(kind);render();},
   snapshot:()=>sceneControls.snapshot(),
   apply:s=>sceneControls.apply(s)
 });
 const welcome=installWelcome({
-  pause(){sceneControls.close();stopWalking();pointers.clear();},
+  pause(){stopWalking();pointers.clear();},
   resume(){if(span) schedule();},
   enter(){
-    if(span) chooseView('entry');
-    else location.hash=viewSlugs.entry;
+    history.replaceState(null,'','#'+viewSlugs.outside+party.suffix);
+    if(span && activeView!=='outside')changeView('outside');
+    canvas.focus({preventScroll:true});
   }
 });
 function render(){
@@ -343,16 +427,22 @@ function render(){
   const seconds=performance.now()/1000;
   const outside=outdoorsFloor(body?.label);
   lighting?.update(camera.position,activeView,seconds,camera,outside);
+  const animateSplitting=woodSplit?.update(camera,activeView,seconds);
+  const animateWood=firewood?.update(body,activeView,seconds,activities.offeringFood);
   const animateFire=fires?.update(camera,activeView,seconds);
   woodland.update(camera,outside,walking(),ringCenter,fires?.energy??0);
   sceneControls.setNearFire(Boolean(body && ringCenter && camera.position.distanceToSquared(ringCenter)<49 &&
     Math.abs(camera.position.y-ringCenter.y)<2.8),activeView==='stars');
+  const animateLeaves=surfaces?.update(camera,activeView,seconds,outside);
+  const animateTree=treeLights?.update(camera,activeView,seconds,canvas.height);
   const animateGuests=party.update(seconds);
   const animateDoors=entryDoors?.update(camera,walking(),seconds);
   const animateGrill=grill?.update(camera,activeView,seconds);
   const animateDeer=wildlife?.update(camera,activeView,seconds);
-  renderer.render(world,camera);
-  if(!document.hidden && (animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
+  const cinematic=film && walking();
+  const adapting=cinematic?film.render(world,camera,lighting,outside,seconds):false;
+  if(!cinematic)renderer.render(world,camera);
+  if(!document.hidden && (adapting || animateSplitting || animateWood || animateLeaves || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
 }
 function reset() {
   if(activeView!=='property') {resetInterior();return;}
@@ -451,7 +541,7 @@ canvas.addEventListener('keydown',e=>{
 });
 async function show() {
   renderer = new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1,matchMedia('(pointer: coarse)').matches?1.5:2));
+  renderer.setPixelRatio(maxRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.12;
@@ -471,6 +561,7 @@ async function show() {
       object.visible=false;
     }
     if(!object.isMesh) return;
+    if(/asphalt|pavement|poured concrete|fescue|leaf litter|brushed greige floor porcelain|blue-gray crushed stone/i.test(object.material.name) && !/shingle/i.test(object.material.name))finishMeshes.push(object);
     let helper=object;
     while(helper && !/^Walk(Surface|Block)_/i.test(helper.name)) helper=helper.parent;
     if(!helper) return;
@@ -497,6 +588,13 @@ async function show() {
     const elevation=THREE.MathUtils.degToRad(41.67);
     interiorCameras.stars={eye:[...eye],target:[eye[0],eye[1]+5*Math.sin(elevation),eye[2]-5*Math.cos(elevation)],fov:68};
   }
+  fires=installTourFires(world,gltf.scene);
+  firewood=installFirewood(world,gltf.scene,walkSpace,camera,fires,woodControls.set,kind=>party.fuel(kind));
+  interiorCameras.wood=firewood.view;
+  woodSplit=installWoodSplitting(world,gltf.scene,walkSpace,{
+    schedule,takeSplitLog:()=>firewood.takeSplitLog(),onStrike:strength=>woodland.strike(strength)
+  });
+  interiorCameras.splitting=woodSplit.view;
   grill=installGrill(world,gltf.scene,activities.setGrill);
   entryDoors=installEntryDoors(gltf.scene,()=>{renderer.shadowMap.needsUpdate=true;});
   for(const button of viewButtons){
@@ -548,8 +646,15 @@ async function show() {
   gltf.scene.updateMatrixWorld(true);
   const ring=gltf.scene.getObjectByName('WalkBlock_FireRing');
   if(ring)ringCenter=new THREE.Box3().setFromObject(ring).getCenter(new THREE.Vector3());
-  fires=installTourFires(world,gltf.scene);
+  treeLights=installTreeLights(world,gltf.scene,reducedMotion);
+  surfaces=installCabinSurfaces(gltf.scene,renderer);
+  for(const item of aerialLayers){
+    item.originalMaterial=item.mesh.material;
+    item.originalGeometry=item.mesh.geometry;
+  }
   batchStatic(gltf.scene);
+  lighting.captureExterior();
+  film=cabinFilm(renderer);
   const bounds=new THREE.Box3();
   gltf.scene.traverseVisible(object=>{
     if(!object.geometry) return;
@@ -569,6 +674,7 @@ async function show() {
   if(initialView!=='property') changeView(initialView);
   controlsPanel.hidden=false;
   element('views').hidden=false;
+  element('tour-controls').hidden=false;
   status.hidden=true;
   party.initial();
 }

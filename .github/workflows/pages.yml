@@ -18,6 +18,7 @@ jobs:
           node-version: 22
       - run: npm ci --prefix Reference/viewer-src
       - run: node Reference/viewer-src/check-geometry.mjs "Reindeer Trail.glb"
+      - run: node Reference/viewer-src/check-wildlife.mjs "Reindeer Trail.glb"
       - run: mkdir -p public
       - run: node Reference/viewer-src/build.mjs "Reindeer Trail.glb" public/index.html Reference --web
       - uses: actions/upload-pages-artifact@v4

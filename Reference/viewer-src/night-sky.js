@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {cloudField} from './tour-sky.js';
 import catalog from './hipparcos-bright.json' with {type:'json'};
 
 const rad=Math.PI/180,latitude=41.67*rad,longitude=-74.82;
@@ -17,19 +18,6 @@ export function localSidereal(hour,now=new Date()){
   const days=(civil-offset*3600000-Date.UTC(2000,0,1,12))/86400000;
   return ((18.697375+24.065709824279*days+longitude/15)%24)*15*rad;
 }
-const cloudNoise=`
-  float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*4375.611);}
-  float noise(vec2 p){
-    vec2 cell=floor(p),f=fract(p);f=f*f*(3.-2.*f);
-    return mix(mix(hash(cell),hash(cell+vec2(1,0)),f.x),
-               mix(hash(cell+vec2(0,1)),hash(cell+vec2(1)),f.x),f.y);
-  }
-  float transmission(vec3 d,float clouds){
-    vec2 p=d.xz/(max(0.,d.y)+.23)*2.8;
-    float n=.57*noise(p)+.29*noise(p*2.09+17.)+.14*noise(p*4.1+31.);
-    return 1.-smoothstep(.77-.53*clouds,.97-.45*clouds,n);
-  }
-`;
 function starField(uniforms) {
   const positions=[],strength=[],color=[],cool=new THREE.Color('#d8e7ff'),warm=new THREE.Color('#ffc08a');
   const white=new THREE.Color('#fff7ec'),tint=new THREE.Color();
@@ -49,14 +37,14 @@ function starField(uniforms) {
     vertexShader:`attribute float strength; attribute vec3 color;
       uniform vec2 sidereal; uniform float night,clouds,pixelRatio,time;
       varying vec3 starColor; varying float alpha;
-      ${cloudNoise}
+      ${cloudField}
       void main(){
         float meridian=sidereal.x*position.x+sidereal.y*position.z;
         vec3 d=vec3(sidereal.x*position.z-sidereal.y*position.x,
           ${Math.sin(latitude)}*position.y+${Math.cos(latitude)}*meridian,
           ${Math.sin(latitude)}*meridian-${Math.cos(latitude)}*position.y);
         float air=smoothstep(.012,.30,d.y);
-        alpha=night*air*transmission(d,clouds)*min(1.8,strength*1.26);
+        alpha=night*air*cloudTransmission(d,clouds)*min(1.8,strength*1.26);
         alpha*=1.+.13*(1.-.75*air)*sin(time*1.9+position.x*325.);
         starColor=color;gl_PointSize=pixelRatio*clamp(1.6+1.8*sqrt(strength),2.,6.5);
         gl_Position=projectionMatrix*modelViewMatrix*vec4(d*315.,1.);

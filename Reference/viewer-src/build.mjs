@@ -40,6 +40,10 @@ const mapJSON=JSON.stringify({images:{
 },lines}).replaceAll('<','\\u003c');
 const welcomePhoto=(await fs.readFile(path.join(base,'welcome-yard.webp'))).toString('base64');
 let template=await fs.readFile(path.join(base,'template.html'),'utf8');
+for(const avatar of ['man','woman']){
+  const portrait=await fs.readFile(path.join(base,'hiker-'+avatar+'.png'));
+  template=template.replace('%%HIKER_'+avatar.toUpperCase()+'%%','data:image/png;base64,'+portrait.toString('base64'));
+}
 if(web){
   const chunkSize=12*1024*1024;
   const parts=[];

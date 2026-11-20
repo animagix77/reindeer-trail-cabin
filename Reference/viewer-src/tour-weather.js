@@ -64,8 +64,15 @@ bool sheltered(vec3 worldPos, float tolerance) {
   return sampleHeight>0. && worldPos.y<height+tolerance;
 }`;
 
-function applySurfaceWeather(material,uniforms) {
-  material.onBeforeCompile=shader=>{
+const coatings=new WeakMap();
+const coated=new WeakSet();
+export function coatOutdoorMaterial(model,material){
+  const uniforms=coatings.get(model);
+  if(!uniforms || coated.has(material))return;
+  coated.add(material);
+  const previous=material.onBeforeCompile,key=material.customProgramCacheKey();
+  material.onBeforeCompile=(shader,renderer)=>{
+    previous.call(material,shader,renderer);
     Object.assign(shader.uniforms,uniforms);
     shader.vertexShader=shader.vertexShader.replace('#include <common>',
       '#include <common>\nvarying vec3 weatherWorldPosition;')
@@ -76,16 +83,18 @@ function applySurfaceWeather(material,uniforms) {
       .replace('#include <roughnessmap_fragment>',`
         #include <roughnessmap_fragment>
         if ((snowCover+wetness)>0. && !sheltered(weatherWorldPosition,-.09)) {
-          float slope=abs(normalize(cross(dFdx(weatherWorldPosition),dFdy(weatherWorldPosition))).y);
-          float coverage=smoothstep(.48,.92,slope);
-          diffuseColor.rgb*=1.-wetness*coverage*.29;
-          roughnessFactor=mix(roughnessFactor,.37,wetness*coverage*.76);
+          float slope=normalize(cross(dFdx(weatherWorldPosition),dFdy(weatherWorldPosition))).y;
+          float coverage=smoothstep(.40,.91,slope);
+          float water=wetness*(.18+.82*coverage);
+          diffuseColor.rgb*=1.-water*.32;
+          roughnessFactor=mix(roughnessFactor,.25,water*.84);
           float texturePattern=dot(diffuseColor.rgb,vec3(.24,.57,.19));
           diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.73,.79,.83),
             snowCover*coverage*(.42+.49*smoothstep(.005,.28,texturePattern)));
         }`);
   };
-  material.customProgramCacheKey=()=>'exterior-weather-v1';
+  material.customProgramCacheKey=()=>key+'|exterior-weather-v2';
+  material.needsUpdate=true;
 }
 
 export function installWeather(scene,model) {
@@ -94,15 +103,14 @@ export function installWeather(scene,model) {
     wetness:{value:0},
     snowCover:{value:0}
   };
-  const treated=new Set();
+  coatings.set(model,weatherSurface);
   model.traverse(mesh=>{
     if(!mesh.isMesh) return;
     const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];
     for(const m of materials){
-      if(treated.has(m) || !m.isMeshStandardMaterial) continue;
+      if(!m.isMeshStandardMaterial)continue;
       if(/^(?:Asphalt shingle|Leaf litter|Cool-season fescue|Fine crushed gravel|Fire circle · pale|Paved public road|Porch · natural sawn timber|Entry · blue-gray crushed|Backdrop_Woodland floor)/i.test(m.name)) {
-        applySurfaceWeather(m,weatherSurface);
-        treated.add(m);
+        coatOutdoorMaterial(model,m);
       }
     }
   });

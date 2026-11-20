@@ -6,7 +6,7 @@ def build_christmas_tree():
     import random
     from mathutils import Vector
     rng = random.Random(10792)
-    center = (19.55, 16.88, .018)
+    center = (19.00, 16.88, .018)
     b = group('Christmas tree | tiered fir, pine sprays and wire lights', center)
     d = group('Christmas tree | glass baubles, ornaments and star', center)
     g = group('Christmas tree | ivory skirt and wrapped gifts', center)
@@ -51,8 +51,8 @@ def build_christmas_tree():
     for name, color in [('cherry','#ff513e'),('gold','#ffd178'),('green','#5bc179'),('blue','#527dff')]:
         m = finish_mat(name+' fairy light', color, 0, .29)
         shader = m.node_tree.nodes.get('Principled BSDF')
-        shader.inputs['Emission Color'].default_value = m.diffuse_color
-        shader.inputs['Emission Strength'].default_value = 3.2
+        shader.inputs['Emission Color'].default_value = shader.inputs['Base Color'].default_value
+        shader.inputs['Emission Strength'].default_value = 7.2
         lamps.append(m)
 
     def vec(angle):
@@ -113,14 +113,14 @@ def build_christmas_tree():
     for j in range(200):
         t = j/199
         a = t*twopi*6.3
-        rr = .415*(1-t)+.038
+        rr = .444*(1-t)+.049
         p = vec(a)*rr + Vector((0,0,.285+1.39*t-.021*math.cos(3*a)))
         if prev is not None:
             b.beam(prev,p,.0018,cord,5)
         if j%3==0:
             socket = p+Vector((.002,0,.01))
             b.beam(p,socket,.004,cord,6)
-            b.beam(socket,socket+Vector((.002,0,.012)),.0043,lamps[j%4],6,.002)
+            b.beam(socket,socket+Vector((.003,0,.019)),.0075,lamps[j%4],8,.0035)
         prev=p
 
     def globe(builder, center, sizes, matl, bands=None, sides=12, rings=8):
@@ -240,6 +240,6 @@ def build_christmas_tree():
     hang(mini+up*.03,mini+up*.075)
     for builder in (b,d,g):
         finish(builder)
-    collider('Christmas_tree_and_skirt',18.23,20.87,15.56,18.20,.0,1.93)
+    collider('Christmas_tree_and_skirt',17.68,20.32,15.56,18.20,.0,1.93)
 
 build_christmas_tree()

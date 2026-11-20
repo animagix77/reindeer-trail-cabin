@@ -724,10 +724,12 @@ def build_exterior_site():
     navy=mat('Patio pillow · midnight blue','#3a495a')
     stove=mat('Portable patio stove · cast iron','#393b37',.28,.53)
     cable=mat('Soft black cord','#3a3930')
-    bulb=mat('String bulbs · warm glass','#ffcf87',0,.28)
+    bulb=mat('String bulbs · amber filament','#ffb451',0,.30)
+    globe=mat('Cafe lights · clear teardrop glass','#fff0d7',.15,.17)
+    globe.node_tree.nodes.get('Principled BSDF').inputs['Alpha'].default_value=.24
     bshader=bulb.node_tree.nodes.get('Principled BSDF')
     bshader.inputs['Emission Color'].default_value=(1.0,.57,.21,1)
-    bshader.inputs['Emission Strength'].default_value=1.6
+    bshader.inputs['Emission Strength'].default_value=5.8
     def softbox(m,x0,x1,y0,y1,z0,z1,rft=.15):
         rad=min(rft,(x1-x0)*.45,(y1-y0)*.45)
         zrad=min(rad*ft*.55,(z1-z0)*.24);vs=[]
@@ -804,37 +806,70 @@ def build_exterior_site():
                 a=i*nlon+j;b=i*nlon+(j+1)%nlon
                 f.append((a,b,b+nlon,a+nlon))
         push(m,p,f)
-    # The outdoor cable follows the canopy beam with a slight sag between posts.
-    path=[]
-    for j in range(25):
-        xx=23.25+17.35*j/24; sag=.09*abs(math.sin(j*math.pi/12))
-        path.append(pos(xx,35.44,dp+2.14-sag))
-    for a,b in zip(path,path[1:]):tube(cable,a,b,.009,.009,4)
-    for j in range(1,25,2):
-        a=Vector(path[j]);tube(cable,a,a-Vector((0,0,.058)),.014,.015,6)
-        ellipsoid(bulb,a-Vector((0,0,.079)),.024,.024,.035,j,0,8,5)
+    def cafe_bulb(tip):
+        tip=Vector(tip)
+        # The clear lamps have a short black socket and a glowing center.
+        tube(cable,tip,tip-Vector((0,0,.037)),.004,.004,6)
+        tube(cable,tip-Vector((0,0,.033)),tip-Vector((0,0,.057)),.012,.013,8)
+        center=tip-Vector((0,0,.082))
+        ellipsoid(globe,center,.023,.023,.034,0,0,10,6)
+        ellipsoid(bulb,center,.006,.006,.018,0,0,7,5)
+    def festoon(a,b,sag,spacing,offset=.5):
+        a,b=Vector(a),Vector(b)
+        length=(b-a).length
+        def point_on(t):return a.lerp(b,t)-Vector((0,0,4*sag*t*(1-t)))
+        # Carry every drop on its cable vertex, including on the steep return.
+        count=max(1,round(length/spacing))
+        hang=[(j+offset)/count for j in range(count)] if length>.35 else []
+        segments=max(2,math.ceil(length/.22))
+        stations=sorted(set([j/segments for j in range(segments+1)]+hang))
+        for t,u in zip(stations,stations[1:]):
+            tube(cable,point_on(t),point_on(u),.004,.004,6)
+        for t in hang:cafe_bulb(point_on(t))
+    post_x=(23.30,32.00,40.70)
+    for left,right in zip(post_x,post_x[1:]):
+        # Under the eave, then in deep separate scallops on the outside rail.
+        festoon(pos(left,35.84,dp+2.065),pos(right,35.84,dp+2.065),.09,.65)
+        festoon(pos(left,35.89,dp+.919),pos(right,35.89,dp+.919),.39,.72)
+    # The branch at the flue-side post drops visibly from fascia to guardrail.
+    festoon(pos(post_x[0],35.87,dp+2.065),pos(post_x[0],35.89,dp+.919),0,.73)
+
     wicker_dark=mat('Suspended baskets · dark woven cane','#493e36',.08,.65)
     chain=mat('Suspension chains · galvanized links','#9c9a8d',.65,.37)
-    pergola_anchor=hanging_pergola(porch_wood,wicker_dark,chain,cushion,site_group,zone,tube,blocker,round_blocker)
-    # DSC01535/537 and L1060579 show the festoon looping across the clearing
-    # on slender dark uprights. Positions along the gravel edge are estimated.
-    poles=[(18.4,62.0),(17.15,48.4)]
+    corners=hanging_pergola(porch_wood,wicker_dark,chain,cushion,site_group,zone,tube,blocker,round_blocker)
+    # L1060582 places the cable on the timber face. Both long faces follow the
+    # square top frame, turning closely round the ends, clear of the swing chains.
+    for j,a in enumerate(corners):
+        b=corners[(j+1)%4]
+        if j%2==0:
+            mid=Vector(a).lerp(Vector(b),.5)
+            festoon(a,mid,.07,.80,.38)
+            festoon(mid,b,.065,.80,.62)
+        else:festoon(a,b,.012,.8)
+    # The two sides of the clearing are visible in L1060579 and the reverse view
+    # DSC01537. A short run connects the near end to the deck; the longer return
+    # passes the picnic-table side on slender black uprights.
+    poles=[(18.4,62.0),(13.25,54.4)]
+    tops=[]
     for k,(xx,yy) in enumerate(poles):
         zz=zone(xx,yy)
-        tube(edging,pos(xx,yy,zz),pos(xx,yy,zz+2.66),.018,.013,10)
+        top=Vector(pos(xx,yy,zz+2.64))
+        tube(edging,pos(xx,yy,zz),top,.018,.013,10)
+        tops.append(top)
         blocker('LightPole'+str(k),pos(xx-.065,yy,zz),pos(xx+.065,yy,zz),.065,2.6)
-    anchors=[pergola_anchor]+[pos(px,py,zone(px,py)+2.64) for px,py in poles]+[pos(40.70,35.65,dp+2.06)]
-    for i,(a,b) in enumerate(zip(anchors,anchors[1:])):
-        a,b=Vector(a),Vector(b)
-        def droop(t):
-            return a.lerp(b,t)-Vector((0,0,.24*4*t*(1-t)))
-        line=[droop(j/24) for j in range(25)]
-        for c,d in zip(line,line[1:]):tube(cable,c,d,.004,.004,5)
-        count=max(2,round((b-a).length/.66))
-        for j in range(1,count):
-            tip=droop(j/count)
-            tube(cable,tip,tip-Vector((0,0,.045)),.012,.013,6)
-            ellipsoid(bulb,tip-Vector((0,0,.070)),.022,.022,.033,j,0,8,5)
+    near_deck=pos(40.70,35.84,dp+2.065)
+    flue_end=pos(23.30,35.84,dp+2.065)
+    festoon(near_deck,corners[0],.16,.78)
+    festoon(corners[1],tops[0],.21,.77)
+    festoon(tops[0],tops[1],.25,.76)
+    festoon(tops[1],flue_end,.24,.92)
+    # Three pooled emitters model bounced light from neighboring bulbs. They
+    # follow the authored suspension heights when deck or garden grades change.
+    for suffix,a,b in [('Pergola',corners[0],corners[1]),('Picnic',tops[0],corners[1]),
+                        ('Deck',flue_end,near_deck)]:
+        marker=bpy.data.objects.new('FestoonPool_'+suffix,None);site_group.objects.link(marker)
+        marker.location=Vector(a).lerp(Vector(b),.5)-Vector((0,0,.20))
+        marker.empty_display_size=.04
     for name,location in [('TourEye_yard',wpos(11.1,60.2,1.59)),('TourLook_yard',pos(28.4,50.2,367.32))]:
         ob=bpy.data.objects.new(name,None);site_group.objects.link(ob);ob.location=location;ob.empty_display_size=.04
     moss=mat('Glacial boulder · moss','#7e7b57')
@@ -857,6 +892,55 @@ def build_exterior_site():
         ellipsoid(tank,base+Vector((0,0,.885)),.262,.262,.135,234+j,nlon=28)
         tube(tank,base+Vector((0,0,.982)),base+Vector((0,0,1.114)),.135,.108,24)
         round_blocker('RearTank%02d'%j,base-Vector((0,0,.055)),.263,.263,1.18)
+    # The fire-pit reference shows low growth under the hardwood trunks behind
+    # the clearing. Keep the modeled driveway, gravel and deer feeding area open.
+    from mathutils.bvhtree import BVHTree
+    forest_floor=BVHTree.FromPolygons([v.co for v in land.data.vertices],
+                                       [list(f.vertices) for f in land.data.polygons])
+    understory=random.Random(579)
+    frond_mats=[mat('Woodland ferns · '+name,tint) for name,tint in
+                [('deep green','#355333'),('leaf green','#506f37'),('new growth','#708343')]]
+    for attempt in range(125):
+        x=understory.uniform(-34,59);y=understory.uniform(41,85)
+        if -7<x<53 and y<79:continue
+        probe=Vector(wpos(x,y,2.0))
+        base,normal,index,_=forest_floor.ray_cast(probe,(0,0,-1),4.0)
+        if base is None or land.data.polygons[index].material_index!=0 or normal.z<.63:continue
+        base.z-=.012
+        if understory.random()<.29:
+            # Young maples with a forked leader and attached photo-textured leaf sprays.
+            height=understory.uniform(.55,1.36)
+            lean=Vector((understory.uniform(-.17,.17),understory.uniform(-.17,.17),height))
+            tube(bough,base,base+lean,.009,.002,5)
+            for j in range(7):
+                theta=j*2.40+understory.uniform(-.25,.25)
+                root=base+lean*(.31+.084*j)
+                heading=Vector((math.cos(theta),math.sin(theta),.41))
+                tip=root+heading*height*(.27-.022*j)
+                tube(bough,root,tip,.0038,.001,4)
+                spray(tip,heading,height*.25,height*.20)
+            continue
+        # Each pinna folds around a rib on an arched frond, so nearby low woodland
+        # catches side light even when viewed across the slope.
+        scale=understory.uniform(.25,.48)
+        for j in range(6):
+            theta=math.tau*j/6+understory.uniform(-.40,.40)
+            length=scale*understory.uniform(.63,1.2)
+            direction=Vector((math.cos(theta),math.sin(theta),0))
+            across=Vector((-direction.y,direction.x,0))
+            def blade(t):
+                return base+direction*(length*t)+Vector((0,0,length*(1.65*t-1.13*t*t)))
+            for k in range(1,11):
+                t=k/12;rib=blade(t)
+                breadth=length*.20*(math.sin(t*math.pi)**.71)*(1-.28*t)
+                for side in (-1,1):
+                    tip=rib+across*(side*breadth)+direction*(.052*length)
+                    ridge=rib.lerp(tip,.56)+Vector((0,0,.012*length))
+                    half=direction*(length*(.019+.008*math.sin(t*math.pi)))
+                    push(frond_mats[(j+k//4)%3],[rib,ridge-half,tip,ridge+half,ridge],
+                         [(0,1,4),(1,2,4),(2,3,4),(3,0,4)])
+            tube(frond_mats[j%3],base,blade(.45),.0028,.0016,3)
+            tube(frond_mats[j%3],blade(.45),blade(1),.0016,.0008,3)
     for m,(vs,faces) in mats.items():
         if m==bark:
             ob=mesh('Hardwood trunks and primary limbs · lidar-guided crown locations',vs,faces,m,site_group)

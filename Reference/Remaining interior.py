@@ -318,6 +318,10 @@ def _furnish_remaining():
     # Sightline to the dining room from the narrow, straight front hall (L1040640).
     # Open shared junction: the camera in L1040618 sees the master, bathroom and stairs together.
     wall('Master barn door stone return','x',23.45,15.48,18.15,terr,(),None,True)
+    # Box in the plaster projection next to the Christmas tree, meeting the stone
+    # pier at its finished end. Keep the passage beside the barn door clear.
+    wall('Tree alcove · stair-side plaster','x',20.75,15.27,18.15,ochre,(),None,True)
+    wall('Tree alcove · living-room plaster','y',18.15,20.75,23.02,ochre,(),None,True,True)
     # The right end of the stone pier has a finished thickness toward the living room.
     wall('Master pier return','y',18.15,23.02,23.45,terr,(),None,True)
     wall('Hall-tree backing','y',10.25,29.04,bench_jamb,amber,(),None,True)

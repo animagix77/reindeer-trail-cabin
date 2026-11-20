@@ -22,7 +22,7 @@ export function installWelcome({pause, resume, enter}) {
   dialog.addEventListener('close', () => {
     try { sessionStorage.setItem('reindeer-welcome-seen','1'); } catch {}
     if (accepted && firstVisit) enter();
-    else if (!firstVisit) document.getElementById('scene-toggle').focus({preventScroll:true});
+    else if (!firstVisit) revisit.focus({preventScroll:true});
     else document.getElementById('view').focus({preventScroll:true});
     resume();
   });

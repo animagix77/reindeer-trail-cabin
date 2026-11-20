@@ -1,16 +1,18 @@
 import {guestMarker} from './guest-marker.js';
 import {openTourRoom,readRoom} from './tour-room.js';
 
-export function installParty({world,getPose,choose,meet,label,snapshot,apply,stop,schedule}){
+export function installParty({world,getPose,joined,meet,label,snapshot,apply,snapshotFuel,applyFuel,addRemoteFuel,stop,schedule}){
   const get=id=>document.getElementById(id);
   const dialog=get('party'),button=get('party-toggle'),start=get('party-start'),notice=get('party-status');
   const details=get('party-details'),join=get('party-join'),share=get('party-link'),log=get('party-log');
-  const input=get('party-input'),markers=new Map();
-  let room=null,own='',active='',invite=readRoom(),pulse=null,lastTick=0,unread=0,ready=false,applying=false;
+  const input=get('party-input'),markers=new Map(),speakerLabels=new Map();
+  let room=null,own='',slot=0,active='',invite=readRoom(),pulse=null,lastTick=null,unread=0,ready=false,applying=false,isHost=false;
+  const neighbors=()=>Array.from(markers.values(),m=>m.target).filter(Boolean);
+  function meetAt(p){meet(p,{index:slot,occupied:neighbors()});}
   function lobby(){
     get('party-solo').hidden=!invite;
     start.textContent=invite?'Join group':'Create group';
-    get('party-note').textContent=invite?'A friend invited you to explore the cabin together.':'Create a link for up to eight people. Keep this tab open while your friends visit.';
+    get('party-note').textContent=invite?'Choose an avatar to join your friend at the cabin.':'Invite up to seven friends to explore with you. Keep this tab open while they visit.';
     details.hidden=true;join.hidden=false;start.disabled=false;
   }
   function open(){
@@ -20,94 +22,142 @@ export function installParty({world,getPose,choose,meet,label,snapshot,apply,sto
   }
   function badge(){button.textContent=unread?'Chat ('+unread+')':ready?'Group chat':'Friends';}
   function address(token){
-    const base=location.hash.split('?')[0]||'#front-entry';
-    const hash=base+(token?'?room='+token:'');history.replaceState(null,'',hash);
+    const base=location.hash.split('?')[0]||'#outside';
+    history.replaceState(null,'',base+(token?'?room='+token:''));
   }
+  function removeMarker(marker){world.remove(marker.root);marker.dispose();}
   function members(list,local){
     own=local;const ids=new Set(list.map(v=>v.id));
-    for(const [id,m] of markers)if(!ids.has(id)){world.remove(m.root);m.dispose();markers.delete(id);}
-    get('party-people').replaceChildren();
+    const nameCounts=new Map();
+    for(const guest of list)nameCounts.set(guest.name,(nameCounts.get(guest.name)||0)+1);
+    speakerLabels.clear();
     for(const guest of list){
-      const chip=document.createElement(guest.id===own?'span':'button');chip.textContent=guest.name+(guest.id===own?' (you)':'');get('party-people').append(chip);
-      if(guest.id===own)continue;
+      const role=guest.slot===0?'host':'guest '+guest.slot;
+      speakerLabels.set(guest.id,nameCounts.get(guest.name)>1?guest.name+' ('+role+')':guest.name);
+    }
+    for(const [id,m] of markers)if(!ids.has(id)){removeMarker(m);markers.delete(id);}
+    const people=get('party-people');people.replaceChildren();
+    for(const guest of list){
+      const row=document.createElement('div');row.className='party-person';people.append(row);
+      if(guest.id===own){
+        const self=document.createElement('span');self.textContent=speakerLabels.get(own)+' (you)';row.append(self);continue;
+      }
       let m=markers.get(guest.id);
-      if(!m){m=guestMarker(guest.name,guest.id);m.chip=chip;markers.set(guest.id,m);world.add(m.root);}else m.chip=chip;
-      m.name=guest.name;chip.onclick=()=>{if(m.target){dialog.close();meet({...m.target});}};
+      if(m&&(m.name!==guest.name||m.avatar!==guest.avatar)){removeMarker(m);markers.delete(guest.id);m=null;}
+      if(!m){
+        m=guestMarker(guest.name,guest.id,guest.avatar);
+        m.name=guest.name;m.avatar=guest.avatar;markers.set(guest.id,m);world.add(m.root);
+      }
+      m.displayName=speakerLabels.get(guest.id);
+      const chip=document.createElement('button');chip.type='button';chip.textContent=m.displayName;row.append(chip);m.chip=chip;
+      chip.onclick=()=>{if(m.target&&m.target.view!=='property'){dialog.close();meetAt({...m.target});}};
+      if(isHost){
+        const place=document.createElement('button');place.type='button';place.className='place';place.textContent='Place nearby';
+        place.setAttribute('aria-label','Place '+m.displayName+' nearby');row.append(place);
+        place.onclick=()=>{
+          if(room?.place(guest.id,getPose()))notice.textContent='Placed '+m.displayName+' near you.';
+          else notice.textContent='Choose a walking view to place a guest near you.';
+        };
+      }
       pose(guest.id,guest.pose||m.target);
+      if(!m.target)chip.disabled=true;
     }
     schedule();
   }
   function pose(id,p){
     const m=markers.get(id);if(!m||!p)return;
-    if(m.chip && (m.target?.view!==p.view || !m.chip.title)){
-      const place=label(p.view);m.chip.title='Meet '+m.name+' at '+place;
-      m.chip.textContent=m.name+' · '+place;m.chip.setAttribute('aria-label',m.chip.title);
+    if(m.chip&&(m.target?.view!==p.view||!m.chip.title)){
+      const place=label(p.view);m.chip.title='Meet '+m.displayName+' at '+place;
+      m.chip.textContent=m.displayName+' · '+place;m.chip.disabled=p.view==='property';m.chip.setAttribute('aria-label',m.chip.title);
     }
     m.root.userData.destination=p.view;
-    if(!m.target || Math.hypot(p.x-m.target.x,p.z-m.target.z)>2)m.root.position.set(p.x,p.y,p.z);
+    if(!m.target||Math.hypot(p.x-m.target.x,p.y-m.target.y,p.z-m.target.z)>2)m.root.position.set(p.x,p.y,p.z);
     m.target=p;m.root.rotation.y=p.yaw;schedule();
   }
-  function message(item){
-    const row=document.createElement('p'),by=document.createElement('strong');by.textContent=item.from;
+  function message(item,history){
+    const row=document.createElement('p'),by=document.createElement('strong');by.textContent=speakerLabels.get(item.fromId)||item.from;
     row.append(by,document.createTextNode(' '+item.text));log.append(row);
     while(log.childElementCount>45)log.firstChild.remove();
-    log.scrollTop=log.scrollHeight;if(!dialog.open){unread=Math.min(99,unread+1);badge();}
+    log.scrollTop=log.scrollHeight;
+    if(history||item.fromId===own)return;
+    markers.get(item.fromId)?.say(item.text);
+    if(!dialog.open){unread=Math.min(99,unread+1);badge();}
+    schedule();
   }
   function end(reason){
-    clearInterval(pulse);pulse=null;
+    clearInterval(pulse);pulse=null;lastTick=null;
     const hadRoom=ready;
     ready=false;own='';room=null;unread=0;active='';if(hadRoom){invite='';address('');}
-    for(const m of markers.values()){world.remove(m.root);m.dispose();}markers.clear();
+    for(const m of markers.values())removeMarker(m);markers.clear();speakerLabels.clear();
     log.replaceChildren();share.value='';get('party-people').replaceChildren();badge();lobby();
-    notice.textContent=reason;if(!dialog.open && hadRoom)open();schedule();
+    notice.textContent=reason;if(!dialog.open&&hadRoom)open();schedule();
   }
   function begin(e){
     e.preventDefault();if(room)return;
     if(location.protocol==='file:'){notice.textContent='Open the public cabin tour to invite friends.';return;}
-    const name=get('party-name').value.trim();if(!name){get('party-name').focus();return;}
-    notice.textContent='Connecting…';start.disabled=true;
-    try{room=openTourRoom({name,invite,snapshot,onEnd:end,onRoster:members,onPose:pose,onMessage:message,
-      onScene(s){applying=true;try{apply(s);}finally{applying=false;}},
-      onReady(token){
-        ready=true;pulse=setInterval(()=>room?.move(getPose()),160);active=token;address(token);share.value=location.href;
-        if(getPose().view==='property')choose('entry');
-        join.hidden=true;details.hidden=false;notice.textContent=invite?'You joined the group.':'Your group is open. Share the invitation below.';
-        badge();input.focus();schedule();
-      }
-    });}catch{end('This browser could not open a group connection. Try the public tour in a current browser.');}
+    const name=get('party-name').value.trim(),avatar=join.elements.avatar.value;
+    if(!name){get('party-name').focus();return;}
+    if(!avatar){join.querySelector('input[name=avatar]').focus();return;}
+    isHost=!invite;notice.textContent='Connecting…';start.disabled=true;
+    try{
+      room=openTourRoom({name,avatar,invite,snapshot,onEnd:end,onRoster:members,onPose:pose,onMessage:message,
+        snapshotFuel,onFuelState:applyFuel,onAddFuel:addRemoteFuel,
+        onPlace(p){if(dialog.open)dialog.close();meetAt(p);},
+        onScene(s){applying=true;try{apply(s);}finally{applying=false;}},
+        async onReady(token,arrival){
+          ready=true;slot=arrival.index;active=token;address(token);
+          // The first shared pose must be at the guest's assigned arrival slot.
+          const session=room;
+          await joined(arrival);
+          if(room!==session||!ready)return;
+          room.move(getPose());pulse=setInterval(()=>room?.move(getPose()),160);
+          share.value=location.href.split('#')[0]+'#outside?room='+active;
+          join.hidden=true;details.hidden=false;notice.textContent=isHost?'Your group is open. Share the invitation below.':'You joined the group.';
+          badge();if(isHost)input.focus();else if(dialog.open)dialog.close();
+          schedule();
+        }
+      });
+    }catch{end('This browser could not open a group connection. Try again in the public tour.');}
   }
   button.addEventListener('click',open);get('party-close').onclick=()=>dialog.close();
   get('party-solo').onclick=()=>{room?.leave();invite='';address('');lobby();dialog.close();};
   join.addEventListener('submit',begin);
   get('party-chat').addEventListener('submit',e=>{e.preventDefault();if(!input.value.trim())return;room?.send(input.value.trim());input.value='';});
   get('party-copy').onclick=async()=>{
-    const url=location.href.split('#')[0]+'#'+(location.hash.slice(1).split('?')[0]||'front-entry')+'?room='+active;
-    share.value=url;try{await navigator.clipboard.writeText(url);notice.textContent='Invitation copied.';}
+    try{await navigator.clipboard.writeText(share.value);notice.textContent='Invitation copied.';}
     catch{share.focus();share.select();notice.textContent='Copy the selected invitation link.';}
   };
   get('party-leave').onclick=()=>room?.leave();
   window.addEventListener('pagehide',()=>{if(room){ready=false;room.leave();}});
   lobby();
   return {
+    neighbors,
     initial(){if(invite)open();},
     get open(){return dialog.open;},
     get suffix(){const value=active||invite;return value?'?room='+value:'';},
-    conditions(){if(ready && !applying)room.conditions(snapshot());},
+    fuel(kind){if(ready)room.fuel(kind);},
+    conditions(){if(ready&&!applying)room.conditions(snapshot());},
     update(seconds){
       if(!ready)return false;
-      const p=getPose();
-
-      const k=1-Math.exp(-Math.min(.12,seconds-lastTick)*17);lastTick=seconds;
-      let moving=false;
+      const local=getPose(),dt=lastTick===null?0:Math.max(0,seconds-lastTick);
+      lastTick=seconds;
+      const k=1-Math.exp(-Math.min(.15,dt)*17);
+      let animated=false;
       for(const m of markers.values()){
-        if(!m.target)continue;
-        const t=m.target;m.root.visible=t.view!=='property' && p.view!=='property' && Math.hypot(p.x-t.x,p.z-t.z)>.38;
-        if(!m.root.visible)continue;
-        const pos=m.root.position;if(Math.hypot(pos.x-t.x,pos.y-t.y,pos.z-t.z)>.008){
-          pos.x+=(t.x-pos.x)*k;pos.y+=(t.y-pos.y)*k;pos.z+=(t.z-pos.z)*k;moving=true;
+        const t=m.target;
+        m.root.visible=!!t&&t.view!=='property'&&local.view!=='property'&&Math.hypot(local.x-t.x,local.z-t.z)>.38;
+        let walking=false;
+        if(t){
+          const pos=m.root.position;
+          walking=Math.hypot(pos.x-t.x,pos.z-t.z)>.014;
+          if(Math.hypot(pos.x-t.x,pos.y-t.y,pos.z-t.z)>.006){
+            pos.x+=(t.x-pos.x)*k;pos.y+=(t.y-pos.y)*k;pos.z+=(t.z-pos.z)*k;
+            animated=true;
+          }
         }
+        if(m.update(dt,walking))animated=true;
       }
-      return moving;
+      return animated;
     }
   };
 }
