@@ -9,7 +9,7 @@ export function afterPaint(){
 }
 
 function transferTime(seconds){
-  if(seconds==null)return 'Estimating download time…';
+  if(seconds==null)return 'Estimating time…';
   if(seconds<60){
     const value=seconds<15?Math.ceil(seconds):Math.round(seconds/5)*5;
     return 'About '+value+(value===1?' second':' seconds')+' left';
@@ -27,6 +27,20 @@ export function installLoadingScreen(){
     retry.addEventListener('click',()=>location.reload());
     return {host,retry,bar:find('bar'),stage:find('stage'),detail:find('detail'),percent:find('percent'),eta:find('eta')};
   });
+  const quotes=JSON.parse(document.getElementById('loading-quotes').textContent);
+  const captions=[full.querySelector('[data-load-quote]'),dialog.querySelector('[data-load-quote]')];
+  let currentQuote=quotes.indexOf(captions[0].textContent);
+  captions[1].textContent=quotes[currentQuote];
+  const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+  const quoteTimer=setInterval(()=>{
+    if(document.hidden || reducedMotion.matches)return;
+    currentQuote=(currentQuote+1)%quotes.length;
+    for(const caption of captions)caption.textContent=quotes[currentQuote];
+  },8000);
+  function endQuotes(){
+    clearInterval(quoteTimer);
+    for(const caption of captions)caption.hidden=true;
+  }
   canvas.inert=true;
   canvas.setAttribute('aria-busy','true');
   let finished=false,failed=false;
@@ -63,12 +77,14 @@ export function installLoadingScreen(){
       await afterPaint();
     },
     ready(){
+      endQuotes();
       finished=true;canvas.inert=false;canvas.setAttribute('aria-busy','false');
       display('ready','Ready to explore','','',100);
       full.hidden=true;compact.hidden=!dialog.open;
       if(!dialog.open && document.activeElement===document.body)canvas.focus({preventScroll:true});
     },
     failed(message){
+      endQuotes();
       failed=true;canvas.setAttribute('aria-busy','false');
       full.hidden=false;compact.hidden=false;
       display('error','The cabin couldn’t open',message);
