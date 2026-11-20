@@ -12,6 +12,8 @@ import {installFirewoodControls} from './firewood-controls.js';
 import {installFirewood} from './firewood.js';
 import {installTourFires} from './fires.js';
 import {installWelcome} from './welcome.js';
+import {readModel,ModelDownloadError} from './model-loading.js';
+import {installLoadingScreen,afterPaint} from './loading-screen.js';
 import {installPropertyMap} from './property-map.js';
 import {installSceneControls} from './scene-controls.js';
 import {batchStatic} from './batch.js';
@@ -25,7 +27,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const element = id => document.getElementById(id);
 const canvas = element('view');
 const controlsPanel = element('tools');
-const status = element('status');
+const loading=installLoadingScreen();
+let sceneCanRender=false;
 const roofs = [];
 const backdrop=[];
 const diagram=[];
@@ -422,8 +425,8 @@ const welcome=installWelcome({
     canvas.focus({preventScroll:true});
   }
 });
-function render(){
-  if(propertyMap.open || welcome.open)return;
+function render(firstFrame=false){
+  if(!sceneCanRender || (firstFrame!==true && (propertyMap.open || welcome.open)))return;
   const seconds=performance.now()/1000;
   const outside=outdoorsFloor(body?.label);
   lighting?.update(camera.position,activeView,seconds,camera,outside);
@@ -539,8 +542,14 @@ canvas.addEventListener('keydown',e=>{
   camera.position.copy(orbit.target).add(vec.setFromSpherical(s));
   orbit.update();render();
 });
+class GraphicsStartError extends Error {}
 async function show() {
-  renderer = new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'high-performance'});
+  await afterPaint();
+  try{
+    renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true,powerPreference:'high-performance'});
+  }catch(cause){
+    throw new GraphicsStartError('This browser couldn’t start 3D graphics. Enable hardware acceleration or try another browser.',{cause});
+  }
   renderer.setPixelRatio(maxRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -551,7 +560,10 @@ async function show() {
   orbit.addEventListener('change',render);
   new ResizeObserver(resized).observe(canvas);
   resized();
-  const gltf=await new GLTFLoader().parseAsync(await readModel(), '');
+  const bytes=await readModel(element('model'),loading.transfer);
+  await loading.preparing(1,'Unpacking rooms and textures');
+  const gltf=await new GLTFLoader().parseAsync(bytes,'');
+  await loading.preparing(2,'Setting up the grounds and walking paths');
   world.add(gltf.scene);
   gltf.scene.updateMatrixWorld(true);
   gltf.scene.traverse(object=>{
@@ -652,6 +664,7 @@ async function show() {
     item.originalMaterial=item.mesh.material;
     item.originalGeometry=item.mesh.geometry;
   }
+  await loading.preparing(3,'Lighting and drawing your first view');
   batchStatic(gltf.scene);
   lighting.captureExterior();
   film=cabinFilm(renderer);
@@ -672,42 +685,17 @@ async function show() {
   updateLookControls();
   const initialView=viewFromAddress();
   if(initialView!=='property') changeView(initialView);
+  sceneCanRender=true;
+  render(true);
+  await afterPaint();
   controlsPanel.hidden=false;
   element('views').hidden=false;
   element('tour-controls').hidden=false;
-  status.hidden=true;
+  loading.ready();
   party.initial();
-}
-class ModelDownloadError extends Error {}
-async function readModel(){
-  const model=element('model');
-  model.remove();
-  if(model.dataset.parts){
-    try {
-      const names=model.dataset.parts.split(' ');
-      const parts=await Promise.all(names.map(async name=>{
-        const response=await fetch(name);
-        if(!response.ok)throw Error('HTTP '+response.status+' reading '+name);
-        return new Uint8Array(await response.arrayBuffer());
-      }));
-      const length=Number(model.dataset.bytes);
-      if(parts.reduce((total,p)=>total+p.length,0)!==length)throw Error('Incomplete model download');
-      const bytes=new Uint8Array(length);
-      let offset=0;
-      for(const part of parts){bytes.set(part,offset);offset+=part.length;}
-      return bytes.buffer;
-    } catch(error) {
-      throw new ModelDownloadError('The property model could not download. Reload the page to try again.',{cause:error});
-    }
-  }
-  const encoded=model.textContent.trim();
-  if(Uint8Array.fromBase64)return Uint8Array.fromBase64(encoded).buffer;
-  const binary=atob(encoded);
-  const bytes=new Uint8Array(binary.length);
-  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-  return bytes.buffer;
 }
 show().catch(error=>{
   console.error(error);
-  status.textContent=error instanceof ModelDownloadError ? error.message : 'The 3D view could not open. Use a browser with WebGL enabled or open the companion GLB in Blender.';
+  loading.failed(error instanceof ModelDownloadError || error instanceof GraphicsStartError
+    ? error.message : 'The scene could not be prepared. Try loading the cabin again.');
 });

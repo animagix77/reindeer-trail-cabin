@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
+import {modelPartBytes} from './model-loading.js';
 import path from 'node:path';
 const args=process.argv.slice(2);
 const web=args.at(-1)==='--web';
@@ -45,10 +46,9 @@ for(const avatar of ['man','woman']){
   template=template.replace('%%HIKER_'+avatar.toUpperCase()+'%%','data:image/png;base64,'+portrait.toString('base64'));
 }
 if(web){
-  const chunkSize=12*1024*1024;
   const parts=[];
-  for(let start=0;start<glb.length;start+=chunkSize){
-    const chunk=glb.subarray(start,start+chunkSize);
+  for(let start=0;start<glb.length;start+=modelPartBytes){
+    const chunk=glb.subarray(start,start+modelPartBytes);
     const digest=createHash('sha256').update(chunk).digest('hex');
     const name='scene-'+digest+'.bin';
     await fs.writeFile(path.join(path.dirname(outPath),name),chunk);
