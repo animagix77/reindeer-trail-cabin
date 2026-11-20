@@ -1,285 +1,304 @@
 import * as T from 'three';
 import {makeSplittingBlock} from './splitting-block.js';
+import {createSplitPhysics} from './split-physics.js';
 
 const now=()=>performance.now()/1000;
-const recoverSeconds=3.2, drawSeconds=.32;
-const swingReach=1.20, pickupReach=1.45, returnDistance=1.80;
-const clamp=n=>Math.min(1,Math.max(0,n));
-// One beat crosses the painted band in each direction. The period stays
-// identical for touch and keyboard even when the renderer drops frames.
-const beat=t=>.5-.5*Math.cos(Math.max(0,t)*Math.PI*2/1.85);
+const clamp=T.MathUtils.clamp;
+const drawSeconds=.34,loadSeconds=.85,restSeconds=1.65;
+const swingReach=1.2,pickupReach=1.45,returnDistance=1.8;
 
-export function installWoodSplitting(scene,model,space,{camera,schedule,takeSplitLog,handsBusy,onSwing,onStrike}){
+export function installWoodSplitting(scene,model,space,{camera,schedule,takeSplitLog,handsBusy,onSwing,onStrike,onContact}){
   const station=makeSplittingBlock(model),root=station.root;
-  function ground(x,z){
-    return space.heights(x,z).find(h=>h.label==='WalkSurface_ParcelGround')?.y;
-  }
-  // End of the garage motor court where IMG_5816 looks down the gravel
-  // shoulder into the yard. No permanent splitting station is identifiable
-  // in the photographs; this spot leaves the garage and stair access clear.
+  const ground=(x,z)=>space.heights(x,z).find(h=>h.label==='WalkSurface_ParcelGround')?.y;
+  // Gravel shoulder beside the garage motor court, clear of the driveway stairs.
   const px=-8,py=32.6;
-  const x=4.65-.3048*(.995562*px+.094108*py);
-  const z=-8.5+.3048*(-.094108*px+.995562*py);
+  const x=4.65-.3048*(.995562*px+.094108*py),z=-8.5+.3048*(-.094108*px+.995562*py);
   root.position.set(x,ground(x,z),z);root.rotation.y=1.52;scene.add(root);
   root.updateMatrixWorld(true);
   const worldPoint=(x,y,z)=>root.localToWorld(new T.Vector3(x,y,z));
-  for(const name of ['Unsplit oak rounds','Split wood ready to carry','Split log cradle']){
-    const mesh=root.getObjectByName(name),inst=new T.Matrix4(),q=new T.Vector3();
-    for(let i=0;i<mesh.instanceMatrix.count;i++){
-      mesh.getMatrixAt(i,inst);q.setFromMatrixPosition(inst);
-      const wp=worldPoint(q.x,0,q.z),floor=ground(wp.x,wp.z);
-      if(Number.isFinite(floor))inst.elements[13]+=floor-root.position.y;
-      mesh.setMatrixAt(i,inst);
-    }
-    mesh.instanceMatrix.needsUpdate=true;
+  function groundAt(x,z){
+    const p=worldPoint(x,0,z);
+    return (ground(p.x,p.z)??root.position.y)-root.position.y;
   }
+  const cache=root.getObjectByName('Unsplit oak rounds');
+  const matrix=new T.Matrix4(),p=new T.Vector3();
+  for(let i=0;i<cache.count;i++){
+    cache.getMatrixAt(i,matrix);p.setFromMatrixPosition(matrix);
+    matrix.elements[13]+=groundAt(p.x,p.z);cache.setMatrixAt(i,matrix);
+  }
+  cache.instanceMatrix.needsUpdate=true;cache.computeBoundingSphere();
   function blocker(name,cx,cz,width,depth,height){
-    const g=new T.BoxGeometry(width,height,depth),box=new T.Mesh(g);
+    const box=new T.Mesh(new T.BoxGeometry(width,height,depth));
     box.position.copy(worldPoint(cx,height*.5,cz));box.rotation.y=root.rotation.y;
-    box.updateMatrixWorld();space.add(box,'WalkBlock_Splitting'+name);g.dispose();box.material.dispose();
+    box.updateMatrixWorld();space.add(box,'WalkBlock_Splitting'+name);box.geometry.dispose();box.material.dispose();
   }
-  blocker('Block',0,0,.51,.51,.60);blocker('Rounds',-.92,-.16,.94,.40,.59);blocker('LogCradle',.92,-.15,.95,.33,.39);
-  const eye=worldPoint(.04,0,.90);eye.y=(ground(eye.x,eye.z)??root.position.y)+1.59;
-  const view={eye:eye.toArray(),target:worldPoint(0,.75,0).toArray(),fov:62};
+  blocker('Block',0,0,.51,.51,.60);blocker('Rounds',-.92,-.16,.94,.40,.59);
+  const physics=createSplitPhysics({root,groundAt,onContact:speed=>{
+    const range=Math.hypot(camera.position.x-x,camera.position.z-z);
+    if(range<10)onContact?.(speed*Math.min(1,2/Math.max(1,range)));
+  }});
+  const eye=worldPoint(.04,0,.96);eye.y=(ground(eye.x,eye.z)??root.position.y)+1.59;
+  const view={eye:eye.toArray(),target:worldPoint(0,.72,0).toArray(),fov:62};
   const el=id=>document.getElementById(id);
-  const panel=el('woodwork'),trigger=el('split-open'),action=el('split-action'),mode=el('split-mode');
-  const collect=el('split-collect'),reset=el('split-reset'),meter=el('split-meter'),needle=el('split-needle');
+  const panel=el('woodwork'),action=el('split-action'),collect=el('split-collect');
   const power=el('split-strength'),readout=el('split-strength-value'),reticle=el('split-reticle');
-  const scoreText=el('split-score'),message=el('split-message'),canvas=el('view');
+  const pile=el('split-score'),message=el('split-message'),canvas=el('view');
   const reduced=matchMedia('(prefers-reduced-motion: reduce)'),touch=matchMedia('(pointer: coarse)');
-  if(reduced.matches)mode.value='steady';
-
-  let near=false,opened=false,equipped=false,distance=Infinity,drawnAt=0,aimBegan=0;
-  let swing=null,queuedHit=null,strength=1,recoveryFrom=0,lastTick=now(),score=0,rewards=0;
-  let roundSplit=false,shownPower=-1,shownState='',note='';
-  function shadowChanged(){model.userData.lightRevision=(model.userData.lightRevision||0)+1;schedule();}
-  function drawTime(){return reduced.matches?0:drawSeconds;}
-  function stage(t){
+  let near=false,distance=Infinity,equipped=false,drawnAt=0,strength=1,recoverAt=0,lastTick=now();
+  let swing=null,queuedHit=null,reloadAfter=null,loading=null,lastClear=0,lastShadow=0,hint='',hover=null;
+  const stump=root.getObjectByName('Scored chopping stump');
+  const ray=new T.Raycaster(),ndc=new T.Vector2(),point=new T.Vector3(),viewer=new T.Vector3();
+  const oldEdge=new T.Vector3(),newEdge=new T.Vector3(),projected=new T.Vector3();
+  const suggested=new T.Vector2();
+  function dirty(){model.userData.lightRevision=(model.userData.lightRevision||0)+1;}
+  function canInput(){return near && !document.querySelector('dialog[open]');}
+  function phase(t){
     if(!equipped)return 'parked';
     if(swing)return 'swinging';
-    if(t<drawnAt+drawTime())return 'drawing';
+    if(t<drawnAt+(reduced.matches?0:drawSeconds))return 'drawing';
+    if(loading || reloadAfter!==null)return 'loading';
     return strength===1?'ready':'recovering';
   }
-  function say(text){note=text;}
-  function show(t){
-    const phase=stage(t),canReach=distance<=(equipped?swingReach:pickupReach);
-    const locked=document.pointerLockElement===canvas;
-    const key=[near,opened,phase,canReach,mode.value,score,rewards,note,locked].join('|');
-    if(key!==shownState){
-      shownState=key;
-      panel.hidden=!opened;trigger.hidden=!near;trigger.setAttribute('aria-expanded',String(opened));
-      panel.toggleAttribute('data-equipped',equipped);panel.dataset.stage=phase;
-      reticle.hidden=!near||!locked;
-      action.textContent=({parked:'Pick up axe',drawing:'Lifting axe…',swinging:'Swinging…',recovering:'Resting…',ready:'Swing axe'})[phase];
-      action.disabled=!canReach || !['parked','ready'].includes(phase);
-      mode.disabled=!!swing;reset.disabled=!score||!!swing;collect.hidden=!rewards;collect.disabled=!!swing;
-      meter.hidden=phase!=='ready'||mode.value!=='timed';
-      scoreText.textContent=score+' '+(score===1?'point':'points')+' · '+rewards+' '+(rewards===1?'piece':'pieces')+' stacked';
-      station.inventory(rewards);
-      let guide=note;
-      if(!guide && !canReach)guide='Step closer to the chopping block.';
-      if(!guide && phase==='parked')guide=touch.matches?'Tap the axe to pick it up.':'Click the axe or press E to pick it up.';
-      if(!guide && phase==='drawing')guide='Lifting the axe. Choose your spot on the round.';
-      if(!guide && phase==='swinging')guide='Swinging through the round.';
-      if(!guide && phase==='ready'){
-        guide=touch.matches?'Tap the round to swing.':'Click the round or aim and press Space to swing.';
-        if(mode.value==='timed')guide='Swing as the marker crosses the gold band.';
-      }
-      if(!guide && phase==='recovering')guide='Stand still to recover your strength.';
-      if(message.textContent!==guide)message.textContent=guide;
-    }
-    const percent=strength===1?100:Math.floor(strength*100);
-    if(shownPower!==percent){
-      shownPower=percent;power.value=percent;readout.textContent=percent+'%';
-    }
-  }
-  function returnAxe(){
-    if(!equipped)return;
-    if(swing && roundSplit)station.stroke(1,true,true,undefined,swing.aim);
-    swing=null;queuedHit=null;equipped=false;canvas.style.cursor='';station.rest();shadowChanged();
-  }
-  function setOpen(on){
-    if(on && !near)return;
-    opened=on;
-    if(!on){returnAxe();say('');}
-    show(now());schedule();
-  }
-  function setRound(){
-    station.begin();roundSplit=false;shadowChanged();
-  }
-  function pickup(){
-    if(!near || distance>pickupReach || equipped)return false;
-    opened=true;
-    if(handsBusy()){
-      say('Your hands are full. Put down what you’re carrying first.');show(now());return false;
-    }
-    canvas.style.cursor='';equipped=true;drawnAt=now();aimBegan=drawnAt+drawTime();
-    if(roundSplit && strength===1)setRound();
-    say('');show(drawnAt);shadowChanged();return true;
-  }
-  function strike(hit){
-    const t=now();
-    if(!equipped || strength<1 || distance>swingReach || swing)return false;
-    if(stage(t)==='drawing'){
-      if(!queuedHit)queuedHit=hit;
-      return true;
-    }
-    queuedHit=null;
-    const error=mode.value==='timed'?Math.abs(beat(t-aimBegan)-.5):0;
-    const duration=reduced.matches?.38:station.swingDuration;
-    swing={start:t,duration,aim:hit,good:error<=.16,contact:false,whoosh:false,
-      centered:mode.value==='timed'?error<=.065:Math.hypot(hit.x,hit.z)<.085};
-    canvas.style.cursor='';strength=0;recoveryFrom=t+duration;
-    say('');show(t);schedule();return true;
-  }
-  function contact(){
-    swing.contact=true;
-    swing.good=swing.good && distance<=swingReach;
-    onStrike(swing.good?(swing.centered?1:.82):.32);
-    if(swing.good){
-      roundSplit=true;rewards+=2;score+=mode.value==='steady'?1:swing.centered?3:2;
-      say('Clean split. Two pieces stacked. Stand still to recover.');
-    }else say('Glancing hit. Rest, then try the round again.');
-    shadowChanged();
+  function canReach(){return distance<=(equipped?swingReach:pickupReach);}
+  function hud(t){
+    panel.hidden=!near;
+    const stage=phase(t);
+    panel.dataset.stage=stage;panel.toggleAttribute('data-equipped',equipped);
+    const percent=Math.floor(strength*100);
+    if(power.value!==percent){power.value=percent;readout.textContent=percent+'%';}
+    const n=physics.count;
+    const quantity=n+' split '+(n===1?'piece':'pieces');
+    if(pile.textContent!==quantity)pile.textContent=quantity;
+    pile.hidden=!n;collect.hidden=!n;collect.disabled=!!swing||distance>pickupReach;
+    const text=equipped?'Swing':'Pick up axe';
+    if(action.textContent!==text)action.textContent=text;
+    action.disabled=!canReach() || !['ready','parked'].includes(stage);
+    let guide=hint;
+    if(!guide && !canReach())guide='Step closer to the block.';
+    if(!guide && stage==='parked')guide=touch.matches?'Tap the axe to pick it up.':'Click the axe to pick it up.';
+    if(!guide && stage==='ready')guide=touch.matches?'Tap a spot on the round.':'Click a spot on the round.';
+    if(!guide && stage==='recovering')guide='Stand still to catch your breath.';
+    if(!guide && stage==='loading')guide='Setting the next round on the block.';
+    if(message.textContent!==guide)message.textContent=guide;
   }
 
-  const ray=new T.Raycaster(),ndc=new T.Vector2(),localHit=new T.Vector3();
-  const stump=root.getObjectByName('Scored chopping stump');
+  function aimAt(x,z){
+    // Recast onto the end grain. A strike on the side aims at the rim above it.
+    ray.set(worldPoint(x,station.top+station.height+.10,z),new T.Vector3(0,-1,0));
+    const top=ray.intersectObject(station.round,false)[0];
+    if(!top)return null;
+    root.worldToLocal(point.copy(top.point));root.worldToLocal(viewer.copy(camera.position));
+    const bearing=Math.atan2(viewer.x-point.x,viewer.z-point.z);
+    const lateral=(point.x*Math.cos(bearing)-point.z*Math.sin(bearing))/station.radius;
+    const angle=bearing+.36*clamp(lateral,-1,1);
+    return {kind:'round',x:point.x,y:point.y,z:point.z,nx:Math.cos(angle),nz:-Math.sin(angle)};
+  }
   function hitTest(clientX,clientY,slop=0){
     const rect=canvas.getBoundingClientRect();
-    if(!rect.width || !rect.height)return null;
     const nx=clientX==null?0:2*(clientX-rect.left)/rect.width-1;
     const ny=clientY==null?0:1-2*(clientY-rect.top)/rect.height;
     camera.updateWorldMatrix(true,false);root.updateWorldMatrix(true,true);
-    // Test the nearest station surface. In-hand geometry is excluded so the
-    // visitor's grip never occludes their aim at the round.
-    const targets=equipped?[station.round,stump]:[station.maul,station.round,stump];
-    for(const [dx,dy] of (slop?[[0,0],[slop,0],[-slop,0],[0,slop],[0,-slop]]:[[0,0]])){
-      ndc.set(nx+2*dx/rect.width,ny+2*dy/rect.height);ray.setFromCamera(ndc,camera);
+    const targets=[stump,cache];
+    if(station.round.visible)targets.push(station.round);
+    if(!equipped)targets.push(station.maul);
+    const offsets=slop?[[0,0],[slop,0],[-slop,0],[0,slop],[0,-slop]]:[[0,0]];
+    for(const [dx,dy] of offsets){
+      ndc.set(nx+2*dx/rect.width,ny+2*dy/rect.height);ray.far=Infinity;ray.setFromCamera(ndc,camera);
       const hit=ray.intersectObjects(targets,true).find(({object})=>{
         for(let o=object;o && o!==root;o=o.parent)if(!o.visible)return false;
         return true;
       });
       if(!hit)continue;
       if(!equipped){
-        for(let o=hit.object;o;o=o.parent)if(o===station.maul)return {kind:'axe'};
-      }else if(hit.object===station.round){
-        station.round.worldToLocal(localHit.copy(hit.point));
-        return {kind:'round',x:localHit.x,z:localHit.z};
+        for(let obj=hit.object;obj;obj=obj.parent)if(obj===station.maul)return {kind:'axe'};
+      }else if(hit.object===station.round && !loading){
+        root.worldToLocal(point.copy(hit.point));
+        const aim=aimAt(point.x,point.z);
+        if(aim)return aim;
       }
     }
     return null;
   }
-  function canInput(){return near && !document.querySelector('dialog[open]');}
-  function activate(hit){
-    if(!canInput())return false;
-    if(!equipped)return hit?.kind==='axe' && pickup();
-    return hit?.kind==='round' && strike(hit);
-  }
-  // A look drag, pinch or cancelled touch must never become a pickup or swing.
-  const pressed=new Set();
-  let tap=null;
-  canvas.addEventListener('pointerdown',event=>{
-    if(event.button!==0||!canInput())return;
-    canvas.style.cursor='';pressed.add(event.pointerId);
-    tap=pressed.size===1?{id:event.pointerId,x:event.clientX,y:event.clientY}:null;
-  });
-  canvas.addEventListener('pointermove',event=>{
-    if(document.pointerLockElement===canvas)return;
-    if(!pressed.size && near && event.pointerType==='mouse'){
-      const available=equipped?strength===1 && !swing && distance<=swingReach:distance<=pickupReach;
-      const hit=available && hitTest(event.clientX,event.clientY,3);
-      canvas.style.cursor=hit?'pointer':'';
-    }
-    if(!tap || tap.id!==event.pointerId)return;
-    if(Math.hypot(event.clientX-tap.x,event.clientY-tap.y)>(event.pointerType==='touch'?10:5))tap=null;
-  });
-  canvas.addEventListener('pointerup',event=>{
-    const didTap=tap && tap.id===event.pointerId;
-    pressed.delete(event.pointerId);tap=null;
-    if(!didTap || !canInput())return;
+  function showTarget(t){
+    reticle.hidden=true;
+    if(!near||!canReach()||!canInput()||swing||loading||reloadAfter!==null)return;
     const locked=document.pointerLockElement===canvas;
-    const hit=hitTest(locked?null:event.clientX,locked?null:event.clientY,event.pointerType==='touch'?8:3);
-    if(activate(hit))canvas.focus({preventScroll:true});
-  });
-  canvas.addEventListener('pointerleave',()=>{canvas.style.cursor='';});
-  function cancelTap(event){pressed.delete(event.pointerId);tap=null;}
-  canvas.addEventListener('pointercancel',cancelTap);canvas.addEventListener('lostpointercapture',cancelTap);
-  window.addEventListener('blur',()=>{pressed.clear();tap=null;});
-  document.addEventListener('pointerlockchange',()=>{canvas.style.cursor='';pressed.clear();tap=null;show(now());schedule();});
-
-  trigger.addEventListener('click',()=>{setOpen(!opened);if(opened)action.focus({preventScroll:true});});
-  el('split-close').addEventListener('click',()=>{setOpen(false);canvas.focus({preventScroll:true});});
-  action.addEventListener('click',()=>{
-    if(!canInput() || !opened)return;
-    if(!equipped)pickup();
-    else if(!activate(hitTest(null,null))){
-      say('Look at the round on top of the block.');show(now());
+    const hit=locked?hitTest(null,null):hover;
+    if(locked&&!hit)return;
+    if(equipped){
+      if(!station.round.visible)return;
+      if(hit?.kind==='round')projected.set(hit.x,hit.y+.003,hit.z);
+      else projected.set(suggested.x,station.top+station.height+.003,suggested.y);
+      root.localToWorld(projected);
+    }else station.maul.localToWorld(projected.set(0,0,-.27));
+    camera.updateWorldMatrix(true,false);projected.project(camera);
+    if(Math.abs(projected.x)>.995||Math.abs(projected.y)>.995||Math.abs(projected.z)>1)return;
+    reticle.style.left=(locked?50:50*(1+projected.x))+'%';
+    reticle.style.top=(locked?50:50*(1-projected.y))+'%';
+    reticle.dataset.ready=String(phase(t)==='ready'||!equipped);
+    reticle.hidden=false;
+  }
+  function refresh(){hud(now());showTarget(now());schedule();}
+  function returnAxe(){
+    swing=null;queuedHit=null;equipped=false;hover=null;canvas.style.cursor='';
+    station.rest();dirty();
+  }
+  function pickup(){
+    if(!near||!canReach()||equipped)return false;
+    if(handsBusy()){hint='Put down what you’re carrying first.';refresh();return false;}
+    equipped=true;drawnAt=now();hint='';hover=null;dirty();refresh();return true;
+  }
+  function strike(aim){
+    const t=now();
+    if(!aim || !equipped || distance>swingReach || swing || strength<1 || reloadAfter!==null || loading)return false;
+    if(phase(t)==='drawing'){queuedHit??=aim;return true;}
+    const duration=reduced.matches?.48:station.swingDuration;
+    swing={start:t,duration,aim,contact:false,whoosh:false};
+    strength=0;recoverAt=t+duration;hint='';hover=null;canvas.style.cursor='';
+    refresh();return true;
+  }
+  function resolveImpact(hit,t){
+    swing.contact=true;
+    if(!hit || hit.object!==station.round || distance>swingReach){
+      swing.aim.outcome='glance';onStrike(.28,'glance');hint='Glancing blow. Aim inside the rim.';return;
     }
+    const contact=root.worldToLocal(hit.point.clone());
+    const result=station.impact({...swing.aim,x:contact.x,z:contact.z,energy:1});
+    swing.aim.outcome=result.split?'split':result.bite?'bite':'glance';
+    onStrike(result.split?1:result.bite?.7:.28,swing.aim.outcome);
+    if(result.split){
+      physics.release(result.pieces,result.cut);
+      reloadAfter=t+.28;lastClear=t;hint='';
+    }else if(result.bite){
+      // Mark a spot along the opened check, leaving its mouth visible.
+      const {x,z,nx,nz}=result.cut;
+      const direction=z*nx-x*nz>0?-1:1;
+      suggested.set(x-direction*.045*nz,z+direction*.045*nx).clampLength(0,station.radius*.84);
+      hint='Follow the crack toward either end.';
+    }else hint='Glancing blow. Aim inside the rim.';
+    dirty();
+  }
+  function advanceSwing(t){
+    const s=swing,end=clamp((t-s.start)/s.duration,0,1),impact=station.impactFraction;
+    if(!s.whoosh && end>=impact-.18/s.duration){
+      s.whoosh=true;if(!reduced.matches && end<impact)onSwing((impact-end)*s.duration);
+    }
+    if(!s.contact && end>=impact){
+      // Evaluate the final descent even when a slow frame spans the entire hit.
+      // Sweep the sharpened edge against the current, possibly notched mesh.
+      const pose=(u,out)=>{
+        station.stroke(u,true,false,camera,s.aim);
+        return station.maul.localToWorld(out.copy(station.edge));
+      };
+      let hit=null;
+      pose(impact-.08,oldEdge);
+      for(let i=1;i<=5 && !hit;i++){
+        pose(impact-.08+.08*i/5,newEdge);
+        const length=oldEdge.distanceTo(newEdge);
+        if(length>1e-7){
+          ray.set(oldEdge,point.subVectors(newEdge,oldEdge).normalize());
+          ray.far=length+.0015;
+          hit=ray.intersectObjects([station.round,stump],false)[0];
+        }
+        oldEdge.copy(newEdge);
+      }
+      ray.far=Infinity;
+      resolveImpact(hit,t);
+    }
+    station.stroke(end,true,reduced.matches,camera,s.aim);
+    if(end===1)swing=null;
+  }
+  function reload(t){
+    if(reloadAfter!==null && t>=reloadAfter && !swing){
+      if(physics.canLoad()){
+        station.begin();suggested.set(0,0);loading={start:t};reloadAfter=null;
+        hint='';dirty();
+      }else if(t-lastClear>1.5){physics.clearBlock();lastClear=t;}
+    }
+    if(!loading)return;
+    const u=clamp((t-loading.start)/(reduced.matches?.12:loadSeconds),0,1);
+    const travel=u*u*(3-2*u);
+    station.round.position.set(-.62*(1-travel),station.top+.24*Math.sin(Math.PI*travel)-.21*(1-travel),-.22*(1-travel));
+    station.round.rotation.set(1.32*(1-travel),0,.14*Math.sin(Math.PI*travel));
+    if(u===1){loading=null;dirty();}
+  }
+
+  const pressed=new Set();let tap=null;
+  canvas.addEventListener('pointerdown',e=>{
+    if(e.button!==0 || !canInput())return;
+    pressed.add(e.pointerId);
+    tap=pressed.size===1?{id:e.pointerId,x:e.clientX,y:e.clientY}:null;
+  });
+  canvas.addEventListener('pointermove',e=>{
+    if(document.pointerLockElement===canvas)return;
+    if(tap?.id===e.pointerId && Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>(e.pointerType==='touch'?10:5))tap=null;
+    if(pressed.size||!near||e.pointerType!=='mouse')return;
+    hover=canReach() && !swing?hitTest(e.clientX,e.clientY,2):null;
+    canvas.style.cursor=hover?'pointer':'';showTarget(now());
+  });
+  canvas.addEventListener('pointerup',e=>{
+    const clicked=tap?.id===e.pointerId;pressed.delete(e.pointerId);tap=null;
+    if(!clicked||!canInput())return;
+    const locked=document.pointerLockElement===canvas;
+    const hit=hitTest(locked?null:e.clientX,locked?null:e.clientY,e.pointerType==='touch'?9:3);
+    if(hit?.kind==='axe'?pickup():hit?.kind==='round' && strike(hit))canvas.focus({preventScroll:true});
+  });
+  canvas.addEventListener('pointerleave',()=>{canvas.style.cursor='';hover=null;showTarget(now());});
+  function cancel(e){pressed.delete(e.pointerId);tap=null;}
+  canvas.addEventListener('pointercancel',cancel);canvas.addEventListener('lostpointercapture',cancel);
+  function clearPointers(){pressed.clear();tap=null;hover=null;canvas.style.cursor='';}
+  window.addEventListener('blur',clearPointers);
+  document.addEventListener('pointerlockchange',()=>{clearPointers();refresh();});
+  action.addEventListener('click',()=>{
+    if(!canInput()||!canReach())return;
+    if(!equipped)pickup();
+    else if(!reticle.hidden)strike(document.pointerLockElement===canvas?hitTest(null,null):aimAt(suggested.x,suggested.y));
     canvas.focus({preventScroll:true});
   });
-  mode.addEventListener('change',()=>{aimBegan=now();say('');show(aimBegan);schedule();});
   collect.addEventListener('click',()=>{
-    if(!canInput() || !opened || !rewards || swing)return;
-    if(takeSplitLog()){
-      returnAxe();rewards--;say('You’re carrying a split log. Take it to the fire pit.');shadowChanged();
-      canvas.focus({preventScroll:true});
-    }else say('Your hands are full. Put down the wood you’re carrying first.');
-    show(now());schedule();
-  });
-  reset.addEventListener('click',()=>{
-    if(!canInput() || !opened || swing)return;
-    score=0;say('Fresh score. Your stacked firewood is here.');show(now());schedule();
+    if(!canInput()||distance>pickupReach||swing||!physics.count)return;
+    if(!handsBusy() && takeSplitLog()){
+      physics.take();returnAxe();hint='Take your split log to the fire pit.';
+    }else hint='Your hands are full.';
+    canvas.focus({preventScroll:true});refresh();
   });
   document.addEventListener('keydown',e=>{
     if(!canInput()||e.defaultPrevented||e.repeat||e.altKey||e.ctrlKey||e.metaKey)return;
-    if(e.key==='Escape' && opened){setOpen(false);return;}
     if(document.pointerLockElement!==canvas && ![canvas,document.body].includes(e.target))return;
     if(e.code==='KeyE'){
-      if(equipped){returnAxe();say('');show(now());}else pickup();
+      if(equipped){returnAxe();hint='';refresh();}else pickup();
       e.preventDefault();
     }else if(e.code==='Space' && equipped){
-      if(['ready','drawing'].includes(stage(now())) && !activate(hitTest(null,null))){say('Aim at the round on top of the block.');show(now());}
+      const aim=hitTest(null,null);if(aim?.kind==='round')strike(aim);
       e.preventDefault();
     }
   });
-
-  return {view,update(activeView,seconds,moving){
-    const p=camera.position;
-    distance=Math.hypot(p.x-x,p.z-z);
-    const next=activeView!=='property' && distance<2.5 && Math.abs(p.y-root.position.y-1.55)<1.25;
-    if(next!==near){
-      near=next;opened=next;say('');canvas.style.cursor='';pressed.clear();tap=null;
-    }
-    if(equipped && (!near || distance>returnDistance)){returnAxe();say('');}
-    if(queuedHit && stage(seconds)==='ready'){
-      const hit=queuedHit;queuedHit=null;strike(hit);
-    }
-    if(swing){
-      const t=clamp((seconds-swing.start)/swing.duration);
-      const untilContact=(station.impactFraction-t)*swing.duration;
-      if(!swing.whoosh && untilContact>0 && untilContact<.20){
-        swing.whoosh=true;if(!reduced.matches)onSwing(untilContact);
+  return {view,
+    blocksStep(wx,wz,footY){
+      if(!physics.count)return false;
+      root.worldToLocal(p.set(wx,footY,wz));return physics.blocksStep(p.x,p.z,p.y);
+    },
+    update(activeView,seconds,moving){
+      const dt=Math.max(0,seconds-lastTick);
+      const activePhysics=physics.step(dt);
+      distance=Math.hypot(camera.position.x-x,camera.position.z-z);
+      const here=activeView!=='property' && distance<2.25 && Math.abs(camera.position.y-root.position.y-1.55)<1.25;
+      if(near!==here){near=here;hint='';clearPointers();}
+      if(equipped && (!near || distance>returnDistance)){returnAxe();hint='';}
+      if(queuedHit && phase(seconds)==='ready'){
+        const aim=queuedHit;queuedHit=null;strike(aim);
       }
-      if(!swing.contact && t>=station.impactFraction)contact();
-      station.stroke(t,swing.good,reduced.matches,camera,swing.aim);
-      if(t===1)swing=null;
-    }
-    if(strength<1 && !moving){
-      const elapsed=Math.max(0,seconds-Math.max(lastTick,recoveryFrom));
-      strength=Math.min(1,strength+elapsed/recoverSeconds);
-      if(strength===1){
-        if(roundSplit)setRound();
-        aimBegan=seconds;say('');
+      if(swing)advanceSwing(seconds);
+      reload(seconds);
+      if(strength<1 && !moving)strength=Math.min(1,strength+Math.max(0,seconds-Math.max(lastTick,recoverAt))/restSeconds);
+      lastTick=seconds;
+      if(equipped && !swing){
+        const lift=reduced.matches?1:clamp((seconds-drawnAt)/drawSeconds,0,1);
+        station.hold(camera,seconds,reduced.matches,strength,lift);
       }
+      if(distance<9 && (activePhysics || loading || swing) && seconds-lastShadow>=.12){dirty();lastShadow=seconds;}
+      hud(seconds);showTarget(seconds);
+      return activePhysics || !!loading || reloadAfter!==null || !!swing || (strength<1&&!moving) || phase(seconds)==='drawing';
     }
-    lastTick=seconds;
-    if(equipped && !swing){
-      const raised=drawTime()?clamp((seconds-drawnAt)/drawTime()):1;
-      station.hold(camera,seconds,reduced.matches,strength,raised);
-      if(mode.value==='timed' && stage(seconds)==='ready')needle.style.left=(beat(seconds-aimBegan)*100).toFixed(1)+'%';
-    }
-    show(seconds);
-    return !!swing || (strength<1 && !moving) || (equipped && (stage(seconds)==='drawing' || mode.value==='timed'));
-  }};
+  };
 }

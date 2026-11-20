@@ -73,20 +73,24 @@ function channel(ctx,kind,channelIndex){
   for(let i=0;i<edge;i++){const fade=i/edge;samples[i]*=fade;samples[samples.length-1-i]*=fade;}
   return samples;
 }
-// A short block resonance follows the metal impact. On a good strike, a second,
-// higher transient gives the split a distinct dry crack.
-function splittingSound(ctx,solid){
+// Strike, tearing fibers and landing wood use separate envelopes. A half
+// knocking the stump can sound before its later impact on the ground.
+function splittingSound(ctx,outcome,variant){
   const rate=22050,buf=ctx.createBuffer(1,Math.ceil(rate*.34),rate),samples=buf.getChannelData(0);
-  const rng=random(solid?5941:3151);
-  let previous=0;
+  const rng=random(5941+variant*3351+outcome.length*113);
+  const split=outcome==='split',landing=outcome==='landing',glance=outcome==='glance';
+  const pitch=(landing?82:glance?183:111)*(.92+.16*rng()),decay=landing?39:27;
+  const tearAt=.012+.009*rng();
+  let previous=0,low=0;
   for(let i=0;i<samples.length;i++){
-    const t=i/rate,white=rng()*2-1,fiberTime=t-.022;
-    const impulse=(white-previous)*Math.exp(-t*152);
-    const block=Math.sin(tau*(solid?113:170)*t)*Math.exp(-t*24)
-      +.31*Math.sin(tau*281*t)*Math.exp(-t*40);
-    const crack=solid && fiberTime>0 ? white*Math.exp(-fiberTime*88)*(.72+.28*Math.cos(910*fiberTime)) : 0;
+    const t=i/rate,white=rng()*2-1,fiberTime=t-tearAt;
+    low+=.14*(white-low);
+    const impulse=(landing?low:.48*(white-previous))*Math.exp(-t*(glance?72:164));
+    const block=(.64*Math.sin(tau*pitch*t)+.31*Math.sin(tau*pitch*2.27*t)*Math.exp(-t*19))*Math.exp(-t*decay);
+    const fibers=split && fiberTime>0?(white-.7*low)*Math.exp(-fiberTime*66)*(.55+.45*Math.cos(810*fiberTime)**2):0;
+    const ring=glance?.20*Math.sin(tau*691*t)*Math.exp(-t*47):0;
     previous=white;
-    samples[i]=Math.tanh(.60*impulse+.54*block+.91*crack)*Math.min(1,i/9);
+    samples[i]=Math.tanh(impulse+block+1.24*fibers+ring)*Math.min(1,i/8);
   }
   return buf;
 }
@@ -107,7 +111,7 @@ export function installWoodlandSound() {
   let hour,sunDirection,weather='clear',day=1;
   const tracks={},right=new THREE.Vector3(),toward=new THREE.Vector3(),up=new THREE.Vector3(0,1,0);
   const last={},steps=new Map(),impacts=new Map();
-  let stepNumber=0,swingBuffer;
+  let stepNumber=0,impactNumber=0,swingBuffer;
   function init(){
     const Context=globalThis.AudioContext||globalThis.webkitAudioContext;
     if(!Context)throw Error('Web Audio is unavailable.');
@@ -135,6 +139,15 @@ export function installWoodlandSound() {
     last[key]=value;param.setTargetAtTime(value,audio.currentTime,lag);
   }
   const hidden=()=>document.hidden;
+  function woodSound(outcome,volume){
+    if(!enabled || audio?.state!=='running' || hidden())return;
+    const variant=impactNumber++%3,key=outcome+variant;
+    if(!impacts.has(key))impacts.set(key,splittingSound(audio,outcome,variant));
+    const source=audio.createBufferSource(),gain=audio.createGain();
+    source.buffer=impacts.get(key);source.playbackRate.value=.97+.06*Math.random();
+    gain.gain.value=volume;source.connect(gain);gain.connect(bus);
+    source.onended=()=>{source.disconnect();gain.disconnect();};source.start();
+  }
   async function wake(){if(enabled&&audio&&!hidden())await audio.resume().catch(()=>{});}
   document.addEventListener('visibilitychange',()=>{if(hidden())audio?.suspend().catch(()=>{});else wake();});
   window.addEventListener('pagehide',()=>audio?.suspend().catch(()=>{}));
@@ -179,16 +192,11 @@ export function installWoodlandSound() {
       source.buffer=swingBuffer;source.playbackRate.value=swingBuffer.duration/seconds;
       source.connect(bus);source.onended=()=>source.disconnect();source.start();
     },
-    strike(strength){
-      if(!enabled || audio?.state!=='running' || hidden())return;
-      const solid=strength>.6;
-      if(!impacts.has(solid))impacts.set(solid,splittingSound(audio,solid));
-      const source=audio.createBufferSource(),gain=audio.createGain();
-      source.buffer=impacts.get(solid);source.playbackRate.value=.97+.07*Math.random();
-      gain.gain.value=.36+.59*strength;
-      source.connect(gain);gain.connect(bus);
-      source.onended=()=>{source.disconnect();gain.disconnect();};
-      source.start();
+    strike(strength,outcome=strength>.6?'split':'glance'){
+      woodSound(outcome,.32+.57*THREE.MathUtils.clamp(strength,0,1));
+    },
+    woodImpact(speed){
+      woodSound('landing',THREE.MathUtils.clamp((speed-.28)*.13,0,.46));
     },
     conditions(settings){
       hour=settings.hour??hour;weather=settings.weather??weather;

@@ -266,40 +266,38 @@ main:has(#activity:not([hidden])) #firewood-hud{display:none}
   }
 }
 @media(max-height:470px){#firewood-hud{right:9px;bottom:max(47px,calc(env(safe-area-inset-bottom) + 38px));max-height:calc(100dvh - 157px);overflow:auto;padding:7px 9px}}
-#woodwork{position:absolute;z-index:4;bottom:max(82px,env(safe-area-inset-bottom));left:clamp(12px,3vw,55px);width:min(276px,calc(100vw - 24px));padding:11px 14px;border:1px solid var(--hud-line,#849185);border-radius:10px;background:linear-gradient(125deg,#25362ff5,#17231ff2);color:#faf6e9;box-shadow:0 4px 18px #0d171d40;max-height:49dvh;overflow:auto}
-#woodwork h2{font:500 1.19rem/1.1 "Baskervville","Iowan Old Style",Georgia,serif;margin:0}#woodwork .wood-heading{display:flex;align-items:center;justify-content:space-between}
-#woodwork :is(button,select){font:inherit;color:inherit;border-radius:6px;background:#324239;border:1px solid #9ba99570;min-height:34px;padding:3px 8px;font-size:.82rem}
-#woodwork #split-close{line-height:1;font-size:1.2rem;border:0;background:transparent;min-width:35px}
-#woodwork #split-action{background:#edcf96;color:#332a17;font-weight:700}#woodwork button:disabled{opacity:.54}
-#woodwork :is(button,select,summary):focus-visible{outline:2px solid #edcf96;outline-offset:2px}
-#split-stats,.wood-actions,.wood-mode{display:flex;align-items:center;gap:6px;justify-content:space-between}
-#split-score,.wood-mode,.wood-options{font-size:.76rem;color:#e1e1cd}.wood-actions{justify-content:flex-start;flex-wrap:wrap}
-#split-stats{margin-top:7px;flex-wrap:wrap}.wood-options{margin:0}.wood-options summary{cursor:pointer;padding:4px 0}.wood-options[open]{flex-basis:100%}
-#woodwork #split-reset{white-space:nowrap;background:none;border:0;text-decoration:underline;color:#e2d4b8;font-size:.75rem}
-#split-message{font-size:.85rem;margin:.45rem 0;line-height:1.3;min-height:2.6em}
-.split-power{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:4px;margin:.25rem 0 .4rem;font-size:.85rem;color:#f1f0e2}
-#split-strength-value{font-variant-numeric:tabular-nums;font-size:.8rem;color:#f6d699}
-#split-strength{grid-column:1/-1;display:block;appearance:none;width:100%;height:7px;border:0;border-radius:3px;background:#ffffff26;overflow:hidden}
-#split-strength::-webkit-meter-bar{height:7px;border:0;border-radius:3px;background:#ffffff26}
-#split-strength::-webkit-meter-optimum-value{border-radius:3px;background:linear-gradient(90deg,#bb8d54,#f3d49a)}
-#split-strength::-moz-meter-bar{border-radius:3px;background:linear-gradient(90deg,#bb8d54,#f3d49a)}
-#split-reticle{position:absolute;z-index:2;top:50%;left:50%;width:6px;height:6px;transform:translate(-50%,-50%);border-radius:50%;background:#fff5dd;box-shadow:0 0 0 1px #1e2925,0 0 4px #182522;pointer-events:none}
-#split-meter{position:relative;height:12px;margin:12px 6px;border-radius:6px;background:linear-gradient(to right,#718076 34%,#e6bc74 34%,#e6bc74 46%,#f5dca4 46%,#f5dca4 54%,#e6bc74 54%,#e6bc74 66%,#718076 66%);}
-#split-needle{position:absolute;top:-4px;bottom:-4px;left:0;width:3px;background:white;outline:1px solid #273328;border-radius:1px;transform:translateX(-50%)}
+#woodwork{position:absolute;z-index:4;bottom:max(82px,env(safe-area-inset-bottom));left:clamp(12px,3vw,55px);width:min(265px,calc(100vw - 20px));padding:10px 12px;border:1px solid #d6dec44d;border-radius:10px;background:linear-gradient(125deg,#29372ff2,#17231ff2);color:#faf6e9;box-shadow:0 4px 18px #0d171d40}
+.wood-heading,.split-power,.wood-actions{display:flex;align-items:center;gap:7px}
+.wood-heading{justify-content:space-between}
+#woodwork h2{font:500 1.15rem/1.1 "Baskervville","Iowan Old Style",Georgia,serif;margin:0}
+#split-score{font-size:.71rem;color:#e0d8bc;font-variant-numeric:tabular-nums}
+#split-message{font-size:.8rem;line-height:1.3;margin:6px 0 8px}
+#split-message:empty{display:none}
+.split-power{margin:7px 0 6px;font-size:.72rem;color:#eee5d2}
+#woodwork:not([data-equipped]) .split-power{display:none}
+#split-strength{flex:1;width:50px;height:6px;appearance:none;border:0;border-radius:4px;overflow:hidden;background:#ffffff26}
+#split-strength::-webkit-meter-bar{background:#ffffff26;height:6px;border:0;border-radius:4px}
+#split-strength::-webkit-meter-optimum-value{background:#e2bd83}
+#split-strength::-moz-meter-bar{background:#e2bd83}
+#split-strength-value{min-width:3.2ch;text-align:right;font-variant-numeric:tabular-nums}
+#woodwork button{min-height:32px;border:1px solid #d2ddc74d;border-radius:6px;padding:4px 10px;background:#31443a;color:#fff6e1;font:550 .8rem/1.2 "DM Sans",system-ui,sans-serif}
+#woodwork button:focus-visible{outline:2px solid #f7d89e;outline-offset:2px}
+#woodwork button:disabled{opacity:.52;cursor:default}
+#split-reticle{position:absolute;z-index:2;pointer-events:none;transform:translate(-50%,-50%);width:17px;height:17px;border-radius:50%;border:1.5px solid #ffe4a9;box-shadow:0 0 0 1px #291f17a1,0 1px 5px #160e08aa;display:grid;place-items:center}
+#split-reticle::after{content:"";width:3px;height:3px;border-radius:50%;background:#fff4cf;box-shadow:0 0 0 1px #33251480}
+#split-reticle[data-ready=false]{border-style:dashed;opacity:.58}
 main:has(#woodwork:not([hidden])) #firewood-hud{display:none}
 @media(max-width:700px){
-  #woodwork:not([hidden]){left:7px;right:7px;bottom:max(53px,env(safe-area-inset-bottom));width:auto;padding:6px 10px;max-height:34dvh}
-  #woodwork .wood-heading button{min-height:26px}
-  #woodwork #split-stats{margin:2px 0 0}
-  #woodwork .split-power{margin:1px 0 4px;gap:2px}
-  #woodwork #split-meter{margin:7px 4px}#woodwork #split-message{margin:1px 0;min-height:1.3em}
-  #woodwork #split-reset{padding:3px 1px;flex-shrink:0}#woodwork select{min-width:0;flex:1;max-width:139px}
-  main:has(#woodwork:not([hidden])) #stick{left:8px;bottom:calc(54px + min(35dvh, 172px));width:65px;height:65px}
-  main:has(#woodwork:not([hidden])) #nub{width:28px;height:28px;left:calc(50% - 14px);top:calc(50% - 14px)}
+  #woodwork:not([hidden]){left:auto;right:8px;bottom:max(64px,env(safe-area-inset-bottom));width:min(235px,calc(100vw - 112px));padding:7px 9px}
+  #woodwork h2{font-size:1.03rem}
+  .wood-heading{flex-wrap:wrap;gap:2px 5px}
+  #woodwork button{padding:4px 7px}
+  .wood-actions{flex-wrap:wrap;gap:4px}
+  main:has(#woodwork:not([hidden])) #stick{left:8px;bottom:77px;width:76px;height:76px}
+  main:has(#woodwork:not([hidden])) #nub{width:30px;height:30px;left:calc(50% - 15px);top:calc(50% - 15px)}
   main:has(#woodwork:not([hidden])) #hint{visibility:hidden}
 }
-@media(max-height:480px) and (min-width:600px){#woodwork:not([hidden]){left:auto;right:8px;bottom:53px;width:224px;max-height:49dvh}main:has(#woodwork:not([hidden])) #stick{bottom:12px}}
-
+@media(max-height:480px) and (min-width:600px){#woodwork:not([hidden]){left:auto;right:8px;bottom:45px;width:210px}main:has(#woodwork:not([hidden])) #stick{bottom:12px}}
 #status{position:absolute;inset:0;z-index:8;isolation:isolate;display:flex;align-items:flex-end;padding:clamp(24px,9vh,92px) max(7vw,env(safe-area-inset-right)) max(8vh,env(safe-area-inset-bottom)) max(7vw,env(safe-area-inset-left));overflow:auto;color:#fffaf0;background:radial-gradient(ellipse at 76% 12%,#384838,#162a22 72%)}
 #load-photo{position:absolute;z-index:-2;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:55% 65%;pointer-events:none}
 #status::before{content:"";position:absolute;z-index:-1;inset:0;pointer-events:none;background:linear-gradient(0deg,#0b1712f2 0%,#0b1712b0 30%,#0b17121f 74%),linear-gradient(90deg,#0a171194,transparent 72%)}
@@ -395,12 +393,10 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
 </section></div>
 <span id="split-reticle" aria-hidden="true" hidden></span>
 <section id="woodwork" aria-labelledby="split-title" hidden>
-  <div class="wood-heading"><h2 id="split-title">Splitting block</h2><button type="button" id="split-close" aria-label="Close wood splitting">×</button></div>
-  <div class="split-power"><label for="split-strength">Strength</label><span id="split-strength-value" aria-hidden="true">100%</span><meter id="split-strength" min="0" max="100" value="100"></meter></div>
-  <div id="split-meter" aria-hidden="true" hidden><i id="split-needle"></i></div>
+  <div class="wood-heading"><h2 id="split-title">Splitting block</h2><span id="split-score" hidden></span></div>
+  <div class="split-power"><label for="split-strength">Strength</label><meter id="split-strength" min="0" max="100" value="100"></meter><span id="split-strength-value" aria-hidden="true">100%</span></div>
   <p id="split-message" role="status"></p>
   <div class="wood-actions"><button type="button" id="split-action">Pick up axe</button><button type="button" id="split-collect" hidden>Carry a piece</button></div>
-  <div id="split-stats"><span id="split-score"></span><details class="wood-options"><summary>Swing options</summary><div class="wood-mode"><label for="split-mode">Mode</label><select id="split-mode"><option value="aim" selected>Aim at round</option><option value="timed">Timed</option><option value="steady">Steady</option></select><button type="button" id="split-reset">Reset score</button></div></details></div>
 </section>
 <aside id="firewood-hud" aria-labelledby="firewood-title" hidden>
   <h2 id="firewood-title">Campfire wood</h2><p id="firewood-guide" role="status"></p>
@@ -420,7 +416,7 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
       <label><input type="radio" name="deer-food" value="carrot"><span>Carrots <b></b></span></label>
       <label><input type="radio" name="deer-food" value="vegetables"><span>Vegetables <b></b></span></label>
     </fieldset>
-    <div class="activity-actions"><button class="primary" id="hold-food">Hold out</button><button id="toss-food">Toss</button><button id="refill-basket">Refill</button></div><p id="deer-message" role="status"></p></div></section><div class="dock" id="tools" hidden><p class="hint" id="hint">Drag to orbit · Scroll or pinch to zoom</p><nav aria-label="Model controls"><button id="roof" aria-pressed="true">Roof</button><button id="imagery" aria-pressed="true">Aerial</button><button id="canopy" aria-pressed="false">Tree canopy</button><button type="button" id="split-open" aria-expanded="false" aria-controls="woodwork" hidden>Split wood</button><button id="use-grill" aria-controls="activity" aria-expanded="false" hidden>Use grill</button><button id="lock" hidden>Mouse look</button><button id="far" class="zoom" aria-label="Zoom out">−</button><button id="near" class="zoom" aria-label="Zoom in">+</button><button id="reset">Reset view</button></nav></div></main><dialog id="welcome" aria-labelledby="welcome-title">
+    <div class="activity-actions"><button class="primary" id="hold-food">Hold out</button><button id="toss-food">Toss</button><button id="refill-basket">Refill</button></div><p id="deer-message" role="status"></p></div></section><div class="dock" id="tools" hidden><p class="hint" id="hint">Drag to orbit · Scroll or pinch to zoom</p><nav aria-label="Model controls"><button id="roof" aria-pressed="true">Roof</button><button id="imagery" aria-pressed="true">Aerial</button><button id="canopy" aria-pressed="false">Tree canopy</button><button id="use-grill" aria-controls="activity" aria-expanded="false" hidden>Use grill</button><button id="lock" hidden>Mouse look</button><button id="far" class="zoom" aria-label="Zoom out">−</button><button id="near" class="zoom" aria-label="Zoom in">+</button><button id="reset">Reset view</button></nav></div></main><dialog id="welcome" aria-labelledby="welcome-title">
   <div class="welcome-layout">
     <div class="welcome-copy">
       <p class="welcome-location">Smallwood, New York</p>

@@ -5,7 +5,32 @@ const vec=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);
 const smooth=t=>t*t*(3-2*t);
 const mix=T.MathUtils.lerp;
 const edge=vec(0,-.117,-.657);
-const impactFraction=.59;
+
+// Integrate the rotating tool about the lower hand. Gravity's moment grows
+// as the head passes the top of its arc. Keep this common trajectory independent
+// of rendering rate so collision substeps and visible poses always agree.
+function downswing(){
+  const headMass=3.15,haftMass=.66,lever=.58,haftLength=.69;
+  const inertia=headMass*lever**2+haftMass*haftLength**2/3;
+  const weightMoment=9.81*(headMass*lever+haftMass*haftLength*.5);
+  const step=1/480,arc=1.84,samples=[0];
+  let angle=0,velocity=.23;
+  while(angle<arc){
+    const pull=20+8*Math.sin(Math.PI*angle/arc);
+    const acceleration=(pull+weightMoment*Math.sin(.24+angle)-.18*velocity)/inertia;
+    velocity+=acceleration*step;angle+=velocity*step;samples.push(angle);
+  }
+  const duration=(samples.length-2+(arc-samples.at(-2))/(angle-samples.at(-2)))*step;
+  return {duration,progress(seconds){
+    if(seconds<=0)return 0;
+    if(seconds>=duration)return 1;
+    const index=seconds/step,i=Math.floor(index);
+    return mix(samples[i],samples[i+1],index-i)/arc;
+  }};
+}
+const drop=downswing(),liftStart=.073,bracedAt=.415,dropStart=.46;
+const impactAt=dropStart+drop.duration,releaseDuration=.41;
+const swingDuration=impactAt+releaseDuration,impactFraction=impactAt/swingDuration;
 
 function hickory(){
   const width=128,height=256,bytes=new Uint8Array(width*height*4);
@@ -98,6 +123,7 @@ export function makeSplittingMaul(root){
   const pose=()=>({p:vec(),q:new T.Quaternion()});
   const parked=pose(),ready=pose(),loaded=pose(),high=pose(),contact=pose(),bite=pose(),tired=pose(),current=pose();
   const delta=vec(),eye=vec(),wrist=vec(),elbow=vec(),up=vec(0,1,0);
+  const crown=vec(),butt=vec(),tangent=vec(),sideways=vec();
   const cameraInRoot=new T.Matrix4(),cameraRotation=new T.Quaternion(),euler=new T.Euler(0,0,0,'YXZ');
   function edgeAt(out,x,y,z){
     out.p.set(x,y,z).sub(delta.copy(edge).applyQuaternion(out.q));
@@ -105,7 +131,7 @@ export function makeSplittingMaul(root){
   // Park the tool with its poll and bit clearly visible beside the loaded round.
   parked.q.setFromEuler(euler.set(-.78,1.64,.08));
   edgeAt(parked,.075,.462,.215);
-  let held;
+  let held,prepared=false;
   function equip(enabled){
     if(held===enabled)return;
     held=enabled;
@@ -113,7 +139,7 @@ export function makeSplittingMaul(root){
     handle.receiveShadow=head.receiveShadow=true;
     for(const {glove,sleeve} of hands)glove.visible=sleeve.visible=held;
   }
-  function rest(){equip(false);maul.position.copy(parked.p);maul.quaternion.copy(parked.q);maul.updateMatrixWorld(true);}
+  function rest(){prepared=false;equip(false);maul.position.copy(parked.p);maul.quaternion.copy(parked.q);maul.updateMatrixWorld(true);}
   function cameraFrame(camera){
     camera.updateWorldMatrix(true,false);root.updateWorldMatrix(true,false);
     cameraInRoot.copy(root.matrixWorld).invert().multiply(camera.matrixWorld);
@@ -135,7 +161,7 @@ export function makeSplittingMaul(root){
     equip(true);maul.position.copy(current.p);maul.quaternion.copy(current.q);
     for(const {side,glove,sleeve} of hands){
       // The guide hand slides toward the butt as momentum takes the head forward.
-      glove.position.z=side>0?-mix(.415,.206,slide):-.095;
+      glove.position.z=side>0?-mix(.427,.193,slide):-.095;
       wrist.set(side*.043,-.014,glove.position.z+.025).applyQuaternion(current.q).add(current.p);
       elbow.set(side*.40,-.46,.12).applyMatrix4(cameraInRoot);
       delta.subVectors(elbow,wrist);
@@ -147,51 +173,85 @@ export function makeSplittingMaul(root){
     viewPose(tired,camera,.50,-.23+wave,.78,.69,-.13,-.35);
   }
   function hold(camera,seconds,reduced,strength=1,draw=1){
-    cameraFrame(camera);atRest(camera,reduced?0:Math.sin(seconds*1.8)*.008);
+    prepared=false;cameraFrame(camera);atRest(camera,reduced?0:Math.sin(seconds*1.8)*.008);
     interpolate(tired,ready,smooth(T.MathUtils.clamp(strength,0,1)));
     if(!reduced && draw<1){
       const t=1-smooth(T.MathUtils.clamp(draw,0,1));current.p.lerp(parked.p,t);current.q.slerp(parked.q,t);
     }
     place(0);
   }
-  const cut={x:0,z:0,nx:1,nz:0};
+  const cut={x:0,y:.76,z:0,nx:1,nz:0};
+  let heading=0;
+  function prepare(camera,aim){
+    atRest(camera,0);
+    cut.x=aim?.x??0;cut.y=aim?.y??.76;cut.z=aim?.z??0;
+    const toward=Math.atan2(eye.x-cut.x,eye.z-cut.z);
+    const length=Math.hypot(aim?.nx??0,aim?.nz??0);
+    cut.nx=length?aim.nx/length:Math.cos(toward);
+    cut.nz=length?aim.nz/length:-Math.sin(toward);
+    heading=Math.atan2(-cut.nz,cut.nx);
+    if(Math.cos(heading-toward)<0)heading+=Math.PI;
+    tangent.set(-Math.sin(heading),0,-Math.cos(heading));
+    sideways.set(Math.cos(heading),0,-Math.sin(heading));
+    viewPose(loaded,camera,.42,-.04,.82,.86,-.11,-.31);
+    // The raising hand transfers the load over the shoulder. Fix the hit and
+    // the loaded pose in the station frame when the swing begins.
+    crown.copy(eye).addScaledVector(tangent,.31).addScaledVector(sideways,.21);
+    crown.y+=.27;
+    high.q.copy(currentRotation(1.74,heading+.12,-.18));
+    edgeAt(high,crown.x,crown.y,crown.z);
+    contact.q.copy(currentRotation(-.082,heading,0));
+    edgeAt(contact,cut.x,cut.y,cut.z);
+    prepared=true;
+  }
+  function finishPose(outcome){
+    const broke=outcome==='split',glanced=outcome==='glance';
+    const depth=broke?.13:glanced?-.022:.032;
+    bite.q.copy(currentRotation(broke?-.41:glanced?.015:-.16,heading,glanced?-.14:0));
+    const forward=broke?.028:.009,skid=glanced?.062:0;
+    edgeAt(bite,cut.x+tangent.x*forward+sideways.x*skid,cut.y-depth,cut.z+tangent.z*forward+sideways.z*skid);
+  }
   function stroke(t,good,reduced,camera,aim){
-    cameraFrame(camera);atRest(camera,0);
-    const ax=aim?.x??0,az=aim?.z??0,radius=Math.hypot(ax,az);
-    const inset=radius>.112?.112/radius:1;
-    const x=good?ax*inset:0,z=good?az*inset:0;
-    const approach=Math.atan2(eye.x-x,eye.z-z);
-    const nx=Math.cos(approach),nz=-Math.sin(approach);
-    cut.x=x;cut.z=z;cut.nx=nx;cut.nz=nz;
-    contact.q.copy(currentRotation(-.44,approach,good?.04:-.18));
-    const offset=good?0:.126;
-    edgeAt(contact,x+nx*offset,.755,z+nz*offset);
-    bite.q.copy(currentRotation(good?-.59:-.55,approach,good?.05:-.34));
-    const follow=good?.006:.17;
-    edgeAt(bite,x+nx*follow,good?.69:.68,z+nz*follow);
+    if(!camera)return;
+    cameraFrame(camera);
+    if(!prepared)prepare(camera,aim);
+    const seconds=t*swingDuration;
+    const outcome=aim?.outcome||(good?'split':'glance');
     let slide=0;
     if(reduced){
-      const striking=t>=impactFraction && t<.84;
-      const still=striking?contact:t>=.84?tired:ready;
+      const striking=t>=impactFraction && seconds<impactAt+.14;
+      const still=striking?contact:t>=impactFraction?tired:ready;
       interpolate(still,still,0);slide=striking?1:0;
+    }else if(seconds<liftStart){
+      interpolate(ready,loaded,smooth(seconds/liftStart));
+    }else if(seconds<bracedAt){
+      interpolate(loaded,high,smooth((seconds-liftStart)/(bracedAt-liftStart)));
+    }else if(seconds<dropStart){
+      interpolate(high,high,0);
+    }else if(t<impactFraction){
+      const u=drop.progress(seconds-dropStart);
+      interpolate(high,contact,u);
+      // Rotate the head around a moving grip. This sweeps a curved edge path
+      // even for an off-center strike or a visitor standing beside the stump.
+      butt.subVectors(contact.p,high.p);
+      current.p.copy(high.p).addScaledVector(butt,u*u*(2-u));
+      slide=smooth(u);
     }else{
-      viewPose(loaded,camera,.43,-.01,.80,.88,-.12,-.28);
-      viewPose(high,camera,.68,1.44,.54,1.80,.12,-.36);
-      if(t<.1)interpolate(ready,loaded,smooth(t/.1));
-      else if(t<.40)interpolate(loaded,high,smooth((t-.1)/.30));
-      else if(t<impactFraction){
-        const u=(t-.40)/(impactFraction-.40);
-        interpolate(high,contact,u*u);slide=smooth(u);
-      }else if(t<.73){
-        const u=(t-impactFraction)/(.73-impactFraction);
-        interpolate(contact,bite,1-(1-u)**3);slide=1;
+      const elapsed=Math.max(0,seconds-impactAt),broke=outcome==='split';
+      const recoil=outcome==='glance'?.09:broke?.095:.055;
+      const dwell=broke?.13:outcome==='bite'?.185:.105;
+      finishPose(outcome);
+      if(elapsed<recoil){
+        interpolate(contact,bite,1-(1-elapsed/recoil)**3);slide=1;
+      }else if(elapsed<dwell){
+        interpolate(bite,bite,0);slide=1;
       }else{
-        const u=smooth((t-.73)/.27);
+        const u=smooth(T.MathUtils.clamp((elapsed-dwell)/(releaseDuration-dwell),0,1));
         interpolate(bite,tired,u);slide=1-u;
       }
     }
     place(slide);
   }
   rest();
-  return {maul,hold,stroke,rest,cut,impactFraction,swingDuration:1.12};
+  return {maul,hold,stroke,rest,edge,cut,impactFraction,swingDuration};
 }

@@ -15,7 +15,7 @@ if(glb.length<20 || glb.readUInt32LE(0)!==0x46546c67 || glb.readUInt32LE(4)!==2 
 const manifest=JSON.parse(glb.subarray(20,20+glb.readUInt32LE(12)).toString());
 if([...(manifest.images||[]),...(manifest.buffers||[])].some(item=>item.uri && !item.uri.startsWith('data:'))) throw Error('The GLB has external dependencies. Please export a self-contained GLB.');
 const js=(await build({entryPoints:[path.join(base,'viewer.js')],bundle:true,format:'iife',minify:true,legalComments:'inline',write:false,target:'es2022'})).outputFiles[0].text;
-const licenseFiles=['three/LICENSE','peerjs/LICENSE','peerjs-js-binarypack/LICENSE','eventemitter3/LICENSE','sdp/LICENSE','webrtc-adapter/LICENSE.md','@msgpack/msgpack/LICENSE'];
+const licenseFiles=['three/LICENSE','cannon-es/LICENSE','peerjs/LICENSE','peerjs-js-binarypack/LICENSE','eventemitter3/LICENSE','sdp/LICENSE','webrtc-adapter/LICENSE.md','@msgpack/msgpack/LICENSE'];
 const licenses=await Promise.all(licenseFiles.map(async file=>file.split('/LICENSE')[0]+'\n'+await fs.readFile(path.join(base,'node_modules',file),'utf8')));
 const license=licenses.join('\n\n').replaceAll('*/','* /');
 let orthophoto='';

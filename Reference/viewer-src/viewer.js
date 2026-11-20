@@ -612,8 +612,10 @@ async function show() {
   woodSplit=installWoodSplitting(world,gltf.scene,walkSpace,{
     camera,schedule,takeSplitLog:()=>firewood.takeSplitLog(),
     handsBusy(){const wood=firewood.snapshot();return wood.held || wood.inFlight || activities.offeringFood;},
-    onSwing:duration=>woodland.swing(duration),onStrike:strength=>woodland.strike(strength)
+    onSwing:duration=>woodland.swing(duration),onStrike:(strength,kind)=>woodland.strike(strength,kind),
+    onContact:speed=>woodland.woodImpact(speed)
   });
+  walkSpace.dynamicBlocker=woodSplit.blocksStep;
   interiorCameras.splitting=woodSplit.view;
   grill=installGrill(world,gltf.scene,activities.setGrill);
   entryDoors=installEntryDoors(gltf.scene,()=>{renderer.shadowMap.needsUpdate=true;});

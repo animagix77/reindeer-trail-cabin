@@ -44,6 +44,7 @@ export class WalkSpace {
   floors=new Map();
   blocks=new Map();
   start=null;
+  dynamicBlocker=null;
   add(mesh,helperName) {
     const attr=mesh.geometry.getAttribute('position');
     const points=Array.from({length:attr.count},(_,i)=>new THREE.Vector3().fromBufferAttribute(attr,i).applyMatrix4(mesh.matrixWorld));
@@ -90,7 +91,7 @@ export class WalkSpace {
     const target=expectedFloor??eyeY-1.59;
     for(const h of [...hits].sort((a,b)=>Math.abs(a.y-target)-Math.abs(b.y-target))) {
       const state=this.settle(x,z,h,hits);
-      if(state) return state;
+      if(state && !this.dynamicBlocker?.(x,z,state.y)) return state;
     }
     return null;
   }
@@ -99,7 +100,7 @@ export class WalkSpace {
     const possible=hits.filter(h=>h.y<=state.y+STEP && h.y>=state.y-DROP).sort((a,b)=>b.y-a.y);
     for(const h of possible) {
       const next=this.settle(x,z,h,hits);
-      if(next) return next;
+      if(next && (!this.dynamicBlocker?.(x,z,next.y) || this.dynamicBlocker(state.x,state.z,state.y)))return next;
     }
     return null;
   }
