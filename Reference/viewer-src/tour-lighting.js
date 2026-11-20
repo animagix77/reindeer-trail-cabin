@@ -60,7 +60,7 @@ function yardReflection(model,renderer,point) {
 }
 
 // The room environment supplies close indoor reflections, with a separate outdoor probe.
-export function installTourLighting(scene,renderer,model) {
+export function installTourLighting(scene,renderer,model,arrival) {
   const textureGenerator=new THREE.PMREMGenerator(renderer);
   const studio=new RoomEnvironment();
   const environment=textureGenerator.fromScene(studio,.045);
@@ -128,8 +128,9 @@ export function installTourLighting(scene,renderer,model) {
   ].map(([x,y,z,color,power,range])=>({p:fromPlan(x,y,z),color,power,range}));
   const cafeLights=installCafeLights(scene,model);
   const lamps=Array.from({length:3},()=>{const l=new THREE.PointLight(0xffffff,0,4,2);scene.add(l);return l;});
-  let zoneKey=null,stateKey='',lampGain=1,daylight=1;
-  let hour=16.25,weather='clear',yard=null,outdoor=false,roomGain=.34,skyGain=.62,metalGain=1;
+  let zoneKey=null,stateKey='',lampGain=1,daylight=1,lowSun=0;
+  let {hour,weather}=arrival;
+  let yard=null,outdoor=false,roomGain=.34,skyGain=.62,metalGain=1;
   const reflectedSky={value:new THREE.Color(1,1,1)};
   function applyEnvironment(){
     scene.environment=outdoor && yard?yard.target.texture:environment.texture;
@@ -161,8 +162,10 @@ export function installTourLighting(scene,renderer,model) {
     if(validWeather(conditions.weather))weather=conditions.weather;
     const a=atmosphere(hour,weather);
     sky.set(a);stars.set(hour,a);
-    air.color.copy(a.horizon);
-    air.density=a.fog;
+    lowSun=a.golden*(1-a.clouds);
+    air.color.copy(a.horizon).lerp(a.sunTint,.42*lowSun);
+    air.density=a.fog+.004*lowSun;
+    renderer.toneMappingExposure=1.05+.16*lowSun;
     const availableLight=a.day*a.light;
     daylight=a.direction.y>0?availableLight:0;
     roomGain=.105+.36*availableLight;
@@ -174,7 +177,7 @@ export function installTourLighting(scene,renderer,model) {
     applyEnvironment();
     hemisphere.color.copy(a.skyTint);
     hemisphere.groundColor.copy(a.groundTint);
-    hemisphere.intensity=.19+a.day*(.83+.28*a.clouds)+.22*a.blueHour*(1-.66*a.clouds);
+    hemisphere.intensity=.19+a.day*(.83+.28*a.clouds-.13*lowSun)+.22*a.blueHour*(1-.66*a.clouds);
     const lunar=a.direction.y<0;
     const lightDirection=a.direction.clone().multiplyScalar(lunar?-1:1);
     lightDirection.y=Math.max(lightDirection.y,.07);
@@ -182,7 +185,7 @@ export function installTourLighting(scene,renderer,model) {
     sun.color.copy(lunar?new THREE.Color(0xadc8f4):a.sunTint);
     sun.intensity=lunar
       ? .22*(1-a.day)*(1-.76*a.clouds)
-      : (2.60+.43*a.golden)*a.day*(1-.91*a.clouds)*THREE.MathUtils.smoothstep(a.direction.y,-.06,.16);
+      : (2.60+1.28*lowSun)*a.day*(1-.91*a.clouds)*THREE.MathUtils.smoothstep(a.direction.y,-.06,.16);
     for(const [m,base] of daylightMaterials)m.emissiveIntensity=base*(.04+.96*availableLight);
     for(const [m,base] of lampMaterials)m.emissiveIntensity=base*(1+1.65*(1-availableLight));
     cafeLights.set(availableLight);
@@ -195,6 +198,7 @@ export function installTourLighting(scene,renderer,model) {
   return {
     sun,setConditions,captureExterior,
     get daylight(){return daylight;},
+    get goldenHour(){return lowSun;},
     get animated(){return weatherFX.animated || stars.animated;},
     update(eye,mode,seconds=performance.now()/1000,camera,outdoors=false){
       const walking=mode!=='property';

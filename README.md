@@ -4,9 +4,9 @@ A furnished, walkable model of a cabin in Smallwood, New York. [Visit the public
 
 ## Visit
 
-You arrive on the driveway in the late-afternoon light. Walk with WASD, the arrow keys or the movement pad, and drag to look around. Use **View** to jump to a room or clearing. The time, weather, furnace and fire controls stay in view as you explore. Sound starts with your first interaction. You can hear your footing change from pavement to floorboards and the fire crackle as you draw near. **Sound** remembers your mute preference. Reduced Motion keeps the walking camera steady and the tree lights constant.
+You arrive on the driveway at golden hour. Walk with WASD, the arrow keys or the movement pad, and drag to look around. Use **View** to jump to a room or clearing. The time, weather, furnace and fire controls stay in view as you explore. Sound starts with your first interaction. You can hear your footing change from pavement to floorboards and the fire crackle as you draw near. **Sound** remembers your mute preference. Reduced Motion keeps the walking camera steady and the tree lights constant.
 
-- Select **Wood splitting** to visit the rounds and maul beside the driveway. Set a round and time your swing as the marker crosses the gold band. A clean split yields two pieces. **Steady** lets you play at your own pace. Pick **Carry a piece** to take one to the fire pit.
+- At **Wood splitting** beside the driveway, click or tap the axe to pick it up. At full strength, click the round to take a swing. Stand still to catch your breath while the strength meter refills. A clean split earns two pieces for the fire pit. Walk away and the axe returns to the block. You can also use the on-screen controls or choose a timed swing under **Swing options**.
 - At the **Woodpile**, gather twigs, sticks or a split log. Walk to the fire ring or choose **Fire pit** while carrying it. Face the ring and toss the wood. Twigs flare quickly, sticks last longer, and logs sustain the fire. You can lay wood in a cold ring before lighting it.
 - Visit the deck grill to light it, cook steak, chicken or vegetable skewers, turn the food and serve it.
 - Choose **Feed deer** to visit the meadow. Walk too close and the herd scatters. Stand still with an apple, carrot or greens and a curious deer may take it from your hand. You can also toss food and refill the basket.

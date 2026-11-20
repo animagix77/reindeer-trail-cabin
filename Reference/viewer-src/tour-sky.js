@@ -94,6 +94,9 @@ export function createSky(scene) {
         float lowAir=exp(-5.1*up);
         vec3 color=mix(horizon,zenith,1.-exp(-2.75*up));
         float towardsSun=smoothstep(-.28,.97,dot(d,sunDirection));
+        // The cooler band opposite the sun meets the amber glow along the tree line.
+        float duskBelt=golden*clearFraction*(1.-towardsSun)*exp(-abs(up-.11)*9.);
+        color=mix(color,vec3(.56,.30,.39),.36*duskBelt);
         color+=clearFraction*lowAir*(golden*(.12+.88*towardsSun)*vec3(.88,.29,.057)
                                   +blueHour*towardsSun*vec3(.31,.094,.043));
         color+=clearFraction*(day+blueHour*.24)*sunTint*

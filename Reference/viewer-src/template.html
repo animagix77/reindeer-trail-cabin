@@ -227,29 +227,39 @@ main:has(#activity:not([hidden])) #firewood-hud{display:none}
 @media(min-width:701px) and (pointer:fine){#firewood-hud{left:clamp(12px,4vw,64px);right:auto}}
 @media(max-width:700px) and (min-height:471px){#firewood-hud[data-carrying]{top:198px;bottom:auto}}
 @media(max-height:470px){#firewood-hud{right:9px;bottom:max(47px,calc(env(safe-area-inset-bottom) + 38px));max-height:calc(100dvh - 157px);overflow:auto;padding:7px 9px}}
-#woodwork{position:absolute;z-index:4;bottom:max(82px,env(safe-area-inset-bottom));right:clamp(12px,4vw,65px);width:min(260px,calc(100vw - 24px));box-sizing:border-box;padding:12px 14px;border:1px solid #b8bc9d66;border-radius:10px;background:#18231fee;color:#f6f5e9;box-shadow:0 5px 22px #0005;max-height:48dvh;overflow:auto}
-#woodwork h2{font-size:1.02rem;margin:0;color:#fff}#woodwork .wood-heading{display:flex;align-items:center;justify-content:space-between}
+#woodwork{position:absolute;z-index:4;bottom:max(82px,env(safe-area-inset-bottom));left:clamp(12px,3vw,55px);width:min(276px,calc(100vw - 24px));padding:11px 14px;border:1px solid var(--hud-line,#849185);border-radius:10px;background:linear-gradient(125deg,#25362ff5,#17231ff2);color:#faf6e9;box-shadow:0 4px 18px #0d171d40;max-height:49dvh;overflow:auto}
+#woodwork h2{font:500 1.19rem/1.1 "Baskervville","Iowan Old Style",Georgia,serif;margin:0}#woodwork .wood-heading{display:flex;align-items:center;justify-content:space-between}
 #woodwork :is(button,select){font:inherit;color:inherit;border-radius:6px;background:#324239;border:1px solid #9ba99570;min-height:34px;padding:3px 8px;font-size:.82rem}
 #woodwork #split-close{line-height:1;font-size:1.2rem;border:0;background:transparent;min-width:35px}
 #woodwork #split-action{background:#edcf96;color:#332a17;font-weight:700}#woodwork button:disabled{opacity:.54}
-#woodwork :is(button,select):focus-visible{outline:2px solid #edcf96;outline-offset:2px}
+#woodwork :is(button,select,summary):focus-visible{outline:2px solid #edcf96;outline-offset:2px}
 #split-stats,.wood-actions,.wood-mode{display:flex;align-items:center;gap:6px;justify-content:space-between}
-#split-score,.wood-mode{font-size:.76rem;color:#e1e1cd}.wood-actions{justify-content:flex-start;flex-wrap:wrap}
-#split-stats{margin:7px 0}#woodwork #split-reset{white-space:nowrap;background:none;border:0;text-decoration:underline;color:#e2d4b8;font-size:.75rem}
-#split-message{font-size:.8rem;margin:.45rem 0;line-height:1.3}
+#split-score,.wood-mode,.wood-options{font-size:.76rem;color:#e1e1cd}.wood-actions{justify-content:flex-start;flex-wrap:wrap}
+#split-stats{margin-top:7px;flex-wrap:wrap}.wood-options{margin:0}.wood-options summary{cursor:pointer;padding:4px 0}.wood-options[open]{flex-basis:100%}
+#woodwork #split-reset{white-space:nowrap;background:none;border:0;text-decoration:underline;color:#e2d4b8;font-size:.75rem}
+#split-message{font-size:.85rem;margin:.45rem 0;line-height:1.3;min-height:2.6em}
+.split-power{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:4px;margin:.25rem 0 .4rem;font-size:.85rem;color:#f1f0e2}
+#split-strength-value{font-variant-numeric:tabular-nums;font-size:.8rem;color:#f6d699}
+#split-strength{grid-column:1/-1;display:block;appearance:none;width:100%;height:7px;border:0;border-radius:3px;background:#ffffff26;overflow:hidden}
+#split-strength::-webkit-meter-bar{height:7px;border:0;border-radius:3px;background:#ffffff26}
+#split-strength::-webkit-meter-optimum-value{border-radius:3px;background:linear-gradient(90deg,#bb8d54,#f3d49a)}
+#split-strength::-moz-meter-bar{border-radius:3px;background:linear-gradient(90deg,#bb8d54,#f3d49a)}
+#split-reticle{position:absolute;z-index:2;top:50%;left:50%;width:6px;height:6px;transform:translate(-50%,-50%);border-radius:50%;background:#fff5dd;box-shadow:0 0 0 1px #1e2925,0 0 4px #182522;pointer-events:none}
 #split-meter{position:relative;height:12px;margin:12px 6px;border-radius:6px;background:linear-gradient(to right,#718076 34%,#e6bc74 34%,#e6bc74 46%,#f5dca4 46%,#f5dca4 54%,#e6bc74 54%,#e6bc74 66%,#718076 66%);}
 #split-needle{position:absolute;top:-4px;bottom:-4px;left:0;width:3px;background:white;outline:1px solid #273328;border-radius:1px;transform:translateX(-50%)}
 main:has(#woodwork:not([hidden])) #firewood-hud{display:none}
 @media(max-width:700px){
-  #woodwork:not([hidden]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 8px;left:7px;right:7px;bottom:max(53px,env(safe-area-inset-bottom));width:auto;padding:7px 10px;max-height:36dvh}
-  #woodwork .wood-heading{grid-column:1/-1}#woodwork .wood-heading button{min-height:26px}
-  #woodwork .wood-mode{justify-content:flex-start}#woodwork #split-stats{margin:0;gap:3px}
-  #woodwork :is(#split-meter,.wood-actions,#split-message){grid-column:1/-1}
-  #woodwork #split-meter{margin:7px 4px}#woodwork #split-message{margin:1px 0}
-  #woodwork #split-reset{padding:3px 1px;flex-shrink:0}#woodwork select{min-width:0;width:0;flex:1;max-width:139px}
+  #woodwork:not([hidden]){left:7px;right:7px;bottom:max(53px,env(safe-area-inset-bottom));width:auto;padding:6px 10px;max-height:34dvh}
+  #woodwork .wood-heading button{min-height:26px}
+  #woodwork #split-stats{margin:2px 0 0}
+  #woodwork .split-power{margin:1px 0 4px;gap:2px}
+  #woodwork #split-meter{margin:7px 4px}#woodwork #split-message{margin:1px 0;min-height:1.3em}
+  #woodwork #split-reset{padding:3px 1px;flex-shrink:0}#woodwork select{min-width:0;flex:1;max-width:139px}
+  main:has(#woodwork:not([hidden])) #stick{left:8px;bottom:calc(54px + min(35dvh, 172px));width:65px;height:65px}
+  main:has(#woodwork:not([hidden])) #nub{width:28px;height:28px;left:calc(50% - 14px);top:calc(50% - 14px)}
   main:has(#woodwork:not([hidden])) #hint{visibility:hidden}
 }
-@media(max-height:480px){#woodwork{bottom:52px;max-height:57dvh}}
+@media(max-height:480px) and (min-width:600px){#woodwork:not([hidden]){left:auto;right:8px;bottom:53px;width:224px;max-height:49dvh}main:has(#woodwork:not([hidden])) #stick{bottom:12px}}
 
 #status{position:absolute;inset:0;z-index:8;isolation:isolate;display:flex;align-items:flex-end;padding:clamp(24px,9vh,92px) max(7vw,env(safe-area-inset-right)) max(8vh,env(safe-area-inset-bottom)) max(7vw,env(safe-area-inset-left));overflow:auto;color:#fffaf0;background:radial-gradient(ellipse at 76% 12%,#384838,#162a22 72%)}
 #load-photo{position:absolute;z-index:-2;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:55% 65%;pointer-events:none}
@@ -323,8 +333,8 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
 <section id="scene-panel" aria-label="Scene settings">
   <div class="environment">
     <div class="time-setting">
-      <label for="scene-hour">Time of day</label><output id="scene-clock" for="scene-hour">4:15 PM</output>
-      <input id="scene-hour" type="range" min="0" max="23.75" step=".25" value="16.25" aria-valuetext="4:15 PM">
+      <label for="scene-hour">Time of day</label><output id="scene-clock" for="scene-hour">5:30 PM</output>
+      <input id="scene-hour" type="range" min="0" max="23.75" step=".25" value="17.5" aria-valuetext="5:30 PM">
     </div>
     <div class="weather-setting"><label for="scene-weather">Weather</label><select id="scene-weather">
       <option value="clear">Clear</option><option value="cloudy">Overcast</option><option value="rain">Rain</option><option value="snow">Snow</option>
@@ -338,13 +348,14 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
     <button type="button" id="scene-deer" aria-controls="activity" aria-expanded="false" title="Visit Deer meadow and feed the herd">Feed deer</button>
   </div>
 </section></div>
+<span id="split-reticle" aria-hidden="true" hidden></span>
 <section id="woodwork" aria-labelledby="split-title" hidden>
   <div class="wood-heading"><h2 id="split-title">Splitting block</h2><button type="button" id="split-close" aria-label="Close wood splitting">×</button></div>
-  <div class="wood-mode"><label for="split-mode">Swing</label><select id="split-mode"><option value="timed">Timed</option><option value="steady">Steady · no timer</option></select></div>
-  <div id="split-stats"><span id="split-score"></span><button type="button" id="split-reset">Reset score</button></div>
+  <div class="split-power"><label for="split-strength">Strength</label><span id="split-strength-value" aria-hidden="true">100%</span><meter id="split-strength" min="0" max="100" value="100"></meter></div>
   <div id="split-meter" aria-hidden="true" hidden><i id="split-needle"></i></div>
-  <div class="wood-actions"><button type="button" id="split-action">Set round</button><button type="button" id="split-collect" hidden>Carry a piece</button></div>
   <p id="split-message" role="status"></p>
+  <div class="wood-actions"><button type="button" id="split-action">Pick up axe</button><button type="button" id="split-collect" hidden>Carry a piece</button></div>
+  <div id="split-stats"><span id="split-score"></span><details class="wood-options"><summary>Swing options</summary><div class="wood-mode"><label for="split-mode">Mode</label><select id="split-mode"><option value="aim" selected>Aim at round</option><option value="timed">Timed</option><option value="steady">Steady</option></select><button type="button" id="split-reset">Reset score</button></div></details></div>
 </section>
 <aside id="firewood-hud" aria-labelledby="firewood-title" hidden>
   <h2 id="firewood-title">Campfire wood</h2><p id="firewood-guide" role="status"></p>

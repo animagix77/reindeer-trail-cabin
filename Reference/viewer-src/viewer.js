@@ -430,7 +430,7 @@ function render(firstFrame=false){
   const seconds=performance.now()/1000;
   const outside=outdoorsFloor(body?.label);
   lighting?.update(camera.position,activeView,seconds,camera,outside);
-  const animateSplitting=woodSplit?.update(camera,activeView,seconds);
+  const animateSplitting=woodSplit?.update(activeView,seconds,velocity.lengthSq()>.0025);
   const animateWood=firewood?.update(body,activeView,seconds,activities.offeringFood);
   const animateFire=fires?.update(camera,activeView,seconds);
   woodland.update(camera,outside,walking(),ringCenter,fires?.energy??0);
@@ -604,7 +604,9 @@ async function show() {
   firewood=installFirewood(world,gltf.scene,walkSpace,camera,fires,woodControls.set,kind=>party.fuel(kind));
   interiorCameras.wood=firewood.view;
   woodSplit=installWoodSplitting(world,gltf.scene,walkSpace,{
-    schedule,takeSplitLog:()=>firewood.takeSplitLog(),onStrike:strength=>woodland.strike(strength)
+    camera,schedule,takeSplitLog:()=>firewood.takeSplitLog(),
+    handsBusy(){const wood=firewood.snapshot();return wood.held || wood.inFlight || activities.offeringFood;},
+    onSwing:duration=>woodland.swing(duration),onStrike:strength=>woodland.strike(strength)
   });
   interiorCameras.splitting=woodSplit.view;
   grill=installGrill(world,gltf.scene,activities.setGrill);
@@ -615,7 +617,9 @@ async function show() {
     if(!button.hidden) locationPicker.add(new Option(button.textContent,key));
   }
   locationPicker.value='property';
-  lighting=installTourLighting(world,renderer,gltf.scene);
+  const arrival=sceneControls.snapshot();
+  lighting=installTourLighting(world,renderer,gltf.scene,arrival);
+  woodland.conditions(arrival);
   const imagerySource=element('ortho').textContent.trim();
   element('ortho').remove();
   if(imagerySource) {

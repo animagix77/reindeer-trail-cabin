@@ -132,7 +132,9 @@ export function cabinFilm(renderer){
       u.cameraWorld.value.copy(camera.matrixWorld);u.sunMatrix.value.copy(sun.shadow.matrix);
       u.sunDepth.value=sun.shadow.map.depthTexture;
       u.sunDir.value.subVectors(sun.position,sun.target.position).normalize();
-      u.sunColor.value.copy(sun.color).multiplyScalar(sun.intensity*lighting.daylight);
+      // The low sun travels through more haze. The shadow samples keep the light
+      // in gaps between branches and stop the shafts at the cabin walls.
+      u.sunColor.value.copy(sun.color).multiplyScalar(sun.intensity*lighting.daylight*(1+1.6*lighting.goldenHour));
       renderer.setRenderTarget(light);scatter.render(renderer);
       renderer.setRenderTarget(null);finish.render(renderer);
       return Math.abs(desired-gain)>.003;

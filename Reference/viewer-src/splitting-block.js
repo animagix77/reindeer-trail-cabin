@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {makeSplittingMaul} from './splitting-maul.js';
 
 // Bark comes from the cabin's woodland photograph. The sawn cross-section
 // keeps the same annual rings on both pieces as they separate.
@@ -66,6 +67,45 @@ function billet(radius,height,start=0,arc=Math.PI*2){
   return g;
 }
 
+// Slice the actual loaded round through the blade. Its bark and both rings
+// keep their original UVs, even when a cut near the rim takes off a thin piece.
+function splitBillet(source,cut,side){
+  const shape=source.attributes.position,texture=source.attributes.uv;
+  const geometry=new T.BufferGeometry(),positions=[],uv=[],crossings=[];
+  const distance=p=>side*((p[0]-cut.x)*cut.nx+(p[2]-cut.z)*cut.nz);
+  function vertex(p){positions.push(p[0],p[1],p[2]);uv.push(p[3],p[4]);}
+  for(const {start,count,materialIndex} of source.groups){
+    const first=positions.length/3;
+    for(let i=start;i<start+count;i+=3){
+      const polygon=[],triangle=[];
+      for(let j=i;j<i+3;j++)triangle.push([shape.getX(j),shape.getY(j),shape.getZ(j),texture.getX(j),texture.getY(j)]);
+      for(let j=0;j<3;j++){
+        const a=triangle[j],b=triangle[(j+1)%3],da=distance(a),db=distance(b);
+        if(da>=0)polygon.push(a);
+        if((da>=0)!==(db>=0)){
+          const t=da/(da-db);
+          polygon.push(a.map((value,k)=>T.MathUtils.lerp(value,b[k],t)));
+        }
+      }
+      if(materialIndex===0)for(const p of polygon)if(Math.abs(distance(p))<1e-7)crossings.push(p);
+      for(let j=1;j+1<polygon.length;j++){vertex(polygon[0]);vertex(polygon[j]);vertex(polygon[j+1]);}
+    }
+    geometry.addGroup(first,positions.length/3-first,materialIndex);
+  }
+  const along=p=>p[2]*cut.nx-p[0]*cut.nz;
+  crossings.sort((a,b)=>along(a)-along(b));
+  const height=Math.max(...crossings.map(p=>p[1])),bottom=crossings.filter(p=>p[1]<1e-7),top=crossings.filter(p=>p[1]>height-1e-7);
+  const face=[bottom[0],bottom.at(-1),top.at(-1),top[0]];
+  if(side<0)face.reverse();
+  const first=positions.length/3;
+  for(const i of [0,1,2,0,2,3]){
+    const p=face[i];vertex([p[0],p[1],p[2],.5+along(p)/.27,p[1]/height]);
+  }
+  geometry.addGroup(first,6,2);
+  geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geometry.computeVertexNormals();return geometry;
+}
+
 function marker(mesh,name){mesh.name=name;mesh.castShadow=mesh.receiveShadow=true;return mesh;}
 export function makeSplittingBlock(model){
   const root=new T.Group();root.name='Driveway wood splitting';
@@ -79,8 +119,8 @@ export function makeSplittingBlock(model){
   const base=mesh(billet(.305,.47),materials,'Scored chopping stump');root.add(base);
   const top=.47;
   const round=mesh(billet(.133,.29),materials,'Unsplit round');round.position.y=top;root.add(round);
-  const halves=[0,Math.PI].map((a,i)=>{
-    const m=mesh(billet(.133,.29,a,Math.PI),materials,'Matching split half '+i);root.add(m);return m;
+  const halves=[0,1].map(i=>{
+    const m=mesh(new T.BufferGeometry(),materials,'Matching split half '+i);root.add(m);return m;
   });
   // Stack short rounds and wedges on the shoulder, beyond the swing.
   const rounds=[];
@@ -104,41 +144,39 @@ export function makeSplittingBlock(model){
   for(const xx of [.48,1.36])for(const zz of [-.26,-.025])boards.push([xx,.15,zz,.042,.30,.048]);
   boards.forEach(([x,y,z,w,h,d],i)=>{obj.position.set(x,y,z);obj.rotation.set(0,0,0);obj.scale.set(w,h,d);obj.updateMatrix();rails.setMatrixAt(i,obj.matrix);});
   rails.computeBoundingSphere();root.add(rails);
-  const handleMat=standard(0xb37a43,.60),steel=standard(0x3b4244,.46,.74),blade=standard(0xbdc2c0,.30,.78);
-  const maul=new T.Group();maul.name='Splitting maul';root.add(maul);
-  const handleGeo=new T.LatheGeometry([[0,0],[.024,.006],[.023,.049],[.016,.17],[.018,.46],[.021,.59],[.018,.67],[0,.68]].map(([x,y])=>new T.Vector2(x,y)),14);
-  const handle=mesh(handleGeo,handleMat,'Oiled hickory handle');handle.rotation.x=-Math.PI/2;handle.scale.set(1,1,.78);maul.add(handle);
-  const headProfile=new T.Shape();headProfile.moveTo(-.035,.079);headProfile.lineTo(.035,.079);headProfile.lineTo(.038,.012);headProfile.lineTo(.024,-.042);headProfile.lineTo(0,-.115);headProfile.lineTo(-.024,-.042);headProfile.lineTo(-.038,.012);headProfile.closePath();
-  const head=mesh(new T.ExtrudeGeometry(headProfile,{depth:.095,bevelEnabled:true,bevelSegments:1,steps:1,bevelThickness:.002,bevelSize:.002}),steel,'Forged wedge head');head.position.z=-.70;maul.add(head);
-  const beard=new T.Shape();beard.moveTo(-.012,-.078);beard.lineTo(.012,-.078);beard.lineTo(0,-.116);beard.closePath();
-  const edge=mesh(new T.ExtrudeGeometry(beard,{depth:.0955,bevelEnabled:false}),blade,'Polished cutting edge');edge.position.z=-.7003;maul.add(edge);
+  const tool=makeSplittingMaul(root);
   for(const half of halves)half.visible=false;
   const chips=marker(new T.InstancedMesh(new T.TetrahedronGeometry(.021),split,8),'Flying wood fibers');root.add(chips);chips.visible=false;
-  function pose(a,x,y,z,lean=0){maul.position.set(x,y,z);maul.rotation.set(a,0,lean,'ZXY');}
-  const rest=()=>pose(-1.29,.18,.73,.24,.31);
+  let fractureCut=null;
+  const rollAxis=new T.Vector3();
   function fracture(t){
-    const eased=1-(1-t)*(1-t);
+    if(!fractureCut){
+      fractureCut={...tool.cut};
+      halves.forEach((part,i)=>{
+        part.geometry.dispose();part.geometry=splitBillet(round.geometry,fractureCut,i?-1:1);
+      });
+    }
+    const {nx,nz,x,z}=fractureCut,eased=1-(1-t)*(1-t);
+    rollAxis.set(nz,0,-nx);
     halves.forEach((part,i)=>{
-      const sign=i?-1:1;part.visible=true;part.position.set(sign*.024*eased,top+.023*Math.sin(Math.PI*t),sign*.14*eased);
-      part.rotation.x=sign*.73*eased;
+      const sign=i?-1:1,tilt=sign*.62*eased;part.visible=true;
+      part.position.set(sign*nx*.112*eased,top+.133*Math.sin(Math.abs(tilt))+.018*Math.sin(Math.PI*t),sign*nz*.112*eased);
+      part.quaternion.setFromAxisAngle(rollAxis,tilt);
     });
     round.visible=false;chips.visible=t<1;
     if(t<1){
       for(let i=0;i<8;i++){
-        const a=i*2.4;obj.position.set(Math.cos(a)*.34*t,top+.21+.82*t-1.14*t*t,Math.sin(a)*.35*t);
+        const a=i*2.4;obj.position.set(x+Math.cos(a)*.34*t,top+.29+.82*t-1.14*t*t,z+Math.sin(a)*.35*t);
         obj.rotation.set(i+3.6*t,a+t,i);obj.scale.set(.47,1.5,.83);obj.updateMatrix();chips.setMatrixAt(i,obj.matrix);
       }
       chips.instanceMatrix.needsUpdate=true;chips.frustumCulled=false;
     }
   }
-  rest();
-  return {root,round,halves,rest,
-    begin(){round.visible=true;for(const h of halves)h.visible=false;chips.visible=false;},
-    lift(t,steady){const a=steady?.98:1.04+.035*Math.sin(2*t);pose(a,.014,.977,.61);},
-    stroke(t,good,reduced){
-      const angle=t<=.48?1.08-1.22*(t/.48)**2:-.14+.48*(1-Math.exp(-6*(t-.48)));
-      pose(reduced?-.14:angle,good?.014:.19,.977,.61);
-      if(good && t>=.48)fracture(reduced?1:Math.min(1,(t-.48)/.52));
+  return {...tool,root,round,halves,
+    begin(){fractureCut=null;round.visible=true;for(const h of halves)h.visible=false;chips.visible=false;},
+    stroke(t,good,reduced,camera,aim){
+      if(camera)tool.stroke(t,good,reduced,camera,aim);
+      if(good && t>=tool.impactFraction)fracture(reduced?1:Math.min(1,(t-tool.impactFraction)/(1-tool.impactFraction)));
     },
     inventory(n){pieces.count=Math.min(pieces.instanceMatrix.count,n);}
   };

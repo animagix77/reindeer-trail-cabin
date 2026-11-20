@@ -197,7 +197,7 @@ export function makeDeer({buck=false,young=false,phase=0}={}){
   }};
 }
 
-function assemble(name,parts,roughness=.73){
+export function assemble(name,parts,roughness=.73){
   const geos=parts.map(([geo,c])=>{
     const attr=geo.getAttribute('position'),rgb=new Float32Array(3*attr.count),col=color(c);
     for(let i=0;i<attr.count;i++)col.toArray(rgb,i*3);
@@ -206,8 +206,8 @@ function assemble(name,parts,roughness=.73){
   const mesh=new T.Mesh(mergeGeometries(geos,false),new T.MeshStandardMaterial({vertexColors:true,roughness}));
   mesh.name=name;mesh.castShadow=true;mesh.receiveShadow=true; geos.forEach(g=>g.dispose());parts.forEach(([g])=>g.dispose());return mesh;
 }
-const ovalPart=(x,y,z,sx,sy,sz,tint,rot)=>[ell(ellipsoid.clone(),v(x,y,z),v(sx,sy,sz),rot),tint];
-function stem(a,b,r1,r2,tint,sides=10){
+export const ovalPart=(x,y,z,sx,sy,sz,tint,rot)=>[ell(ellipsoid.clone(),v(x,y,z),v(sx,sy,sz),rot),tint];
+export function stem(a,b,r1,r2,tint,sides=10){
   const A=v(...a),B=v(...b),d=B.clone().sub(A),g=new T.CylinderGeometry(r2,r1,d.length(),sides);
   g.applyQuaternion(new T.Quaternion().setFromUnitVectors(HIGH,d.clone().normalize()));g.translate(...A.lerp(B,.5).toArray());return [g,tint];
 }

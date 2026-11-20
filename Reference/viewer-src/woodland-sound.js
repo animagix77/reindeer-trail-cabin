@@ -90,12 +90,24 @@ function splittingSound(ctx,solid){
   }
   return buf;
 }
+function swingSound(ctx){
+  const rate=22050,buffer=ctx.createBuffer(1,Math.round(rate*.19),rate);
+  const samples=buffer.getChannelData(0),rng=random(19408);
+  let slow=0,fast=0;
+  for(let i=0;i<samples.length;i++){
+    const t=i/(samples.length-1),air=rng()*2-1;
+    // The head accelerates through the air, then the whoosh dies at contact.
+    slow+=.035*(air-slow);fast+=(.09+.28*t*t)*(air-fast);
+    samples[i]=(fast-slow)*.85*t*t*Math.min(1,(1-t)*11);
+  }
+  return buffer;
+}
 export function installWoodlandSound() {
   let audio=null,bus,muffle,pan,enabled=false,revision=0;
-  let hour=16.25,weather='clear',day=1;
+  let hour,weather='clear',day=1;
   const tracks={},right=new THREE.Vector3(),toward=new THREE.Vector3(),up=new THREE.Vector3(0,1,0);
   const last={},steps=new Map(),impacts=new Map();
-  let stepNumber=0;
+  let stepNumber=0,swingBuffer;
   function init(){
     const Context=globalThis.AudioContext||globalThis.webkitAudioContext;
     if(!Context)throw Error('Web Audio is unavailable.');
@@ -160,6 +172,13 @@ export function installWoodlandSound() {
       src.onended=()=>{src.disconnect();pan?.disconnect();};
       src.start();
     },
+    swing(seconds){
+      if(!enabled || audio?.state!=='running' || hidden() || !(seconds>.035))return;
+      swingBuffer??=swingSound(audio);
+      const source=audio.createBufferSource();
+      source.buffer=swingBuffer;source.playbackRate.value=swingBuffer.duration/seconds;
+      source.connect(bus);source.onended=()=>source.disconnect();source.start();
+    },
     strike(strength){
       if(!enabled || audio?.state!=='running' || hidden())return;
       const solid=strength>.6;
@@ -172,7 +191,8 @@ export function installWoodlandSound() {
       source.start();
     },
     conditions(settings){
-      hour=settings.hour??hour;weather=settings.weather??weather;day=atmosphere(hour,weather).day;
+      hour=settings.hour??hour;weather=settings.weather??weather;
+      if(Number.isFinite(hour))day=atmosphere(hour,weather).day;
     },
     update(camera,outside,walking,ring,fire){
       if(!enabled||!audio||!tracks.fire)return;
