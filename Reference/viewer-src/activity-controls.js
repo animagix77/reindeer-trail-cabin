@@ -30,6 +30,7 @@ export function activityControls(actions){
   }
   function setDeer(state){
     deerState=state;
+    get('scene-deer').hidden=!state.near;
     if(mode==='deer'&&!state.near)display(null);
     for(const choice of foodChoices)choice.parentElement.querySelector('b').textContent=state.inventory[choice.value]??0;
     const food=selectedFood();
@@ -39,11 +40,8 @@ export function activityControls(actions){
     get('deer-message').textContent=state.message;
   }
   const bind=(id,fn)=>get(id).addEventListener('click',()=>{fn();actions.schedule();});
-  bind('use-grill',()=>{if(mode==='cook')display(null);else if(actions.view()!=='cook')actions.choose('cook');else display('cook');});
-  bind('scene-deer',()=>{
-    if(deerState.near)display(mode==='deer'?null:'deer');
-    else actions.choose('deer');
-  });
+  bind('use-grill',()=>{if(grillState.near)display(mode==='cook'?null:'cook');});
+  bind('scene-deer',()=>{if(deerState.near)display(mode==='deer'?null:'deer');});
   bind('activity-close',()=>{const trigger=mode==='cook'?'use-grill':'scene-deer';display(null);get(trigger).focus();});
   document.addEventListener('keydown',e=>{if(e.key==='Escape' && mode && !e.defaultPrevented)get('activity-close').click();});
   bind('burners',()=>actions.grill()?.light());bind('add-food',()=>actions.grill()?.add(recipe.value));
@@ -51,5 +49,5 @@ export function activityControls(actions){
   bind('hold-food',()=>actions.herd()?.hold(selectedFood()));bind('toss-food',()=>actions.herd()?.toss(selectedFood()));
   bind('refill-basket',()=>actions.herd()?.refill());
   produce.addEventListener('change',()=>setDeer(deerState));
-  return {setGrill,setDeer,get offeringFood(){return Boolean(deerState.holding);},destination(view){display(view==='cook'&&grillState.near?'cook':view==='deer'?'deer':null);}};
+  return {setGrill,setDeer,get offeringFood(){return Boolean(deerState.holding);},close(){if(mode)display(null);}};
 }

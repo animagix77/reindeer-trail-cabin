@@ -1,13 +1,13 @@
 import {installSceneEnvironment} from './scene-environment.js';
 
-export function installSceneControls({setConditions,share,setFurnace,setFirePit,setSound,viewStars,stopMovement}) {
+export function installSceneControls({setConditions,share,setFurnace,setFirePit,setSound,stopMovement}) {
   const get=id=>document.getElementById(id);
   const environment=installSceneEnvironment({setConditions,share});
   const panel=get('scene-panel'), furnace=get('scene-furnace');
   const pit=get('scene-fire');
   const sound=get('scene-sound'), soundState=get('scene-sound-status');
   const mutePreference='reindeer-woodland-sound';
-  let burning=false,nearPit=false,lookingUp=false;
+  let burning=false,nearPit=false;
   let wantsSound=true, soundRevision=0, soundStateName='ready';
   try { wantsSound=localStorage.getItem(mutePreference)!=='off'; } catch {}
 
@@ -67,7 +67,7 @@ export function installSceneControls({setConditions,share,setFurnace,setFirePit,
   panel.addEventListener('keydown',e=>{
     if(e.key==='Escape')get('view').focus({preventScroll:true});
   });
-  get('scene-stars').addEventListener('click',()=>viewStars());
+  get('scene-stars').addEventListener('click',environment.stargaze);
   furnace.addEventListener('click',()=>{
     const on=furnace.getAttribute('aria-checked')!=='true';
     furnace.setAttribute('aria-checked',String(on));
@@ -84,19 +84,13 @@ export function installSceneControls({setConditions,share,setFurnace,setFirePit,
   syncFire();
   return {
     contains:target=>panel.contains(target),
-    conditions:environment.settings,solo:environment.solo,stargaze:environment.stargaze,
+    conditions:environment.settings,solo:environment.solo,
     snapshot(){return {...environment.snapshot(),furnace:furnace.getAttribute('aria-checked')==='true',fire:burning};},
     apply(s,guest){
       environment.apply(s,guest);
       if((furnace.getAttribute('aria-checked')==='true')!==s.furnace)furnace.click();
       if(burning!==s.fire)changeFire();
     },
-    setNearFire(near,atStars){
-      if(nearPit!==near || lookingUp!==atStars){
-        nearPit=near;
-        lookingUp=atStars;
-        get('scene-stars').setAttribute('aria-current',atStars?'location':'false');
-      }
-    }
+    setNearFire(near){nearPit=near;}
   };
 }

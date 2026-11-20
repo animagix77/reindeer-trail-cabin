@@ -1,7 +1,7 @@
 // The wood controls follow what the walker can actually reach and carry, including on touch.
 const singular={twigs:'handful of twigs',sticks:'stick',logs:'split log'};
 const plural={twigs:'Twigs',sticks:'Sticks',logs:'Split logs'};
-export function installFirewoodControls({pickUp,toss,putBack,gather,stopMovement,render}){
+export function installFirewoodControls({pickUp,toss,putBack,stopMovement,render}){
   const get=id=>document.getElementById(id);
   const panel=get('firewood-hud'),title=get('firewood-title'),guide=get('firewood-guide');
   const choices=get('firewood-choice'),primary=get('firewood-action'),label=get('firewood-label');
@@ -11,8 +11,7 @@ export function installFirewoodControls({pickUp,toss,putBack,gather,stopMovement
     if(!state)return;
     const {counts,held,nearby,nearPit,nearStockpile,inFlight,canToss,message}=state;
     const woods=nearby.filter(k=>Object.hasOwn(singular,k)&&counts[k]>0);
-    const show=view!=='property' && (held||inFlight||
-      (view!=='stars' && (woods.length||nearStockpile||nearPit)));
+    const show=view!=='property' && (held||inFlight||woods.length||nearStockpile||nearPit);
     panel.hidden=!show;
     if(!show){displayKey='';action='';return;}
     const signature=JSON.stringify([woods,counts,held,nearPit,nearStockpile,inFlight,canToss,message]);
@@ -40,8 +39,8 @@ export function installFirewoodControls({pickUp,toss,putBack,gather,stopMovement
       action='';primary.hidden=true;
       guide.textContent=message||'The woodpile is empty.';
     }else{
-      action='gather';label.textContent='Go to woodpile';key.textContent='';
-      guide.textContent=message||(nearStockpile?'Look for loose twigs, sticks and split wood nearby.':'Gather wood at the edge of the clearing.');
+      action='';primary.hidden=true;
+      guide.textContent=nearStockpile?'Walk closer to the loose wood to pick it up.':'Gather wood at the pile behind the hanging chairs.';
     }
     key.hidden=!key.textContent;
     if(action==='pick'||action==='toss')primary.setAttribute('aria-keyshortcuts',key.textContent);
@@ -52,7 +51,6 @@ export function installFirewoodControls({pickUp,toss,putBack,gather,stopMovement
     stopMovement();
     if(action==='pick')pickUp(choices.value);
     else if(action==='toss')toss();
-    else if(action==='gather')gather();
     canvas.focus({preventScroll:true});render();
   }
   primary.addEventListener('click',invoke);

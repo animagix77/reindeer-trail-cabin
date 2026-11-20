@@ -25,7 +25,6 @@ import {installWoodlandSound,outdoorsFloor} from './woodland-sound.js';
 import {installTourLighting} from './tour-lighting.js';
 import { WalkSpace } from './walking.js';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const element = id => document.getElementById(id);
@@ -33,34 +32,16 @@ const canvas = element('view');
 const controlsPanel = element('tools');
 const loading=installLoadingScreen();
 let sceneCanRender=false;
-const roofs = [];
-const backdrop=[];
-const diagram=[];
-const canopy = [];
-const terrainMaps = new Map();
-const aerialLayers=[];
-function showAerial(enabled) {
-  for(const item of aerialLayers) {
-    item.mesh.geometry=enabled?item.orthoGeometry:item.originalGeometry;
-    item.mesh.material=enabled?item.orthoMaterial:item.originalMaterial;
-  }
-}
-const size = new THREE.Vector3();
-const center = new THREE.Vector3();
 const camera = new THREE.PerspectiveCamera(39,1,0.03,4000);
 const world = new THREE.Scene();
 const woodland=installWoodlandSound();
 const flashlightButton=element('flashlight');
 let flashlight,floodlights,hallReflections,flashlightOn=false;
 let lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
-let renderer,orbit,span=0,distance=1;
-
-let activeView='property';
+let renderer;
+let activeView='outside';
 // Positions use glTF Y-up: Blender [x,y,z] maps to [x,z,-y].
-const interiorCameras={
-  living:{eye:[-1.911,4.36,-3.548],target:[1.81,4.40,-.49],fov:70},
-  loft:{eye:[1.7373,6.08,-3.6625],target:[3.745,5.66,-3.136],fov:70}
-};
+const starts={};
 const pointers=new Map();
 const walkSpace=new WalkSpace();
 const held=new Set();
@@ -103,7 +84,7 @@ function paceRenderer(time){
 }
 const walkKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
 const turnSpeed=THREE.MathUtils.degToRad(100);
-const walking=()=>activeView!=='property' && body!==null;
+const walking=()=>body!==null;
 function stopWalking() {
   camera.position.y-=bob;bob=0;gait.reset();velocity.set(0,0);
   held.clear();axes.x=axes.y=0;stickPointer=null;
@@ -164,8 +145,8 @@ window.addEventListener('keydown',e=>{
 });
 window.addEventListener('keyup',e=>held.delete(e.code));
 window.addEventListener('blur',stopWalking);
-document.addEventListener('visibilitychange',()=>{if(document.hidden)stopWalking();else if(span)render();});
-window.addEventListener('focus',()=>{if(span)render();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stopWalking();else if(sceneCanRender)render();});
+window.addEventListener('focus',()=>{if(sceneCanRender)render();});
 const stick=element('stick');
 function steer(e) {
   const rect=stick.getBoundingClientRect(),range=rect.width*.33;
@@ -188,7 +169,6 @@ for(const type of ['pointerup','lostpointercapture','pointercancel']) stick.addE
 });
 const touchControls=matchMedia('(pointer: coarse)');
 function hint() {
-  if(activeView==='property') return 'Drag to orbit · Scroll or pinch to zoom';
   if(!walking()) return 'Drag to look around · Scroll or pinch to zoom';
   if(document.pointerLockElement===canvas) return 'Mouse to look · Esc to release';
   return touchControls.matches?'Move with the pad · Drag to look':'Drag to look';
@@ -200,7 +180,6 @@ function updateLookControls(){
   element('lock').textContent=document.pointerLockElement===canvas?'Release mouse':'Mouse look';
   element('stick').hidden=!walking() || !matchMedia('(any-pointer: coarse)').matches;
   let label='Cabin view. Drag or use the arrow keys to look around.';
-  if(activeView==='property') label='Property view. Drag or use the arrow keys to orbit.';
   if(walking()) label=touchControls.matches?'Walk with the movement pad and drag to look around.':
     'Walk forward with W and back with S. Turn left with A and right with D. The arrow keys also walk and turn. Drag to look around.';
   canvas.setAttribute('aria-label',label);
@@ -220,7 +199,7 @@ document.addEventListener('mousemove',e=>{
 });
 function spawnBody(preset) {
   let p=new THREE.Vector3().fromArray(preset.eye);
-  const expected=p.y-(activeView==='loft'?1:1.59);
+  const expected=p.y-1.59;
   let candidate=walkSpace.spawn(p.x,p.z,p.y,expected);
   // A slightly different export may put a photo-matched camera immediately beside a handrail.
   for(const distance of [.12,.24,.40,.58]) {
@@ -239,20 +218,31 @@ function look() {
   camera.rotation.set(pitch,yaw,0,'YXZ');
   render();
 }
-const viewSlugs = {
-  splitting:'wood-splitting', wood:'woodpile', stars:'stargazing', entry:'front-entry', well:'well-casing', grill:'deck-grill', cook:'grilling', deer:'backyard-deer', tree:'christmas-tree', hearth:'propane-furnace', property:'property', outside:'outside', porch:'covered-porch', yard:'fire-pit', path:'front-path', hall:'front-hall', frontbed:'front-bedroom',
-  master:'master-and-bath', bath:'bathroom', primary:'master-bedroom', vault:'kitchen-vault', kitchenwork:'island-cooler', kitchen:'kitchen', living:'living-room', bunk:'bunk-room', loft:'loft'
+const tourAreas={
+  outside:{label:'Driveway',slug:'driveway',aliases:['property','well','well-casing','splitting','wood-splitting']},
+  entry:{label:'Front of house',slug:'front-of-house',aliases:['front-entry','path','front-path']},
+  yard:{label:'Back yard',slug:'back-yard',aliases:['fire-pit','porch','covered-porch','grill','deck-grill',
+    'cook','grilling','wood','woodpile','deer','backyard-deer','stars','stargazing']},
+  hall:{label:'Inside',slug:'inside',aliases:['front-hall','frontbed','front-bedroom','master','master-and-bath',
+    'bath','bathroom','primary','master-bedroom','vault','kitchen-vault','kitchenwork','island-cooler','kitchen',
+    'living','living-room','bunk','bunk-room','loft','tree','christmas-tree','hearth','propane-furnace']}
 };
 const locationPicker=element('location');
-const viewButtons=[...document.querySelectorAll('[data-view]')];
-function viewFromAddress() {
-  const hash=location.hash.slice(1).split('?')[0];
-  if(hash==='property')return 'property';
-  return Object.keys(interiorCameras).find(key=>viewSlugs[key]===hash) || 'outside';
+function areaFor(name){
+  return Object.keys(tourAreas).find(key=>key===name || tourAreas[key].slug===name || tourAreas[key].aliases.includes(name));
 }
-function chooseView(key) {
-  const hash='#'+viewSlugs[key]+party.suffix;
-  if(location.hash===hash) changeView(key);
+function viewFromAddress(){
+  const fragment=location.hash.slice(1);
+  const name=fragment.split('?')[0];
+  const key=areaFor(name) || 'outside';
+  if(fragment && name!==tourAreas[key].slug){
+    history.replaceState(history.state,'','#'+tourAreas[key].slug+fragment.slice(name.length));
+  }
+  return key;
+}
+function chooseView(key){
+  const hash='#'+tourAreas[key].slug+party.suffix;
+  if(location.hash===hash)changeView(key);
   else location.hash=hash;
 }
 function walkingFov(preset,aspect) {
@@ -265,35 +255,22 @@ function changeView(view) {
   if(document.pointerLockElement===canvas) document.exitPointerLock();
   body=null;
   activeView=view;
-  const inside=view!=='property';
-  orbit.enabled=!inside;
-  backdrop.forEach(object=>{object.visible=inside;});
-  diagram.forEach(object=>{object.visible=!inside;});
-  showAerial(!inside && element('imagery').getAttribute('aria-pressed')==='true');
-  roofs.forEach(roof=>{roof.visible=inside || element('roof').getAttribute('aria-pressed')==='true';});
   pointers.clear();
-  document.documentElement.classList.toggle('inside',inside);
+  document.documentElement.classList.add('inside');
   locationPicker.value=view;
-  for(const button of viewButtons) {
-    updateState(button,button.dataset.view===view);
-  }
+  activities.close();
   reset();
-  if(view==='stars')sceneControls.stargaze();
-  activities.destination(view);
   woodControls.destination(view);
   updateLookControls();
   flashlightButton.hidden=!walking();
-  if(inside) canvas.focus({preventScroll:true});
-}
-for(const button of viewButtons) {
-  button.addEventListener('click',()=>chooseView(button.dataset.view));
+  canvas.focus({preventScroll:true});
 }
 locationPicker.addEventListener('change',()=>chooseView(locationPicker.value));
 window.addEventListener('hashchange',()=>{
-  if(span) changeView(viewFromAddress());
+  if(sceneCanRender) changeView(viewFromAddress());
 });
-function resetInterior() {
-  const preset=interiorCameras[activeView];
+function reset() {
+  const preset=starts[activeView];
   stopWalking();
   body=spawnBody(preset);
   camera.position.fromArray(preset.eye);
@@ -308,7 +285,7 @@ function resetInterior() {
   look();
 }
 canvas.addEventListener('pointerdown',event=>{
-  if(activeView==='property' || document.pointerLockElement===canvas || event.button!==0) return;
+  if(!walking() || document.pointerLockElement===canvas || event.button!==0) return;
   canvas.setPointerCapture(event.pointerId);
   pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
 });
@@ -333,7 +310,7 @@ for (const type of ['pointerup','pointercancel','lostpointercapture']) {
   canvas.addEventListener(type,event=>pointers.delete(event.pointerId));
 }
 canvas.addEventListener('wheel',event=>{
-  if(activeView==='property') return;
+  if(!walking()) return;
   event.preventDefault();
   zoom(Math.exp(THREE.MathUtils.clamp(event.deltaY,-120,120)*.0015));
 },{passive:false});
@@ -341,54 +318,52 @@ canvas.addEventListener('wheel',event=>{
 function resized() {
   const rect = canvas.getBoundingClientRect();
   if(!rect.width || !rect.height)return;
-  const preset=interiorCameras[activeView];
+  const preset=starts[activeView];
   const aspect=rect.width/rect.height;
   if(preset)camera.fov=THREE.MathUtils.clamp(camera.fov*walkingFov(preset,aspect)/walkingFov(preset,camera.aspect),30,94);
   renderer.setSize(rect.width,rect.height,false);
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
-  if (span) render();
+  if (sceneCanRender) render();
 }
 const sceneControls=installSceneControls({
   setConditions(settings){lighting?.setConditions(settings);surfaces?.setWeather(settings.weather);woodland.conditions(settings);fires?.setWeather(settings.weather);render();},
   share(){party.conditions();},
-  async setSound(on){const enabled=await woodland.enable(on);if(span)schedule();return enabled;},
-  viewStars(){chooseView('stars');},
+  async setSound(on){const enabled=await woodland.enable(on);if(sceneCanRender)schedule();return enabled;},
   setFurnace(on){fires.setFurnaceOn(on);party.conditions();render();},
   setFirePit(on){fires.setFirePitOn(on);party.conditions();render();},
   stopMovement(){stopWalking();render();}
 });
 const activities=activityControls({
-  grill:()=>grill,herd:()=>wildlife,view:()=>activeView,choose:chooseView,schedule,
+  grill:()=>grill,herd:()=>wildlife,schedule,
   lid:on=>grill?.open(on)
 });
 const woodControls=installFirewoodControls({
   pickUp:kind=>firewood?.pickUp(kind),toss:()=>firewood?.toss(),putBack:()=>firewood?.putBack(),
-  gather:()=>chooseView('wood'),stopMovement(){stopWalking();pointers.clear();},render
+  stopMovement(){stopWalking();pointers.clear();},render
 });
 const propertyMap=installPropertyMap({
   stopMovement(){stopWalking();pointers.clear();},
   destinations(){
     const locations={};
-    for(const key of ['entry','porch']){
-      const eye=interiorCameras[key]?.eye;
+    for(const key of ['entry','yard']){
+      const eye=starts[key]?.eye;
       // The model is centred on this NAD83 / UTM 18N origin, with north along -Z.
       if(eye) locations[key]=[516338+eye[0],4612439-eye[2]];
     }
     return locations;
   },
-  visit:chooseView, resume(){if(span) schedule();}
+  visit:chooseView, resume(){if(sceneCanRender) schedule();}
 });
 const party=installParty({
-  world,choose:chooseView,schedule,
+  world,schedule,
   stop(){stopWalking();pointers.clear();},
-  label:key=>viewButtons.find(b=>b.dataset.view===key)?.textContent || 'Property',
   getPose(){
     const round=n=>Math.round(n*100)/100;
     return {view:activeView,x:round(body?.x??0),y:round(body?.y??0),z:round(body?.z??0),yaw:round(yaw)};
   },
   joined({index,people}){
-    history.replaceState(null,'','#outside'+party.suffix);
+    history.replaceState(null,'','#'+tourAreas.outside.slug+party.suffix);
     changeView('outside');
     if(!body)return;
     // Spread arrivals across the same grade, leaving a full stride between visitors.
@@ -410,9 +385,10 @@ const party=installParty({
     look();
   },
   meet(guest,{index=0,occupied=[]}={}){
-    if(!Object.hasOwn(viewSlugs,guest.view))return;
+    const region=areaFor(guest.view);
+    if(!region || guest.view==='property')return;
     const place=()=>{
-      if(!body || guest.view==='property')return;
+      if(!body)return;
       stopWalking();
       for(const radius of [1.15,.8,1.55])for(let i=0;i<12;i++){
         const angle=guest.yaw+(index-1)*Math.PI/4+i*Math.PI/6;
@@ -425,9 +401,9 @@ const party=installParty({
         yaw=Math.atan2(body.x-guest.x,body.z-guest.z);pitch=0;look();return;
       }
     };
-    if(activeView===guest.view){place();return;}
-    window.addEventListener('hashchange',()=>{if(activeView===guest.view)place();},{once:true});
-    chooseView(guest.view);
+    if(activeView===region){place();return;}
+    window.addEventListener('hashchange',()=>{if(activeView===region)place();},{once:true});
+    chooseView(region);
   },
   snapshotFuel:()=>fires?.fuelSnapshot(),
   applyFuel:state=>{fires?.applyFuel(state);render();},
@@ -436,16 +412,15 @@ const party=installParty({
   apply:(s,guest)=>sceneControls.apply(s,guest),solo:()=>sceneControls.solo()
 });
 const waterNotes=installWaterNotes({
-  visitWell:()=>chooseView('well'),
   pause(){stopWalking();pointers.clear();},
-  resume(){if(span)schedule();}
+  resume(){if(sceneCanRender)schedule();}
 });
 const welcome=installWelcome({
   pause(){stopWalking();pointers.clear();},
-  resume(){if(span) schedule();},
+  resume(){if(sceneCanRender) schedule();},
   enter(){
-    history.replaceState(null,'','#'+viewSlugs.outside+party.suffix);
-    if(span && activeView!=='outside')changeView('outside');
+    history.replaceState(null,'','#'+tourAreas.outside.slug+party.suffix);
+    if(sceneCanRender && activeView!=='outside')changeView('outside');
     canvas.focus({preventScroll:true});
   }
 });
@@ -455,13 +430,13 @@ function render(firstFrame=false){
   const outside=outdoorsFloor(body?.label);
   lighting?.update(camera.position,activeView,seconds,camera,outside);
   flashlight?.update(camera,walking(),outside,flashlightOn);
-  const animateFlood=floodlights?.update(camera.position,walking() && outside,lighting?.daylight??1,seconds,activeView!=='property');
+  const animateFlood=floodlights?.update(camera.position,walking() && outside,lighting?.daylight??1,seconds,walking());
   const animateSplitting=woodSplit?.update(activeView,seconds,velocity.lengthSq()>.0025);
   const animateWood=firewood?.update(body,activeView,seconds,activities.offeringFood);
   const animateFire=fires?.update(camera,activeView,seconds);
   woodland.update(camera,outside,walking(),ringCenter,fires?.energy??0);
   sceneControls.setNearFire(Boolean(body && ringCenter && camera.position.distanceToSquared(ringCenter)<49 &&
-    Math.abs(camera.position.y-ringCenter.y)<2.8),activeView==='stars');
+    Math.abs(camera.position.y-ringCenter.y)<2.8));
   const animateLeaves=surfaces?.update(camera,activeView,seconds,outside);
   const animateTree=treeLights?.update(camera,activeView,seconds,canvas.height);
   const animateGuests=party.update(seconds);
@@ -474,57 +449,7 @@ function render(firstFrame=false){
   if(!cinematic)renderer.render(world,camera);
   if(!document.hidden && (adapting || animateFlood || animateSplitting || animateWood || animateLeaves || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
 }
-function reset() {
-  if(activeView!=='property') {resetInterior();return;}
-  camera.fov=39;
-  orbit.target.copy(center);
-  // Fit all eight corners in the initial view, leaving room for the header and controls.
-  const direction=new THREE.Vector3(.70,.94,-1.13).normalize();
-  const right=new THREE.Vector3().crossVectors(camera.up,direction).normalize();
-  const up=new THREE.Vector3().crossVectors(direction,right);
-  const tanY=Math.tan(camera.fov*Math.PI/360);
-  const tanX=tanY*camera.aspect;
-  distance=0;
-  for (const x of [-.5,.5]) for (const y of [-.5,.5]) for (const z of [-.5,.5]) {
-    const corner=new THREE.Vector3(x*size.x,y*size.y,z*size.z);
-    const fit=Math.max(Math.abs(corner.dot(right))/(tanX*.88),Math.abs(corner.dot(up))/(tanY*.67));
-    distance=Math.max(distance,corner.dot(direction)+fit);
-  }
-  camera.position.copy(center).addScaledVector(direction,distance);
-  camera.near = Math.max(.015,span * .0005);
-  camera.far = Math.max(500, distance*14);
-  camera.updateProjectionMatrix();
-  orbit.minDistance = Math.max(1,span * .025);
-  orbit.maxDistance = distance*2.5;
-  orbit.update();
-  render();
-}
 function updateState(button,enabled) {button.setAttribute('aria-pressed',String(enabled));}
-element('roof').addEventListener('click',event=>{
-  const visible = event.currentTarget.getAttribute('aria-pressed') !== 'true';
-  roofs.forEach(object=>{object.visible=visible;});
-  renderer.shadowMap.needsUpdate=true;
-  updateState(event.currentTarget,visible);
-  render();
-});
-element('canopy').addEventListener('click',event=>{
-  const visible=event.currentTarget.getAttribute('aria-pressed')!=='true';
-  canopy.forEach(object=>{object.visible=visible;});
-  renderer.shadowMap.needsUpdate=true;
-  updateState(event.currentTarget,visible);
-  render();
-});
-element('imagery').addEventListener('click',event=>{
-  const enabled=event.currentTarget.getAttribute('aria-pressed') !== 'true';
-  showAerial(enabled);
-  terrainMaps.forEach((original,material)=>{
-    material.map=enabled?original.map:null;
-    material.color.copy(enabled?original.color:new THREE.Color(0xb5bda6));
-    material.needsUpdate=true;
-  });
-  updateState(event.currentTarget,enabled);
-  render();
-});
 element('reset').addEventListener('click',reset);
 function toggleFlashlight(){
   if(!walking())return;
@@ -542,48 +467,21 @@ window.addEventListener('keydown',event=>{
   if(walking()){event.preventDefault();toggleFlashlight();}
 });
 function zoom(factor) {
-  if(activeView!=='property') {
-    camera.fov=THREE.MathUtils.clamp(camera.fov*factor,30,94);
-    camera.updateProjectionMatrix();
-    render();
-    return;
-  }
-  const shift=camera.position.clone().sub(orbit.target);
-  const next=THREE.MathUtils.clamp(shift.length()*factor,orbit.minDistance,orbit.maxDistance);
-  camera.position.copy(orbit.target).add(shift.setLength(next));
-  orbit.update();
+  camera.fov=THREE.MathUtils.clamp(camera.fov*factor,30,94);
+  camera.updateProjectionMatrix();
   render();
 }
 element('near').addEventListener('click',()=>zoom(.78));
 element('far').addEventListener('click',()=>zoom(1/.78));
 canvas.addEventListener('keydown',e=>{
-  if (!orbit || !span || e.metaKey || e.ctrlKey || e.altKey || (walking() && walkKeys.has(e.code))) return;
-  const key=e.code==='KeyA'?'ArrowLeft':e.code==='KeyD'?'ArrowRight':e.key;
-  if(activeView!=='property' && key.startsWith('Arrow')) {
-    if(key==='ArrowLeft') yaw+=.10;
-    if(key==='ArrowRight') yaw-=.10;
-    if(key==='ArrowUp') pitch+=.10;
-    if(key==='ArrowDown') pitch-=.10;
-    pitch=THREE.MathUtils.clamp(pitch,-1.47,1.47);
-    e.preventDefault();
-    look();
-    return;
-  }
-  const vec=camera.position.clone().sub(orbit.target);
-  const s=new THREE.Spherical().setFromVector3(vec);
-  switch (key){
-    case 'ArrowLeft': s.theta-=.12;break;
-    case 'ArrowRight': s.theta+=.12;break;
-    case 'ArrowUp': s.phi=Math.max(.02,s.phi-.13);break;
-    case 'ArrowDown': s.phi=Math.min(orbit.maxPolarAngle,s.phi+.13);break;
-    case '+': case '=': zoom(.78);e.preventDefault();return;
-    case '-': zoom(1/.78);e.preventDefault();return;
-    case 'Home': reset();e.preventDefault();return;
-    default: return;
+  if(!sceneCanRender || e.metaKey || e.ctrlKey || e.altKey)return;
+  switch(e.key){
+    case '+': case '=': zoom(.78);break;
+    case '-': zoom(1/.78);break;
+    case 'Home': reset();break;
+    default:return;
   }
   e.preventDefault();
-  camera.position.copy(orbit.target).add(vec.setFromSpherical(s));
-  orbit.update();render();
 });
 class GraphicsStartError extends Error {}
 async function show() {
@@ -598,9 +496,6 @@ async function show() {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.12;
   renderer.setClearColor(0xffffff,0);
-  orbit = new OrbitControls(camera,canvas);
-  orbit.maxPolarAngle=Math.PI*.485;
-  orbit.addEventListener('change',render);
   new ResizeObserver(resized).observe(canvas);
   resized();
   const bytes=await readModel(element('model'),loading.transfer);
@@ -612,7 +507,7 @@ async function show() {
   gltf.scene.traverse(object=>{
     if(/^WalkSpawn_Outside/i.test(object.name)) {
       const anchor=object.getWorldPosition(new THREE.Vector3());
-      interiorCameras.outside={eye:[anchor.x,anchor.y+1.59,anchor.z],target:interiorCameras.living.eye,fov:65};
+      starts.outside={eye:[anchor.x,anchor.y+1.59,anchor.z],target:[-1.911,4.36,-3.548],fov:65};
       object.visible=false;
     }
     if(!object.isMesh) return;
@@ -624,28 +519,20 @@ async function show() {
     helper.visible=false;
   });
   // The camera starts are stored with the geometry so they follow changes to the floor plan.
-  for(const key of Object.keys(viewSlugs)){
+  for(const key of Object.keys(tourAreas)){
     const eye=gltf.scene.getObjectByName('TourEye_'+key);
     const target=gltf.scene.getObjectByName('TourLook_'+key);
     if(eye && target){
-      interiorCameras[key]={
+      starts[key]={
         eye:eye.getWorldPosition(new THREE.Vector3()).toArray(),
         target:target.getWorldPosition(new THREE.Vector3()).toArray(),
-        fov:({entry:55,well:56,cook:57,tree:66,grill:66,hearth:58,kitchenwork:67,kitchen:70,vault:56,master:76,bath:68,primary:68,hall:68})[key] || 66
+        fov:({entry:55,hall:68})[key] || 66
       };
     }
   }
   wildlife=installWildlife(world,walkSpace,camera,{onChange:activities.setDeer});
-  interiorCameras.deer=wildlife.view;
-  if(interiorCameras.yard){
-    const eye=interiorCameras.yard.eye;
-    // Look north from the clearing at the local celestial pole.
-    const elevation=THREE.MathUtils.degToRad(41.67);
-    interiorCameras.stars={eye:[...eye],target:[eye[0],eye[1]+5*Math.sin(elevation),eye[2]-5*Math.cos(elevation)],fov:68};
-  }
   fires=installTourFires(world,gltf.scene);
   firewood=installFirewood(world,gltf.scene,walkSpace,camera,fires,woodControls.set,kind=>party.fuel(kind));
-  interiorCameras.wood=firewood.view;
   woodSplit=installWoodSplitting(world,gltf.scene,walkSpace,{
     camera,schedule,takeSplitLog:()=>firewood.takeSplitLog(),
     handsBusy(){const wood=firewood.snapshot();return wood.held || wood.inFlight || activities.offeringFood;},
@@ -653,67 +540,23 @@ async function show() {
     onContact:speed=>woodland.woodImpact(speed)
   });
   walkSpace.dynamicBlocker=woodSplit.blocksStep;
-  interiorCameras.splitting=woodSplit.view;
   grill=installGrill(world,gltf.scene,activities.setGrill);
   entryDoors=installEntryDoors(gltf.scene,()=>{renderer.shadowMap.needsUpdate=true;});
-  for(const button of viewButtons){
-    const key=button.dataset.view;
-    button.hidden=key!=='property' && !interiorCameras[key];
-    if(!button.hidden) locationPicker.add(new Option(button.textContent,key));
+  for(const [key,area] of Object.entries(tourAreas)){
+    if(!starts[key])throw Error('Missing walking start for '+area.label);
+    locationPicker.add(new Option(area.label,key));
   }
-  element('water-visit').hidden=!interiorCameras.well;
-  locationPicker.value='property';
   const arrival=sceneControls.conditions();
   lighting=installTourLighting(world,renderer,gltf.scene,arrival);
   woodland.conditions(arrival);
-  const imagerySource=element('ortho').textContent.trim();
-  element('ortho').remove();
-  if(imagerySource) {
-    const map=await new THREE.TextureLoader().loadAsync('data:image/jpeg;base64,'+imagerySource);
-    map.colorSpace=THREE.SRGBColorSpace;
-    const orthoMaterial=new THREE.MeshBasicMaterial({map,side:THREE.DoubleSide});
-    gltf.scene.traverse(mesh=>{
-      if(!mesh.isMesh) return;
-      let owner=mesh;
-      while(owner && !/^wooded[ _]terrain/i.test(owner.name))owner=owner.parent;
-      if(!owner)return;
-      const geometry=mesh.geometry.clone();
-      const attribute=geometry.getAttribute('position'),uvs=[],point=new THREE.Vector3();
-      // Bounds in EPSG:26918 minus the model origin (516338 E, 4612439 N).
-      for(let i=0;i<attribute.count;i++){
-        point.fromBufferAttribute(attribute,i).applyMatrix4(mesh.matrixWorld);
-        uvs.push((point.x+22)/44,(-point.z+22)/45);
-      }
-      geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
-      aerialLayers.push({mesh,orthoGeometry:geometry,orthoMaterial,originalGeometry:mesh.geometry,originalMaterial:mesh.material});
-    });
-    if(aerialLayers.length)updateState(element('imagery'),false);
-  }
   gltf.scene.traverse(object=>{
-    if(/^Walk(?:Surface|Block|Spawn)_/i.test(object.name)) return;
-    if(/^Backdrop_/i.test(object.name)) {backdrop.push(object);object.visible=false;}
-    if(/^(Tax[ _]parcel|Site[ _]section)/i.test(object.name)) diagram.push(object);
-    if(/^roof|ceiling|^vault[ _]/i.test(object.name)) roofs.push(object);
-    if(/^canopy/i.test(object.name)) {canopy.push(object);object.visible=false;}
-    if(!object.isMesh || !/^terrain/i.test(object.name)) return;
-    const original=Array.isArray(object.material)?object.material:[object.material];
-    const cloned=original.map(mat=>{
-      if(!mat.map || !mat.color) return mat;
-      const separate=mat.clone();
-      terrainMaps.set(separate,{map:mat.map,color:mat.color.clone()});
-      return separate;
-    });
-    object.material=Array.isArray(object.material)?cloned:cloned[0];
+    if(/^(Tax[ _]parcel|Site[ _]section|Canopy)/i.test(object.name))object.visible=false;
   });
   gltf.scene.updateMatrixWorld(true);
   const ring=gltf.scene.getObjectByName('WalkBlock_FireRing');
   if(ring)ringCenter=new THREE.Box3().setFromObject(ring).getCenter(new THREE.Vector3());
   treeLights=installTreeLights(world,gltf.scene,reducedMotion);
   surfaces=installCabinSurfaces(gltf.scene,renderer);
-  for(const item of aerialLayers){
-    item.originalMaterial=item.mesh.material;
-    item.originalGeometry=item.mesh.geometry;
-  }
   await loading.preparing(3,'Lighting and drawing your first view');
   floodlights=installMotionFloodlights(world,gltf.scene,schedule);
   batchStatic(gltf.scene);
@@ -721,23 +564,7 @@ async function show() {
   flashlight=installWalkingFlashlight(world);
   hallReflections=installHallReflections(world,gltf.scene,renderer);
   film=cabinFilm(renderer);
-  const bounds=new THREE.Box3();
-  gltf.scene.traverseVisible(object=>{
-    if(!object.geometry) return;
-    if(!object.geometry.boundingBox) object.geometry.computeBoundingBox();
-    bounds.union(object.geometry.boundingBox.clone().applyMatrix4(object.matrixWorld));
-  });
-  if(bounds.isEmpty()) throw Error('The model has no visible geometry.');
-  bounds.getSize(size);
-  bounds.getCenter(center);
-  span=Math.max(size.x,size.y,size.z);
-  element('roof').hidden=!roofs.length;
-  element('canopy').hidden=!canopy.length;
-  element('imagery').hidden=!terrainMaps.size && !aerialLayers.length;
-  reset();
-  updateLookControls();
-  const initialView=viewFromAddress();
-  if(initialView!=='property') changeView(initialView);
+  changeView(viewFromAddress());
   sceneCanRender=true;
   render(true);
   await afterPaint();

@@ -1,7 +1,7 @@
 import {guestMarker} from './guest-marker.js';
 import {openTourRoom,readRoom} from './tour-room.js';
 
-export function installParty({world,getPose,joined,meet,label,snapshot,apply,solo,snapshotFuel,applyFuel,addRemoteFuel,stop,schedule}){
+export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snapshotFuel,applyFuel,addRemoteFuel,stop,schedule}){
   const get=id=>document.getElementById(id);
   const dialog=get('party'),button=get('party-toggle'),start=get('party-start'),notice=get('party-status');
   const details=get('party-details'),join=get('party-join'),share=get('party-link'),log=get('party-log');
@@ -22,7 +22,7 @@ export function installParty({world,getPose,joined,meet,label,snapshot,apply,sol
   }
   function badge(){button.textContent=unread?'Chat ('+unread+')':ready?'Group chat':'Friends';}
   function address(token){
-    const base=location.hash.split('?')[0]||'#outside';
+    const base=location.hash.split('?')[0]||'#driveway';
     history.replaceState(null,'',base+(token?'?room='+token:''));
   }
   function removeMarker(marker){world.remove(marker.root);marker.dispose();}
@@ -56,7 +56,7 @@ export function installParty({world,getPose,joined,meet,label,snapshot,apply,sol
         place.setAttribute('aria-label','Place '+m.displayName+' nearby');row.append(place);
         place.onclick=()=>{
           if(room?.place(guest.id,getPose()))notice.textContent='Placed '+m.displayName+' near you.';
-          else notice.textContent='Choose a walking view to place a guest near you.';
+          else notice.textContent='Your friend could not be placed nearby. Try again in a moment.';
         };
       }
       pose(guest.id,guest.pose||m.target);
@@ -67,8 +67,9 @@ export function installParty({world,getPose,joined,meet,label,snapshot,apply,sol
   function pose(id,p){
     const m=markers.get(id);if(!m||!p)return;
     if(m.chip&&(m.target?.view!==p.view||!m.chip.title)){
-      const place=label(p.view);m.chip.title='Meet '+m.displayName+' at '+place;
-      m.chip.textContent=m.displayName+' · '+place;m.chip.disabled=p.view==='property';m.chip.setAttribute('aria-label',m.chip.title);
+      m.chip.title='Meet '+m.displayName+' where they are standing';
+      m.chip.disabled=p.view==='property';
+      m.chip.setAttribute('aria-label',m.chip.title);
     }
     m.root.userData.destination=p.view;
     if(!m.target||Math.hypot(p.x-m.target.x,p.y-m.target.y,p.z-m.target.z)>2)m.root.position.set(p.x,p.y,p.z);
@@ -111,7 +112,7 @@ export function installParty({world,getPose,joined,meet,label,snapshot,apply,sol
           await joined(arrival);
           if(room!==session||!ready)return;
           room.move(getPose());pulse=setInterval(()=>room?.move(getPose()),160);
-          share.value=location.href.split('#')[0]+'#outside?room='+active;
+          share.value=location.href.split('#')[0]+'#driveway?room='+active;
           join.hidden=true;details.hidden=false;notice.textContent=isHost?'Your group is open. Share the invitation below.':'You joined the group.';
           badge();if(isHost)input.focus();else if(dialog.open)dialog.close();
           schedule();

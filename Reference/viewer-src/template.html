@@ -4,7 +4,6 @@
 
 #views{position:absolute;right:clamp(18px,4.5vw,70px);top:clamp(18px,4.5vw,58px)}
 #views button[aria-pressed=true]{background:#305749;color:white}
-.inside :is(#roof,#imagery,#canopy){display:none}
 .inside header,.inside #hint{color:white;text-shadow:0 1px 4px #000}
 .inside h1{font-size:clamp(1.75rem,2.8vw,2.7rem)}.inside header p{color:white;font-size:.9rem}
 .inside main::before{content:"";position:absolute;pointer-events:none;inset:0;z-index:1;background:linear-gradient(180deg,#1721198c,transparent 24%,transparent 80%,#16211b78)}
@@ -21,7 +20,7 @@ header,#views,.dock{z-index:2}
 
 .view-picker{display:none;align-items:center;gap:.55rem;padding:0 .3rem 0 .7rem;color:#476156;font-size:.86rem}
 .view-picker select{max-width:100%;min-height:40px;border:0;border-radius:16px;padding:0 .35rem;background:#f3f7f3;color:#203d30;font:inherit;font-weight:650;cursor:pointer}
-@media(max-width:2220px){#views button[data-view]{display:none}.view-picker{display:flex}#views{border-radius:20px}}
+@media(max-width:2220px){.view-picker{display:flex}#views{border-radius:20px}}
 @media (max-width:790px) and (min-height:471px){#views{top:94px;left:clamp(18px,4.5vw,70px)}}
 
 @media(max-width:350px){.view-picker{gap:.2rem;padding-left:.2rem}.view-picker select{max-width:47vw}}
@@ -118,12 +117,11 @@ header :is(#welcome-again,#water-open){pointer-events:auto;color:inherit;font:in
 #water-notes .water-source,#water-notes #water-status,#water-notes #water-observed{font-size:.81rem;color:#496052}
 #water-notes #water-level{margin:.7rem 0 0;color:#264634;font-size:.9rem}
 #water-depth{font:500 2rem/1.05 "Baskervville","Iowan Old Style",Georgia,serif;letter-spacing:-.035em;font-variant-numeric:lining-nums tabular-nums;margin-right:.2rem}
-#water-visit,#water-retry{padding:4px 8px;min-height:30px;margin:0 8px 2px 0;border:1px solid #9eb09e;border-radius:5px;color:#345a42;background:transparent;font:inherit}
+#water-retry{padding:4px 8px;min-height:30px;margin:0 8px 2px 0;border:1px solid #9eb09e;border-radius:5px;color:#345a42;background:transparent;font:inherit}
 #water-notes .water-source{margin:.3rem 0 0}
 #tour-controls{position:absolute;z-index:4;top:clamp(16px,3vw,42px);right:clamp(16px,3vw,46px);display:grid;gap:5px;justify-items:end;pointer-events:none}
 #tour-controls>*{pointer-events:auto}
 #tour-controls #views{position:static;max-width:100%;padding:4px;flex-wrap:nowrap;border-radius:14px}
-#tour-controls #views button[data-view]{display:none}
 #tour-controls .view-picker{display:flex}
 #scene-panel{display:grid;width:366px;min-width:0;max-width:100%;padding:6px 8px;gap:4px;color:#203c2c;background:#fcfcf7f5;border:1px solid #bdcabc;border-radius:13px;box-shadow:0 5px 20px #1c33231b;font-size:.77rem}
 .environment{display:grid;grid-template-columns:1.45fr 1fr;align-items:center;gap:15px;padding:0 3px}
@@ -133,10 +131,10 @@ header :is(#welcome-again,#water-open){pointer-events:auto;color:inherit;font:in
 #scene-hour{display:block;grid-column:1/-1;width:100%;min-width:0;height:18px;margin:0;accent-color:#43684a;cursor:pointer}
 .weather-setting{display:flex;align-items:center;gap:5px}
 #scene-weather{min-width:0;flex:1;border:1px solid #d1dccf;border-radius:7px;padding:4px 2px 4px 5px;font:inherit;font-weight:600;background:#eef2ea;color:#284430;cursor:pointer}
-.scene-actions{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1.12fr) minmax(0,.92fr) minmax(0,.87fr) minmax(0,.9fr);gap:3px}
+.scene-actions{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:3px}
 #scene-panel button{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:30px;border:1px solid #d3ddcf;border-radius:7px;background:#f1f4ec;padding:3px 4px;color:#294030;font-size:.75rem;line-height:1.15}
 #scene-panel button:hover,#scene-weather:hover{background:#e4ebde}
-#scene-panel button[aria-checked=true],#scene-panel button[aria-current=location]{border-color:#8aa28c;background:#e0eadc}
+#scene-panel button[aria-checked=true]{border-color:#8aa28c;background:#e0eadc}
 #scene-panel button[data-state=ready]{background:#eef2e7;border-color:#c5d2ba}
 #scene-panel button span{font-size:.63rem;font-weight:700}
 #scene-panel button[aria-pressed=true]{background:#f4e4cd;border-color:#bd9569;color:#623716}
@@ -245,7 +243,7 @@ header :is(#welcome-again,#water-open){pointer-events:auto;color:inherit;font:in
 .inside #tour-controls #views button,.inside .dock nav button{color:var(--ink);background:transparent}
 .inside #scene-panel :is(button,select):hover,.inside #activity button:hover,.inside #tour-controls #views button:hover,
 .inside .dock nav button:hover{background:#f4f7e826}
-.inside #scene-panel :is(button[aria-checked=true],button[aria-current=location],button[aria-pressed=true]),
+.inside #scene-panel :is(button[aria-checked=true],button[aria-pressed=true]),
 .inside #produce input:checked+span{background:#d7b98122;border-color:#e7c89175;color:#fff0d4}
 .inside #scene-panel button[data-state=ready]{background:#f4f7e80b;border-color:#d2ddc731}
 .inside #activity .primary{background:#e9c99a;color:#243127}
@@ -350,7 +348,7 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
 @media(max-height:470px){#status{padding-block:20px}#load-title{margin-bottom:14px}}
 @media(prefers-reduced-motion:reduce){.load-track:has(progress:indeterminate)::after{animation:none;transform:translateX(100%)}}
 @media(forced-colors:active){[data-load-bar]{appearance:auto}.load-track:has(progress:indeterminate)::after{display:none}}
-</style></head><body><main><canvas id="view" class="view" tabindex="0" aria-label="Interactive model. Drag or use arrow keys to orbit. Use plus and minus to zoom. Home resets the view."></canvas><section id="status" aria-labelledby="load-title">
+</style></head><body><main><canvas id="view" class="view" tabindex="0" aria-label="Walk the cabin and grounds. Drag to look around."></canvas><section id="status" aria-labelledby="load-title">
     <img id="load-photo" alt="" decoding="async">
     <div class="load-arrival"><p class="load-location">Smallwood, New York</p>
       <h2 id="load-title">The Reindeer Trail</h2>
@@ -372,7 +370,7 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
         document.querySelector('#status [data-load-quote]').textContent=lines[Math.floor(Math.random()*lines.length)];
       }</script>
     </div>
-  </section><header><h1>The Reindeer Trail</h1><p>Smallwood, NY · <button type="button" id="welcome-again" aria-haspopup="dialog" aria-controls="welcome">About the cabin</button> · <button type="button" id="water-open" aria-haspopup="dialog" aria-controls="water-notes" aria-expanded="false">Water notes</button></p></header><div id="tour-controls" hidden><nav aria-label="Choose a viewpoint" id="views" hidden><button data-view="property" aria-pressed="true">Property</button><button data-view="outside" aria-pressed="false">Driveway</button><button data-view="splitting" aria-pressed="false">Wood splitting</button><button data-view="path" aria-pressed="false">Front path</button><button data-view="well" aria-pressed="false">Well casing</button><button data-view="entry" aria-pressed="false">Front entry</button><button data-view="porch" aria-pressed="false">Covered porch</button><button data-view="grill" aria-pressed="false">Deck barbecue</button><button data-view="cook" aria-pressed="false">Cook at the grill</button><button data-view="wood" aria-pressed="false">Woodpile</button><button data-view="yard" aria-pressed="false">Fire pit</button><button data-view="stars" aria-pressed="false">Stargazing</button><button data-view="deer" aria-pressed="false">Deer meadow</button><button data-view="hall" aria-pressed="false">Front hall</button><button data-view="frontbed" aria-pressed="false">Front bedroom</button><button data-view="master" aria-pressed="false">Master &amp; bath</button><button data-view="bath" aria-pressed="false">Bathroom</button><button data-view="primary" aria-pressed="false">Master bedroom</button><button data-view="vault" aria-pressed="false">Kitchen vault</button><button data-view="kitchen" aria-pressed="false">Kitchen</button><button data-view="kitchenwork" aria-pressed="false">Island worktop</button><button data-view="living" aria-pressed="false">Living room</button><button data-view="hearth" aria-pressed="false">Propane furnace</button><button data-view="bunk" aria-pressed="false">Bunk room</button><button data-view="loft" aria-pressed="false">Loft</button><button data-view="tree" aria-pressed="false">Christmas tree</button><label class="view-picker">View <select id="location" aria-label="Tour location"></select></label>
+  </section><header><h1>The Reindeer Trail</h1><p>Smallwood, NY · <button type="button" id="welcome-again" aria-haspopup="dialog" aria-controls="welcome">About the cabin</button> · <button type="button" id="water-open" aria-haspopup="dialog" aria-controls="water-notes" aria-expanded="false">Water notes</button></p></header><div id="tour-controls" hidden><nav aria-label="Tour locations and visitor tools" id="views" hidden><label class="view-picker">Start at <select id="location" aria-label="Tour location"></select></label>
 <button type="button" id="map-toggle" aria-haspopup="dialog" aria-controls="property-map" aria-expanded="false">Map</button>
 <button id="party-toggle" aria-haspopup="dialog" aria-controls="party">Friends</button>
 </nav>
@@ -390,8 +388,8 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
     <button type="button" id="scene-furnace" role="switch" aria-label="Propane furnace" aria-checked="true">Furnace <span id="scene-furnace-status">On</span></button>
     <button type="button" id="scene-sound" role="switch" aria-label="Tour sound" aria-describedby="scene-sound-status" aria-checked="true">Sound <span id="scene-sound-status">Ready</span></button>
     <button type="button" id="scene-fire" aria-pressed="false">Light fire</button>
-    <button type="button" id="scene-stars" title="Look at the backyard night sky">Stargaze</button>
-    <button type="button" id="scene-deer" aria-controls="activity" aria-expanded="false" title="Offer food here or visit Deer meadow">Feed deer</button>
+    <button type="button" id="scene-stars" title="Set a clear night sky">Stargaze</button>
+    <button type="button" id="scene-deer" aria-controls="activity" aria-expanded="false" title="Hold out food or toss it to the deer" hidden>Feed deer</button>
   </div>
   <div class="local-controls" role="group" aria-label="Follow conditions in Smallwood">
     <span>Follow Smallwood</span>
@@ -425,7 +423,7 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
       <label><input type="radio" name="deer-food" value="carrot"><span>Carrots <b></b></span></label>
       <label><input type="radio" name="deer-food" value="vegetables"><span>Vegetables <b></b></span></label>
     </fieldset>
-    <div class="activity-actions"><button class="primary" id="hold-food">Hold out</button><button id="toss-food">Toss</button><button id="refill-basket">Refill</button></div><p id="deer-message" role="status"></p></div></section><div class="dock" id="tools" hidden><p class="hint" id="hint"><span id="walk-keys" hidden><span><kbd>W</kbd><kbd>S</kbd> Walk</span><span><kbd>A</kbd><kbd>D</kbd> Turn</span></span><span id="look-gesture">Drag to orbit · Scroll or pinch to zoom</span></p><nav aria-label="Model controls"><button id="roof" aria-pressed="true">Roof</button><button id="imagery" aria-pressed="true">Aerial</button><button id="canopy" aria-pressed="false">Tree canopy</button><button id="use-grill" aria-controls="activity" aria-expanded="false" hidden>Use grill</button><button id="flashlight" type="button" aria-pressed="false" aria-keyshortcuts="L" title="Flashlight (L)" hidden>Flashlight</button><button id="lock" hidden>Mouse look</button><button id="far" class="zoom" aria-label="Zoom out">−</button><button id="near" class="zoom" aria-label="Zoom in">+</button><button id="reset">Reset view</button></nav></div></main><dialog id="welcome" aria-labelledby="welcome-title">
+    <div class="activity-actions"><button class="primary" id="hold-food">Hold out</button><button id="toss-food">Toss</button><button id="refill-basket">Refill</button></div><p id="deer-message" role="status"></p></div></section><div class="dock" id="tools" hidden><p class="hint" id="hint"><span id="walk-keys" hidden><span><kbd>W</kbd><kbd>S</kbd> Walk</span><span><kbd>A</kbd><kbd>D</kbd> Turn</span></span><span id="look-gesture">Drag to look</span></p><nav aria-label="Model controls"><button id="use-grill" aria-controls="activity" aria-expanded="false" hidden>Use grill</button><button id="flashlight" type="button" aria-pressed="false" aria-keyshortcuts="L" title="Flashlight (L)" hidden>Flashlight</button><button id="lock" hidden>Mouse look</button><button id="far" class="zoom" aria-label="Zoom out">−</button><button id="near" class="zoom" aria-label="Zoom in">+</button><button id="reset">Reset view</button></nav></div></main><dialog id="welcome" aria-labelledby="welcome-title">
   <div class="welcome-layout">
     <div class="welcome-copy">
       <p class="welcome-location">Smallwood, New York</p>
@@ -451,9 +449,9 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
 <dialog id="water-notes" aria-labelledby="water-title">
   <div class="water-heading"><h2 id="water-title">Water notes</h2><button type="button" id="water-close" aria-label="Close water notes">×</button></div>
   <h3>From the well to the tap</h3>
-  <p>The blue cap beside the wooden driveway steps marks the cabin’s well. A submerged pump draws water up to the house. Compressed air in a pressure tank keeps the taps flowing between pump cycles.</p>
+  <p>Walk up the wooden steps from the driveway. Beside the upper railing post on your left, a blue cap marks the cabin’s well. A submerged pump draws water up to the house. Compressed air in a pressure tank keeps the taps flowing between pump cycles.</p>
   <p>The January 2024 inspection also recorded a separate 40-gallon tank for hot water.</p>
-  <p class="water-source"><button type="button" id="water-visit" hidden>See the well</button> <a href="https://www.health.ny.gov/environmental/water/drinking/regulations/fact_sheets/docs/fs7_individual_water_supply_wells.pdf" target="_blank" rel="noopener noreferrer">How a well works · New York State</a></p>
+  <p class="water-source"><a href="https://www.health.ny.gov/environmental/water/drinking/regulations/fact_sheets/docs/fs7_individual_water_supply_wells.pdf" target="_blank" rel="noopener noreferrer">How a well works · New York State</a></p>
   <section class="water-reading" aria-labelledby="water-station-title">
     <h3 id="water-station-title">Groundwater at Woodbourne</h3>
     <div aria-live="polite" aria-atomic="true">
@@ -486,8 +484,8 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
       <img id="map-photo" alt=""><canvas id="map-vectors" aria-hidden="true"></canvas>
       <div class="map-north" aria-label="Grid north is up"><span>N</span><i aria-hidden="true"></i></div>
       <div id="map-scale"><span></span></div>
-      <button type="button" class="map-pin" data-map-place="entry" aria-label="Visit the front approach" hidden><i aria-hidden="true"></i><span>Front approach</span></button>
-      <button type="button" class="map-pin" data-map-place="porch" aria-label="Visit the covered porch" hidden><i aria-hidden="true"></i><span>Covered porch</span></button>
+      <button type="button" class="map-pin" data-map-place="entry" hidden><i aria-hidden="true"></i><span>Front of house</span></button>
+      <button type="button" class="map-pin" data-map-place="yard" hidden><i aria-hidden="true"></i><span>Back yard</span></button>
       <button type="button" id="map-cabin" class="map-pin" aria-label="View the cabin on the detailed aerial" hidden><i aria-hidden="true"></i><span>Cabin</span></button>
     </div><figcaption aria-live="polite"><strong id="map-source-title"></strong><span id="map-source-detail"></span></figcaption></figure>
     <div class="map-options">
@@ -504,4 +502,4 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
     </div>
   </div>
 </dialog>
-<script type="application/json" id="map-assets">%%MAP%%</script><script type="application/octet-stream" id="ortho">%%ORTHO%%</script><script type="application/octet-stream" id="model">%%GLB%%</script><script>%%JS%%</script></body></html>
+<script type="application/json" id="map-assets">%%MAP%%</script><script type="application/octet-stream" id="model">%%GLB%%</script><script>%%JS%%</script></body></html>

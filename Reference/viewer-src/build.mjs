@@ -18,10 +18,7 @@ const js=(await build({entryPoints:[path.join(base,'viewer.js')],bundle:true,for
 const licenseFiles=['three/LICENSE','cannon-es/LICENSE','peerjs/LICENSE','peerjs-js-binarypack/LICENSE','eventemitter3/LICENSE','sdp/LICENSE','webrtc-adapter/LICENSE.md','@msgpack/msgpack/LICENSE'];
 const licenses=await Promise.all(licenseFiles.map(async file=>file.split('/LICENSE')[0]+'\n'+await fs.readFile(path.join(base,'node_modules',file),'utf8')));
 const license=licenses.join('\n\n').replaceAll('*/','* /');
-let orthophoto='';
 const refs=referencePath||path.join(base,'..');
-try {orthophoto=(await fs.readFile(path.join(refs,'State aerial.jpg'))).toString('base64');}
-catch(error){if(referencePath || error.code!=='ENOENT')throw error;}
 const [aerialPhoto,satellitePhoto,mapVectors]=await Promise.all([
   fs.readFile(path.join(refs,'Property aerial.jpg')),
   fs.readFile(path.join(refs,'Neighborhood satellite.jpg')),
@@ -56,6 +53,6 @@ if(web){
   }
   template=template.replace('id="model">%%GLB%%','id="model" data-parts="'+parts.join(' ')+'" data-bytes="'+glb.length+'">');
 }
-const html=template.replace('%%WELCOME_PHOTO%%',()=>welcomePhoto).replace('%%MAP%%',()=>mapJSON).replace('%%ORTHO%%',()=>orthophoto).replace('%%GLB%%',()=>glb.toString('base64')).replace('%%JS%%',()=>('/* '+license+' */\n'+js).replace(/<\/script/gi,'<\\/script'));
+const html=template.replace('%%WELCOME_PHOTO%%',()=>welcomePhoto).replace('%%MAP%%',()=>mapJSON).replace('%%GLB%%',()=>glb.toString('base64')).replace('%%JS%%',()=>('/* '+license+' */\n'+js).replace(/<\/script/gi,'<\\/script'));
 await fs.writeFile(outPath,html);
 console.log(path.resolve(outPath));
