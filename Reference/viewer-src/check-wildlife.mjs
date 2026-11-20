@@ -33,7 +33,7 @@ const herd=installWildlife(scene,space,camera,{onChange(value){
   const distances=deer.map(deer=>deer.getObjectByName('Muzzle').getWorldPosition(new T.Vector3()).distanceTo(target.position));
   const nearest=Math.min(...distances);
   assert(nearest<.18,'Consumed '+kind+' beyond muzzle contact');
-  bites.push({kind,hand,distance:nearest});
+  bites.push({kind,hand,distance:nearest,animal:distances.indexOf(nearest)});
 }});
 const yard=scene.getObjectByName('Backyard wildlife');
 deer=yard.children.filter(o=>o.type==='Group');
@@ -48,10 +48,11 @@ function toss(kind){
 }
 function leaveYard(){camera.position.set(100,10,100);herd.update(camera,'property',clock+=90);}
 const gap=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
-const spread=()=>Math.max(...deer.map((a,i)=>gap(a.position,deer[(i+1)%deer.length].position)));
+const spread=()=>Math.max(...deer.flatMap(a=>deer.map(b=>gap(a.position,b.position))));
 
 home();run(.3);assert.deepEqual(state.inventory,stock);
-assert(herd.hold('apple'));const initialPositions=deer.map(d=>d.position.clone()),startSpread=spread();
+assert(herd.hold('apple'));const initialPositions=deer.map(d=>d.position.clone());
+assert(spread()>15,'The herd should occupy both sides of the woods');
 until(()=>events.some(m=>m.includes('curious deer is')),4,'No curiosity toward a still visitor');
 const direction=new T.Vector3().subVectors(deer[0].position,camera.position);direction.y=0;direction.normalize();
 let body=space.spawn(camera.position.x,camera.position.z,camera.position.y,camera.position.y-1.59);
@@ -62,8 +63,9 @@ for(let f=0;f<65;f++){
 assert(events.some(m=>m.includes('scattered')),'Visitor approach did not alert the herd');
 assert.equal(bites.length,0,'The herd ate during flight');
 run(2.8);
-assert(deer.every((d,i)=>gap(d.position,initialPositions[i])>2),'A herd member stayed behind');
-assert(spread()>startSpread+2,'The herd did not fan out');
+const displacement=deer.map((d,i)=>gap(d.position,initialPositions[i]));
+assert(displacement[0]>3 && displacement[2]>3,'The nearby doe and yearling did not scatter');
+assert(displacement[1]<2.6 && displacement[3]<2.6,'A local alarm sent distant animals into flight');
 until(()=>bites.length>0,30,'No curious deer returned after the visitor stopped');
 const afterMeal=events.length;run(18);
 assert(!events.slice(afterMeal).some(m=>m.includes('scattered')),'A stationary hand-feeder triggered another alarm');
@@ -92,5 +94,45 @@ assert([...foods].every((f,i)=>gap(f.position,starts[i])>1),'Food remained in mi
 assert.equal(bites.length,before,'A deer ate away from the food');
 home();until(()=>!foods.size,100,'Full basket of overlapping servings did not clear');
 herd.refill();assert.deepEqual(state.inventory,stock);
-console.log('Walk-up alarm, flight, return to hand, all foods, refunds and simultaneous throws passed.');
+// The shy buck's original stand is far from the food at the central clearing.
+// The willing deer must travel the woodland route and reach the new offering.
+const outpost=initialPositions[1];
+camera.position.copy(outpost);camera.position.y+=1.59;
+camera.lookAt(new T.Vector3().fromArray(herd.view.target));run(.3);
+assert(state.near,'The wooded side of the parcel should support feeding');
+const beforeApproach=deer.map(d=>gap(camera.position,d.position));
+const priorBites=bites.length;
+assert(herd.hold('apple'),'Unable to offer food at the woodland stand');
+until(()=>bites.length>priorBites,85,'No animal came from the clearing to the wooded stand');
+const handMeal=bites.at(-1);
+assert(handMeal.hand && handMeal.animal!==1,'The wary buck should hang back from a hand');
+assert(beforeApproach[handMeal.animal]>8,'Hand feeding did not draw an animal across the woods');
+
+home();run(.3);
+const beforeToss=deer.map(d=>d.position.clone()),count=bites.length;
+toss('vegetables');run(1.2);
+const mealPosition=[...foods][0].position.clone();
+until(()=>bites.length>count,85,'No deer followed the tossed greens back to the clearing');
+const tossMeal=bites.at(-1);
+assert(!tossMeal.hand && gap(beforeToss[tossMeal.animal],mealPosition)>5,'Tossed food did not draw a distant animal');
+
+// Observe real paths while standing on the driveway, outside the feeding zone.
+const drive=model.scene.getObjectByName('WalkSpawn_Outside').getWorldPosition(new T.Vector3());
+camera.position.copy(drive);camera.position.y+=1.59;
+const origins=deer.map(d=>d.position.clone()),previous=origins.map(p=>p.clone());
+const excursions=deer.map(()=>0);
+for(let f=0;f<65*30;f++){
+  herd.update(camera,'outside',clock+=1/30);
+  for(const [i,d] of deer.entries()){
+    assert(gap(previous[i],d.position)<.105,'A roaming deer jumped between patches');
+    excursions[i]=Math.max(excursions[i],gap(d.position,origins[i]));previous[i].copy(d.position);
+    if(f%15===0){
+      const ground=space.spawn(d.position.x,d.position.z,d.position.y+1.59,d.position.y);
+      assert(ground && Math.abs(ground.y-d.position.y)<.04,'Deer crossed an obstruction or left the terrain');
+    }
+  }
+}
+assert(!state.near);
+assert(excursions.every(d=>d>3),'A distant deer stopped roaming while the visitor was on the driveway');
+console.log('Forest roaming, local alarm, long-range food approach, safe routes, refunds and simultaneous throws passed.');
 console.log(bites.length+' mouth contacts, maximum distance '+Math.round(100*Math.max(...bites.map(b=>b.distance)))+' cm.');

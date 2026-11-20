@@ -9,6 +9,8 @@ const surfaces={
   paving:{relief:.0035,exterior:true},
   masonry:{relief:.004,exterior:true},
   stone:{relief:.004},
+  slate:{relief:.00008},
+  porcelain:{relief:.00028},
   cedar:{relief:.0013,exterior:true},
   bark:{relief:.006,exterior:true},
   oak:{relief:.0009,grain:true},
@@ -19,7 +21,9 @@ function surfaceType(name){
   if(/^(Fire circle · pale|Fine crushed gravel|Entry · blue-gray crushed)/i.test(name))return 'aggregate';
   if(/^(Paved public road|Front motor court|Street gate and upper court|Uphill front court|Concrete stairs · exposed|Rear landing · weathered concrete)/i.test(name))return 'paving';
   if(/^(Roadside masonry|Painted block|Asphalt shingle|Weathered fieldstone|Fieldstone shadows|Weathered stone highlights|Glacial boulder|Fire pit · (photographed aggregate|tumbled stone)|Utility apron · flagstone)/i.test(name))return 'masonry';
-  if(/split.face (shower|ledgestone)|Ledgestone split face|brushed greige floor porcelain/i.test(name))return 'stone';
+  if(name==='Room detail | Entry hall · charcoal-gray tile')return 'slate';
+  if(name==='Bathroom · brushed greige floor porcelain')return 'porcelain';
+  if(/split.face (shower|ledgestone)|Ledgestone split face/i.test(name))return 'stone';
   if(/^(Porch · natural sawn timber|Blue lap siding|Midnight blue siding|Entry wing · blue cedar shakes|Deck boards|Timber$|Adirondack slat|Weathered railing timber|Weathered timber ties|Garage · weathered timber|Entry · weathered cedar)/i.test(name))return 'cedar';
   if(/^(Hardwood bark|Oak and maple branchwood)/i.test(name))return 'bark';
   if(/^(Floor · photograph of clear-finished|Living · gray boards|Cabin furnishing • Storage table|Room detail \| Island · dark stained)/i.test(name))return 'satin';
@@ -92,7 +96,9 @@ function addRelief(m,type,substitute){
       #endif`)
       .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
         #ifdef USE_MAP
-          roughnessFactor=clamp(roughnessFactor-.080*(photoHeight+.60),.17,1.);
+          ${type==='slate'
+            ? 'roughnessFactor=clamp(roughnessFactor-.22*(photoHeight+1.01),.18,.32);'
+            : 'roughnessFactor=clamp(roughnessFactor-.080*(photoHeight+.60),.17,1.);'}
         #endif`)
       .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
         #ifdef USE_MAP
@@ -104,10 +110,51 @@ function addRelief(m,type,substitute){
           vec3 slope=(dFdx(photoHeight)*r1+dFdy(photoHeight)*r2)*
             (${profile.relief.toFixed(6)}*sign(photoDet)/max(1.e-9,abs(photoDet)));
           normal=normalize(normal-slope*min(1.,.46/max(.001,length(slope))));
+          // Fold subpixel normal variation into the microfacet width. Sharp
+          // highlights on grain and stone then stay stable as the walker moves.
+          vec3 normalDx=dFdx(normal),normalDy=dFdy(normal);
+          float variance=min(.035,.20*(dot(normalDx,normalDx)+dot(normalDy,normalDy)));
+          float alpha=roughnessFactor*roughnessFactor;
+          roughnessFactor=sqrt(sqrt(alpha*alpha+variance));
         #endif`);
   };
   m.customProgramCacheKey=()=>key+'|surface-'+type+'-'+Number(substitute);
   m.needsUpdate=true;
+}
+
+// The exported sprays and distant crown atlases both have authored UV tangents.
+// Use that direction to shade across the branch rather than across the carrier quad.
+const canopyVertex=`
+  #ifndef USE_TANGENT
+    attribute vec4 tangent;
+  #endif
+  varying vec3 canopyAcross;
+`;
+const canopyFrame='canopyAcross=normalize(mat3(modelViewMatrix)*tangent.xyz);';
+
+function distantCrowns(m){
+  // The atlas already contains detail in the shade. Let the light define the
+  // shape without adding the full baked color to every side of every tree.
+  m.emissiveIntensity*=.48;
+  const previous=m.onBeforeCompile,key=m.customProgramCacheKey();
+  m.onBeforeCompile=(shader,renderer)=>{
+    previous.call(m,shader,renderer);
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>'+canopyVertex)
+      .replace('#include <begin_vertex>','#include <begin_vertex>\n'+canopyFrame);
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 canopyAcross;')
+      .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+        // Three trees share this atlas. Curve the light across the leafy crown,
+        // preserving the original response on the trunk below the branches.
+        float leafMask=smoothstep(.012,.07,sampledDiffuseColor.g-sampledDiffuseColor.b);
+        float rim=fract(vMapUv.x*3.)*2.-1.;
+        float height=1.-vMapUv.y;
+        vec3 up=viewMatrix[1].xyz;
+        vec3 crown=normalize(normal*(1.-.52*rim*rim)+canopyAcross*rim*1.4
+                         +up*(height-.49)*2.2);
+        normal=normalize(mix(normal,crown,leafMask*smoothstep(.19,.48,height)));
+      `);
+  };
+  m.customProgramCacheKey=()=>key+'|rounded-hardwood-crown';m.needsUpdate=true;
 }
 
 function foliage(m,uniforms){
@@ -117,8 +164,9 @@ function foliage(m,uniforms){
   m.onBeforeCompile=(shader,renderer)=>{
     previous.call(m,shader,renderer);Object.assign(shader.uniforms,uniforms);
     shader.vertexShader=shader.vertexShader.replace('#include <common>',
-      '#include <common>\nuniform float forestClock,branchBend;')
+      '#include <common>'+canopyVertex+'\nuniform float forestClock,branchBend;')
       .replace('#include <begin_vertex>',`#include <begin_vertex>
+        ${canopyFrame}
         vec3 p=(modelMatrix*vec4(position,1.)).xyz;
         float range=1.-smoothstep(17.,29.,distance(p,cameraPosition));
         float stem=clamp(1.-uv.y,0.,1.); // glTF V=1 is the twig end fixed to the tree
@@ -126,13 +174,107 @@ function foliage(m,uniforms){
         float flutter=sin(dot(p,vec3(2.3,1.7,.87))+2.9*forestClock);
         transformed+=range*branchBend*stem*vec3(.041*gust+.011*flutter,.008*flutter,.022*gust);
       `);
-    shader.fragmentShader=shader.fragmentShader.replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
-      #if NUM_DIR_LIGHTS > 0
-        float throughLeaf=smoothstep(-.18,.85,dot(-normal,directionalLights[0].direction));
-        reflectedLight.indirectDiffuse+=diffuseColor.rgb*vec3(.074,.092,.045)*throughLeaf*directionalLights[0].color;
-      #endif`);
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying vec3 canopyAcross;')
+      .replace('#include <map_fragment>',`#include <map_fragment>
+        // Six green leaf colors and a brown twig are painted into each spray.
+        // The palette provides stable blade orientations without another texture.
+        float blade=smoothstep(.056,.13,sampledDiffuseColor.g-sampledDiffuseColor.b);
+        float tone=clamp((sampledDiffuseColor.g-.19)*5.1,0.,1.);
+      `)
+      .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
+        roughnessFactor=mix(roughnessFactor,mix(.62,.44,tone),blade);
+      `)
+      .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+        vec3 up=viewMatrix[1].xyz;
+        float fold=sin(10.*tone+1.3)*(1.-smoothstep(.13,.48,fwidth(tone)));
+        vec3 bladeNormal=normalize(normal+up*(.18+.40*tone)
+          +canopyAcross*(.43*fold+.42*(vMapUv.x-.5)));
+        normal=normalize(mix(normal,bladeNormal,blade));
+      `)
+      .replace('#include <lights_fragment_end>',`#include <lights_fragment_end>
+        #if NUM_DIR_LIGHTS == 1 && defined(RE_Direct)
+          // The cabin sun is the last punctual light accumulated by Three. Its
+          // color already has the shadow at this leaf, including nearby branches.
+          vec3 sunDir=directLight.direction;
+          float back=smoothstep(-.16,.88,dot(-normal,sunDir));
+          float towardSun=smoothstep(-.25,.92,dot(-normalize(vViewPosition),sunDir));
+          // Thin leaf tissue transmits the warm part of incident sunlight.
+          // Twigs are opaque, and overcast and moonlight follow their source intensity.
+          reflectedLight.indirectDiffuse+=diffuseColor.rgb*directLight.color
+            *vec3(.29,.33,.13)*blade*back*(.34+.66*towardSun);
+        #endif`);
   };
-  m.customProgramCacheKey=()=>key+'|near-leaf-wind';m.needsUpdate=true;
+  m.customProgramCacheKey=()=>key+'|folded-broadleaf-spray';m.needsUpdate=true;
+}
+
+// L1040636 shows an eggshell painted hall, a flat ivory ceiling, satin trim
+// and a polished gray entry floor. The runner and grout stay diffuse.
+const finishRoughness=new Map([
+  ['Room detail | Hall paint, warm straw',.82],
+  ['Interior · soft ivory vault',.96],
+  ['Room detail | Painted cream casing',.48],
+  ['Window frames · painted wood',.52],
+  ['Room detail | Entry hall · dark joints',.92],
+  ['Entry runner · photographed woven stripes',.94],
+  ['Room detail | Entry hall · charcoal-gray tile',.235],
+  ['Bathroom · brushed greige floor porcelain',.62]
+]);
+const brushedMetal=/^(Room detail \| (?:Brushed stainless|Bath · satin nickel)|Cabin furnishing • Brushed metal trim)$/;
+function physicalFinish(material){
+  if(material.isMeshPhysicalMaterial)return material;
+  const finish=new T.MeshPhysicalMaterial();
+  T.MeshStandardMaterial.prototype.copy.call(finish,material);
+  finish.defines={STANDARD:'',PHYSICAL:''};
+  return finish;
+}
+
+function wellFinish(model,material){
+  let finish=material;
+  switch(material.name){
+    case 'Water well · cobalt enamel cap':
+      finish=physicalFinish(material);
+      // L1040557 shows a deep blue painted casting with a glossy rim.
+      finish.metalness=0;
+      finish.roughness=.34;
+      finish.clearcoat=.70;
+      finish.clearcoatRoughness=.17;
+      break;
+    case 'Water well · black conduit and gasket':
+      finish.metalness=0;
+      finish.roughness=.50;
+      finish.color.set('#252725');
+      break;
+    case 'Water well · oxidized steel casing': {
+      finish.color.set('#584d46');
+      finish.metalness=.30;
+      finish.roughness=.78;
+      const previous=finish.onBeforeCompile,key=finish.customProgramCacheKey();
+      finish.onBeforeCompile=(shader,renderer)=>{
+        previous.call(finish,shader,renderer);
+        shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 casingPosition;')
+          .replace('#include <begin_vertex>','#include <begin_vertex>\ncasingPosition=(modelMatrix*vec4(position,1.)).xyz;');
+        shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
+          varying vec3 casingPosition;
+          float oxidePatch(vec2 p){
+            vec2 cell=floor(p),f=fract(p);
+            f=f*f*(3.-2.*f);
+            return mix(mix(rand(cell),rand(cell+vec2(1.,0.)),f.x),
+                       mix(rand(cell+vec2(0.,1.)),rand(cell+vec2(1.)),f.x),f.y);
+          }`)
+          .replace('#include <map_fragment>',`#include <map_fragment>
+            vec2 grain=vec2(dot(casingPosition.xz,vec2(.83,.56)),casingPosition.y);
+            float oxide=.72*oxidePatch(grain*vec2(34.,18.))
+                      +.28*oxidePatch(vec2(casingPosition.z-casingPosition.x,casingPosition.y)*87.);
+            diffuseColor.rgb*=mix(vec3(.52,.59,.65),vec3(1.38,1.10,.88),oxide);
+          `);
+      };
+      finish.customProgramCacheKey=()=>key+'|well-casing-oxide';
+      break;
+    }
+  }
+  coatOutdoorMaterial(model,finish);
+  finish.needsUpdate=true;
+  return finish;
 }
 
 export function installCabinSurfaces(model,renderer){
@@ -155,6 +297,14 @@ export function installCabinSurfaces(model,renderer){
     if(!mesh.isMesh)return;
     const source=materials(mesh),changed=source.map(m=>{
       if(!m.isMeshStandardMaterial)return m;
+      if(m.name.startsWith('Water well ·')){
+        if(!done.has(m))done.set(m,wellFinish(model,m));
+        return done.get(m);
+      }
+      if(m.name==='Backdrop_Hardwood cutouts'){
+        if(!done.has(m)){distantCrowns(m);done.set(m,m);}
+        return m;
+      }
       if(m.name==='Daylight broadleaf sprays'){
         if(!done.has(m)){foliage(m,uniforms);done.set(m,m);}
         mesh.castShadow=true;mesh.receiveShadow=true;
@@ -166,6 +316,15 @@ export function installCabinSurfaces(model,renderer){
         }
         return m;
       }
+      if(brushedMetal.test(m.name)){
+        addMetricUV(mesh,true);
+        if(done.has(m))return done.get(m);
+        const finish=physicalFinish(m);
+        finish.anisotropy=.43;
+        finish.roughness=Math.max(.28,m.roughness);
+        done.set(m,finish);return finish;
+      }
+      if(finishRoughness.has(m.name))m.roughness=finishRoughness.get(m.name);
       const type=surfaceType(m.name);if(!type)return m;
       const profile=surfaces[type],wood=type==='cedar'||type==='bark';
       const fallback=type==='cedar'?timber:type==='bark'?bark:type==='masonry'?rock:null;
@@ -175,10 +334,16 @@ export function installCabinSurfaces(model,renderer){
       if(substitute){fallbacks.add(m);m.map=fallback;}
       if(!m.map)return m;
       let dest=m;
-      if(profile.grain && !m.isMeshPhysicalMaterial){
-        dest=new T.MeshPhysicalMaterial();T.MeshStandardMaterial.prototype.copy.call(dest,m);
-        dest.defines={STANDARD:'',PHYSICAL:''};dest.anisotropy=type==='satin'?.37:.18;
-        dest.roughness=Math.min(m.roughness,type==='satin'?.53:.68);
+      if(profile.grain){
+        dest=physicalFinish(m);
+        dest.anisotropy=type==='satin'?.27:.18;
+        dest.roughness=Math.min(m.roughness,type==='satin'?.44:.68);
+        // The owner's living-to-dining photograph catches exterior light on
+        // the clear-finished boards. The smoother varnish sits over the grain.
+        if(/^(Floor · photograph of clear-finished|Living · gray boards)/.test(m.name)){
+          dest.clearcoat=.5;
+          dest.clearcoatRoughness=.24;
+        }
       }
       if(profile.exterior)coatOutdoorMaterial(model,dest);
       addRelief(dest,type,substitute);done.set(m,dest);return dest;

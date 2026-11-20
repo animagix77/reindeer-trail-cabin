@@ -60,26 +60,36 @@ def _furnish_remaining():
         return o
     def flat(n,x0,x1,y0,y1,z,m,step=4.8,col=None):
         vs=[(x0,y0,z),(x1,y0,z),(x1,y1,z),(x0,y1,z)];return face(n,vs,m,[(p[0]/step,p[1]/step) for p in vs],col)
-    hall_return=34.55
-    hall_jog_y=8.58
-    bench_jamb=30.92
+    hall_left,hall_right=29.04,32.75
+    hall_end=10.25
+    hall_cap,hall_head=2.79,2.02
+    bath_open=(25.48,27.53)
+    def hall_ceiling(x,y):
+        return min(hall_cap,max(pz(0,x,y),entry_rake_z(x))-main-.13)
+    def hall_breaks(x):
+        # The side walls meet each planar face of the roof without cutting
+        # across the valley or the transition to flat plaster.
+        eave=pz(0,x,0)-main-.13
+        rise=pz(0,x,1)-pz(0,x,0)
+        return [(level-eave)/rise for level in (entry_rake_z(x)-main-.13,hall_cap)]
     def topz(x,y):
         if 27.90<=x<=34.10 and y<7:
             return max(roofZ(x,y,2),entry_rake_z(x))-main-.13
         if x>=21 and y>=kitchen_eave_y:
             return kitchen_vault_z(y)
-        if 23.44<=x<=hall_return+.01 and 10.25<=y<kitchen_eave_y:
+        if 23.44<=x<=hall_right+.01 and 10.25<=y<kitchen_eave_y:
             return kitchen_vault_z(kitchen_eave_y)
         return roofZ(x,y,1 if x<=21 else 2)-main-.13
-    def wall(n,axis,f,a,b,material,openings=(),cap=None,partition=False,rev=False):
+    def wall(n,axis,f,a,b,material,openings=(),cap=None,partition=False,rev=False,ceiling=None,breaks=()):
         # Split at holes and roof ridge. Surface plus narrow jambs and trim provide actual openings, not pictures on walls.
         def coord(t,z):return (f,t,z) if axis=='x' else (t,f,z)
         def top(t):
             x,y,_=coord(t,0)
-            limit=min(cap,topz(x,y)) if cap else topz(x,y)
+            limit=ceiling(x,y) if ceiling else topz(x,y)
+            if cap is not None:limit=min(limit,cap)
             if x<=front+.001 and y>=7-.001:limit=min(limit,loftdeck-.125)
             return limit
-        cuts={a,b}
+        cuts={a,b,*[t for t in breaks if a<t<b]}
         for lo,hi,z0,z1 in openings:cuts.update((max(a,lo),min(b,hi)))
         if axis=='y' and a<front<b:cuts.add(front)
         if axis=='y' and f<.30:
@@ -305,16 +315,20 @@ def _furnish_remaining():
           (bunk_partition+.008,15.11,primary_ceiling(15.11)),(bunk_partition+.008,3.12,primary_ceiling(3.12))],pale)
     wall('Primary bedroom barn door wall','x',23.45,10.25,15.48,pale,[(11.15,14.35,0,2.04)],None,True)
     wall('Primary bedroom rear return','y',15.27,20.75,23.45,pale,(),2.35,True)
-    wall('Full bedroom and front hall','x',33.25,.13,hall_jog_y,pale,[(3.05,6.05,0,2.02)],2.30,True)
-    wall('Front hall · inset wall beside shoe bench','x',hall_return,hall_jog_y,12.49,pale,(),2.30,True)
-    wall('Front hall · reveal at wider kitchen end','y',hall_jog_y,33.25,hall_return,pale,(),2.30,True)
-    wall('Full bedroom to kitchen','y',12.49,hall_return,40.84,pale,(),None,True,True)
-    wall('Bathroom to entry passage','x',29.04,.13,10.25,amber,(),None,True)
+    # The two faces follow the same jambs all the way in from the street
+    # door. The bedroom-side plaster continues to the kitchen counter wall.
+    wall('Full bedroom and front hall','x',hall_right,.13,hall_end,pale,[(3.05,6.05,0,2.02)],
+         partition=True,ceiling=hall_ceiling,breaks=hall_breaks(hall_right))
+    wall('Front hall · straight wall to counter','x',hall_right,hall_end,kitchen_eave_y,pale,
+         partition=True,ceiling=lambda x,y:2.30)
+    wall('Full bedroom to kitchen','y',kitchen_eave_y,hall_right,40.84,pale,(),None,True,True)
+    wall('Bathroom to entry passage','x',hall_left,.13,hall_end,amber,
+         partition=True,ceiling=hall_ceiling,breaks=hall_breaks(hall_left))
     # The offset at the street-facing end follows the existing step in the footprint.
     wall('Primary side of shower partition','x',21.38,3.12,10.25,pale,(),None,True)
     wall('Bathroom front return','x',22.20,.13,3.12,sage,(),None,True)
     wall('Bath offset along front exterior step','y',3.12,21.38,22.20,pale,(),None,True)
-    wall('Bathroom sliding entry','y',10.25,21.38,29.04,amber,[(26.02,28.78,0,2.04)],None,True)
+    wall('Bathroom sliding entry','y',10.25,21.38,29.04,amber,[(*bath_open,0,2.04)],None,True)
     # Sightline to the dining room from the narrow, straight front hall (L1040640).
     # Open shared junction: the camera in L1040618 sees the master, bathroom and stairs together.
     wall('Master barn door stone return','x',23.45,15.48,18.15,terr,(),None,True)
@@ -324,9 +338,9 @@ def _furnish_remaining():
     wall('Tree alcove · living-room plaster','y',18.15,20.75,23.02,ochre,(),None,True,True)
     # The right end of the stone pier has a finished thickness toward the living room.
     wall('Master pier return','y',18.15,23.02,23.45,terr,(),None,True)
-    wall('Hall-tree backing','y',10.25,29.04,bench_jamb,amber,(),None,True)
-    header=[(bench_jamb,10.25,2.14),(hall_return,10.25,2.14),(hall_return,10.25,topz(hall_return,10.25)),(bench_jamb,10.25,topz(bench_jamb,10.25))]
-    face('Front hall · finished header above passage',header,amber)
+    # L1040640 shows a deep, square opening, with a sign and loft access
+    # above it. The solid lintel closes both the tall hall and low kitchen side.
+    obox('Front hall · plaster lintel',hall_left,hall_right,hall_end-.18,hall_end,hall_head,hall_cap,amber)
     wall('Bunk room wall lining at living entry','y',15.105,.18,bunk_partition,mint,[(2,4.9,0,1.94)],loftdeck-.16,False)
     wall('Main bedroom rear headboard wall','y',15.11,bunk_partition,20.76,pale,(),None)
     # The gray entry flooring and striped runner are distinct in L1040636.
@@ -334,38 +348,35 @@ def _furnish_remaining():
     for n,coords in [
         ('Pine in kitchen and dining',(21.10,40.89,10.25,25.88)),
         ('Pine entry',(22.05,29.05,.12,10.25)),
-        ('Front bedroom pine · entry end',(33.25,40.87,.12,hall_jog_y)),
-        ('Front bedroom pine · wider hall end',(hall_return,40.87,hall_jog_y,10.25)),
+        ('Front bedroom pine',(hall_right,40.87,.12,hall_end)),
         ('Bedside floor',(.14,21.10,3.10,15.25)),
         ('Primary pine return',(21.10,22.05,3.12,10.25))]:
         flat(n,*coords,.013,oak,6)
     # The separate gray-tile entrance ends at the open passage into the kitchen.
-    entry_tile=material('Entry hall · charcoal-gray tile','#726e68',rough=.61)
+    entry_tile=texmat('Room detail | Entry hall · charcoal-gray tile','Entry - polished gray tile.jpg')
+    entry_tile.node_tree.nodes.get('Principled BSDF').inputs['Roughness'].default_value=.24
     entry_grout=material('Entry hall · dark joints','#68645f')
-    flat('Entry hall · grout',29.05,33.25,.12,10.25,.008,entry_grout)
+    flat('Entry hall · grout',hall_left,hall_right,.12,hall_end,.008,entry_grout)
+    tile_w=(hall_right-hall_left)/3
+    tile_d=(hall_end-.12)/8
     for i in range(3):
         for j in range(8):
-            xa=29.05+i*1.4; ya=.12+j*(10.25-.12)/8
-            flat('Entry hall · gray tile',xa+.007,xa+1.393,ya+.007,ya+(10.25-.12)/8-.007,.012,entry_tile)
-    flat('Entry hall · return grout',33.25,hall_return,hall_jog_y,10.25,.009,entry_grout)
-    # Continue the entry's tile grid around the wall jog.
-    for row in (6,7):
-        pitch=(10.25-.12)/8
-        start=max(hall_jog_y,.12+row*pitch)
-        flat('Entry hall · inset tiles',33.257,hall_return-.007,start+.007,.12+(row+1)*pitch-.007,.012,entry_tile)
-    obox('Entry hall · threshold at pine',bench_jamb,hall_return,10.21,10.27,.011,.017,steel)
+            xa=hall_left+i*tile_w;ya=.12+j*tile_d
+            corners=[(xa+.007,ya+.007),(xa+tile_w-.007,ya+.007),
+                     (xa+tile_w-.007,ya+tile_d-.007),(xa+.007,ya+tile_d-.007)]
+            u=(i*.31+j*.13)%1;v=(j*.41+i*.17)%1
+            face('Entry hall · gray tile',[(x,y,.012) for x,y in corners],entry_tile,
+                 [(x/.525+u,y/1.12+v) for x,y in corners])
+    obox('Entry hall · threshold at pine',hall_left,hall_right,hall_end-.04,hall_end+.02,.011,.017,steel)
     obox('Dining · silver floor transition at hearth',21.06,21.14,18.17,dining_wall_y,.013,.019,steel)
     # Flat ceilings and pine kitchen vaulted ceiling, avoiding false surfaces through the sloping roof.
     # The main-floor ceiling stops at the underside of the loft platform.
     # The deck framing itself closes the step at each end.
-    for label,rect,limit in [
-        ('Bunk bedroom under loft',(.15,bunk_partition,3.12,15.24),loftdeck-.125),
-        ('Front hall inset',(33.25,hall_return,hall_jog_y,10.25),2.30)]:
-        x0,x1,y0,y1=rect
-        for j in range(10):
-            y=y0+(y1-y0)*j/10;v=y0+(y1-y0)*(j+1)/10
-            pts=[(x0,y),(x1,y),(x1,v),(x0,v)]
-            face('Interior · '+label+' ceiling',[(x,y,min(limit,topz(x,y))) for x,y in reversed(pts)],ceilingmat)
+    for j in range(10):
+        a=3.12+(15.24-3.12)*j/10;b=3.12+(15.24-3.12)*(j+1)/10
+        pts=[(.15,a),(bunk_partition,a),(bunk_partition,b),(.15,b)]
+        face('Interior · Bunk bedroom under loft ceiling',
+             [(x,y,min(loftdeck-.125,topz(x,y))) for x,y in reversed(pts)],ceilingmat)
     # Continue the gabled front doorway into the hall until each rake meets
     # the main roof. Exact plane intersections keep the entry's headroom clear.
     def cut_plane(polygon,signed):
@@ -377,11 +388,10 @@ def _furnish_remaining():
                 fraction=a/(a-b)
                 out.append(tuple(v[i]+fraction*(w[i]-v[i]) for i in (0,1)))
         return out
-    hall_cap=2.30
     host=lambda x,y:pz(0,x,y)-main-.13
     rake=lambda x,y:entry_rake_z(x)-main-.13
-    for x0,x1 in ((29.04,31.),(31.,33.25)):
-        outline=[(x0,.12),(x0,10.25),(x1,10.25),(x1,.12)]
+    for x0,x1 in ((hall_left,31.),(31.,hall_right)):
+        outline=[(x0,.12),(x0,hall_end),(x1,hall_end),(x1,.12)]
         for ceiling_h,neighbor_h in ((host,rake),(rake,host)):
             facet=cut_plane(outline,lambda x,y:ceiling_h(x,y)-neighbor_h(x,y))
             for sign in (-1,1):
@@ -390,30 +400,22 @@ def _furnish_remaining():
                     face('Interior · front hall gabled ceiling',
                          [(x,y,min(ceiling_h(x,y),hall_cap)) for x,y in area],ceilingmat)
     # The full bedroom has one continuous ceiling from its front eave to its
-    # headboard wall. Its flat portion spans the hall's change of ceiling height.
+    # headboard wall. Its flat portion meets the straight bedroom-side partition.
     front_eave=.12
     def front_bed_eave_height(x,y):return pz(0,x,y)-main-.13
     def edge_of_flat(x):
         low=front_bed_eave_height(x,front_eave)
         return front_eave+(2.30-low)/(front_bed_eave_height(x,front_eave+1)-low)
-    left,right=33.25,40.86
+    left,right=hall_right,40.86
     knee_left=(left,edge_of_flat(left),2.30)
     knee_right=(right,edge_of_flat(right),2.30)
     face('Front bedroom · continuous plaster below front eave',
          [(left,front_eave,front_bed_eave_height(left,front_eave)),knee_left,knee_right,
           (right,front_eave,front_bed_eave_height(right,front_eave))],ceilingmat)
     face('Front bedroom · continuous flat plaster ceiling',
-         [knee_left,(left,hall_jog_y,2.30),(hall_return,hall_jog_y,2.30),(hall_return,12.50,2.30),(right,12.50,2.30),knee_right],ceilingmat)
-    # Keep the full-height room face above the entry door, even where the
-    # ceiling on the hall side falls away. Its low end follows the front eave.
-    hall_x=33.255
-    start_y=front_eave+(2.077-front_bed_eave_height(hall_x,front_eave))/(
-        front_bed_eave_height(hall_x,front_eave+1)-front_bed_eave_height(hall_x,front_eave))
-    face('Front bedroom · continuous upper plaster at hall',
-         [(hall_x,start_y,2.077),(hall_x,hall_jog_y,2.077),(hall_x,hall_jog_y,2.302),
-          (hall_x,edge_of_flat(hall_x),2.302)],pale)
+         [knee_left,(left,kitchen_eave_y,2.30),(right,kitchen_eave_y,2.30),knee_right],ceilingmat)
     for label,a,b in [
-        ('headboard',(hall_return,12.485),(40.855,12.485)),
+        ('headboard',(hall_right,12.485),(40.855,12.485)),
         ('gable',(40.835,12.495),(40.835,10.20))]:
         face('Front bedroom · upper plaster at '+label,
              [(*a,2.17),(*b,2.17),(*b,2.302),(*a,2.302)],pale)
@@ -429,18 +431,12 @@ def _furnish_remaining():
         ('shower return',(21.374,10.256),(23.45,10.256),amber)]:
         face('Primary bedroom · upper plaster at '+label,
              [(*a,2.17),(*b,2.17),(*b,primary_ceiling(b[1])+.004),(*a,primary_ceiling(a[1])+.004)],finish_mat)
-    # At the full-bedroom boundary, the flat 2.30 m room ceiling meets the taller
-    # vaulted hall. The painted face closes the otherwise exposed roof cavity.
-    for ya,yb in [(10.25,12.49)]:
-        face('Front hall · plaster above full-bedroom ceiling',
-             [(hall_return,ya,2.30),(hall_return,yb,2.30),(hall_return,yb,topz(hall_return,yb)),(hall_return,ya,topz(hall_return,ya))],
-             pale)
     # A flat hall soffit meets the low north edge of the vault. Each side of
     # the interior gable is one plane; the return follows the primary room.
     hall_lid=kitchen_vault_z(kitchen_eave_y)
     face('Front hall · plaster soffit at kitchen entry',
-         [(23.44,10.24,hall_lid),(23.44,kitchen_eave_y,hall_lid),
-          (hall_return+.01,kitchen_eave_y,hall_lid),(hall_return+.01,10.24,hall_lid)],ceilingmat)
+         [(23.44,hall_end,hall_lid),(23.44,kitchen_eave_y,hall_lid),
+          (hall_right,kitchen_eave_y,hall_lid),(hall_right,hall_end,hall_lid)],ceilingmat)
     north=[(21,15.25),(23.45,15.25),(23.45,kitchen_eave_y),
            (40.91,kitchen_eave_y),(40.91,kitchen_ridge_y),(21,kitchen_ridge_y)]
     south=[(21,kitchen_ridge_y),(40.91,kitchen_ridge_y),(40.91,25.92),(21,25.92)]
@@ -763,11 +759,12 @@ def _furnish_remaining():
     barn_door('Master · open knotty-pine barn door',(23.73,14.42,0),0,3.18,-3.41,3.69,.22)
     # With this 90° rotation, the broad face, pull and track all face the kitchen.
     # The door extends toward -X, to the right in the head-on bathroom view.
-    barn_door('Bathroom · open knotty-pine barn door',(25.95,10.41,0),90,2.46,-2.97,2.57,.20,True)
+    barn_door('Bathroom · open knotty-pine barn door',(25.54,10.41,0),90,2.09,-2.12,2.15,.20,True)
+    collider('bathroom_parked_leaf',23.45,25.54,10.34,10.55,.025,2.02)
     finish(qdec)
     double=group('Front bedroom | full bed, sea-glass cover and checked pillow',(38.36,9.15,0),180)
     bed(double,4.50,6.27,wash);finish(double);collider('bedroom_double',36.04,40.68,5.96,12.32,0,.49)
-    dbl=group('Front bedroom | paneled pine door and small nightstand',(.50,0,0))
+    dbl=group('Front bedroom | paneled pine door and small nightstand',(hall_right-32.75,0,0))
     # Door swings into the room and parks beside the photographed bedside table.
     bx(dbl,32.80,35.70,5.87,6.00,.028,1.997,woodboard)
     for xx in (33.00,34.33):
@@ -776,9 +773,9 @@ def _furnish_remaining():
             bx(dbl,xx+.032,xx+1.08,5.831,5.848,z+.024,h-.026,woodboard)
     line(dbl,(35.42,5.818,.91),(35.42,5.718,.91),.032,brass2,14)
     pine_leaf=finish(dbl)
-    pine_hull=collider('front_bedroom_open_door',33.31,36.21,5.82,6.02,0,2.0)
+    pine_hull=collider('front_bedroom_open_door',hall_right+.06,hall_right+2.96,5.82,6.02,0,2.0)
     bpy.context.view_layer.update()
-    hinge=point(33.31,5.93,0)
+    hinge=point(hall_right+.06,5.93,0)
     swing=Matrix.Translation(hinge)@Matrix.Rotation(math.radians(58),4,'Z')@Matrix.Translation(-hinge)
     for ob in (pine_leaf,pine_hull):ob.matrix_world=swing@ob.matrix_world
     dbl=group('Front bedroom | drawer stand and reading lamp',(.36,1.64,0))
@@ -881,11 +878,19 @@ def _furnish_remaining():
                  [(37.10,12.45,1.30),(39.40,12.45,1.30),(39.40,12.45,1.72),(37.10,12.45,1.72)],[(1,0),(0,0),(0,1),(1,1)])
     # In the April entry photo the hanging cabin plaque is on the bedroom
     # side of the passage, before its open doorway as you face the front door.
-    bx(foyer,33.16,33.215,7.25,8.30,1.14,1.58,darkoak)
+    bx(foyer,hall_right-.09,hall_right-.035,7.25,8.30,1.14,1.58,darkoak)
     framed_print('Front hall · cabin plaque','Entry - cabin rules plaque.jpg',
-        [(33.157,8.30,1.14),(33.157,7.25,1.14),(33.157,7.25,1.58),(33.157,8.30,1.58)],
+        [(hall_right-.093,8.30,1.14),(hall_right-.093,7.25,1.14),(hall_right-.093,7.25,1.58),(hall_right-.093,8.30,1.58)],
         [(0,0),(1,0),(1,1),(0,1)])
-    for yy in (7.31,8.24):line(foyer,(33.16,yy,1.579),(33.18,7.78,1.70),.0025,darkoak)
+    for yy in (7.31,8.24):line(foyer,(hall_right-.09,yy,1.579),(hall_right-.07,7.78,1.70),.0025,darkoak)
+    cx=(hall_left+hall_right)/2
+    sy=hall_end-.18
+    bx(foyer,cx-1.40,cx+1.40,sy-.056,sy,2.105,2.29,cream)
+    framed_print('Front hall · Be Our Guest','Hall - Be Our Guest.jpg',
+        [(cx-1.40,sy-.061,2.105),(cx+1.40,sy-.061,2.105),(cx+1.40,sy-.061,2.29),(cx-1.40,sy-.061,2.29)],
+        [(0,0),(1,0),(1,1),(0,1)])
+    bx(foyer,cx-1.52,cx+1.52,sy-.035,sy,2.37,2.75,cream)
+    bx(foyer,cx-1.39,cx+1.39,sy-.055,sy-.03,2.395,2.72,whitewood)
     for jj in range(3):
         ya=2.56+jj*.78;yb=ya+.68;l=jj/3;r=(jj+1)/3
         framed_print('Front hall · lake landscape '+str(jj+1),'Front hall landscape triptych.jpg',
@@ -893,7 +898,7 @@ def _furnish_remaining():
     # The wood hall tree separates the front passage from the bathroom (IMG_3969).
     # The rack fits between the bathroom casing and the edge of the hall jamb.
     rack=group('Front hall | shoe bench, shelves and coat hooks')
-    rack.transform=Matrix.Translation((29.01*ft,0,0)) @ Matrix.Diagonal((.95,1,1,1)) @ Matrix.Translation((-28.81*ft,0,0))
+    rack.transform=Matrix.Translation((27.68*ft,0,0)) @ Matrix.Diagonal((.67,1,1,1)) @ Matrix.Translation((-28.81*ft,0,0))
     bx(rack,28.91,30.69,10.34,10.61,.07,1.86,darkoak)
     for xx in (28.96,30.51):
         bx(rack,xx,xx+.12,10.42,11.54,.025,.49,woodboard)
@@ -908,7 +913,7 @@ def _furnish_remaining():
         line(rack,(xx,10.62,1.58),(xx,10.77,1.55),.010,rail)
         line(rack,(xx,10.77,1.55),(xx,10.80,1.59),.009,rail)
     bx(rack,28.81,30.79,10.33,11.01,1.87,1.925,darkoak)
-    collider('hall_tree_bench',29.01,30.90,10.33,11.64,0,1.88)
+    collider('hall_tree_bench',27.68,29.01,10.33,11.64,0,1.925)
     finish(rack);finish(foyer)
     tree_script=work/'Christmas tree.py'
     exec(compile(tree_script.read_text(),str(tree_script),'exec'),{**globals(),**locals()})
@@ -994,5 +999,5 @@ def _furnish_remaining():
     for tag,p,t,power,radius in [('Kitchen',(33,20.2,2.30),(36,20.2,.8),105,1.6),('Dining',(26.4,23.4,2.02),(25,22,.65),55,1.15),('Queen room',(16.3,10,2.23),(15.6,11.5,.52),57,1.45),('Bunk room',(4.1,9.2,1.99),(4.0,5.6,.8),33,.95),('Double room',(36.6,8.4,2.13),(35.8,8.5,.57),40,1.0),('Bathroom',(27.3,5.1,2.06),(25.7,4.7,.99),35,.72),('Front hall',(31.0,5.2,2.06),(31.0,3.0,.60),37,.98)]:
         area_light('Room daylight · '+tag,p,t,power,radius,(1,.91,.80))
     rooms_extra['source']='Appraisal p.20 envelope and room names; owner references L1040596, 598, 605, 608, 612, 614, 618, 619, 621–624, 636, 639 and July–December photographs. Partition dimensions and furniture positions reconstructed.'
-    rooms_extra['clear_thresholds_ft']='Front x29.48–32.52 at y0; rear slider x29.1–32.26 at y26; front bedroom y3.05–6.05 at x33.25; bunk x2–4.9 at y15.25 from living room; main bedroom y11.15–14.35 at x23.45; bath x26.02–28.78 at y10.25.'
+    rooms_extra['clear_thresholds_ft']='Front x29.48–32.52 at y0; rear slider x29.1–32.26 at y26; front bedroom y3.05–6.05 at x32.75; bunk x2–4.9 at y15.25 from living room; main bedroom y11.15–14.35 at x23.45; bath x25.48–27.53 at y10.25.'
 _furnish_remaining()

@@ -19,7 +19,7 @@ function savedObservation(){
   return null;
 }
 
-export function installWaterNotes({pause,resume}){
+export function installWaterNotes({pause,resume,visitWell}){
   const get=id=>document.getElementById(id);
   const dialog=get('water-notes'),open=get('water-open'),close=get('water-close');
   const level=get('water-level'),depth=get('water-depth'),unit=get('water-unit');
@@ -85,6 +85,7 @@ export function installWaterNotes({pause,resume}){
     void refresh();
   });
   retry.addEventListener('click',()=>void refresh(true));
+  get('water-visit').addEventListener('click',()=>dialog.close('visit'));
   close.addEventListener('click',()=>dialog.close());
   dialog.addEventListener('keydown',event=>event.stopPropagation());
   dialog.addEventListener('click',event=>{
@@ -95,7 +96,11 @@ export function installWaterNotes({pause,resume}){
   dialog.addEventListener('close',()=>{
     if(dialog.open)return;
     stopRequests();open.setAttribute('aria-expanded','false');
-    open.focus({preventScroll:true});resume();
+    const visit=dialog.returnValue==='visit';
+    dialog.returnValue='';
+    if(visit)visitWell();
+    else open.focus({preventScroll:true});
+    resume();
   });
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden)stopRequests();

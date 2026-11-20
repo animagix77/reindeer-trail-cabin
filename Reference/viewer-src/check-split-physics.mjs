@@ -41,13 +41,16 @@ test('split halves fall, collide with the ground and one another and become a pe
     physics.release(result,cut);all.push(...result);
     assert.equal(physics.count,(n+1)*2);
     assert(!physics.canLoad(),'The round blocks reloading while still on the stump');
-    for(let attempt=0;attempt<3;attempt++){
-      if(attempt)assert(physics.clearBlock()>0,'A new round nudges perched wood over the lip');
-      assert(Number.isFinite(settle(physics,20)),'Bodies reach sleep after round '+n);
-      if(physics.canLoad())break;
+    // Match the interactive reloader. Split the next round while pieces farther
+    // from the block can still be tumbling and nudges occur every 1.5 seconds.
+    for(let frame=1;frame<=900;frame++){
+      physics.step(1/60);
+      if(frame>=100 && physics.canLoad())break;
+      if(frame%90===0 && !physics.canLoad())assert(physics.clearBlock()>0);
     }
     assert(physics.canLoad(),'Chopping surface clears for the next round '+n);
   }
+  assert(Number.isFinite(settle(physics,40)),'The completed pile goes to sleep');
   assert(contacts.length>=12,'Contact speeds come from actual impacts');
   assert(root.children.some(m=>m.name==='Settled split wood'),'A large sleeping pile batches its draw calls');
   for(const {mesh} of all){

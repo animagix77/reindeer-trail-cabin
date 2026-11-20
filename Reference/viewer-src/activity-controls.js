@@ -8,7 +8,7 @@ export function activityControls(actions){
   function display(next){
     mode=next;
     panel.hidden=!mode;grill.hidden=mode!=='cook';deer.hidden=mode!=='deer';
-    get('activity-title').textContent=mode==='cook'?'Deck grill':'Deer meadow';
+    get('activity-title').textContent=mode==='cook'?'Deck grill':'Feed the deer';
     for(const [id,key] of [['use-grill','cook'],['scene-deer','deer']]){
       get(id).setAttribute('aria-expanded',String(key===mode));
     }

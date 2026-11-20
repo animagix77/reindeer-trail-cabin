@@ -86,6 +86,7 @@ def build_exterior_site():
     well_x0,well_x1=21.47,24.62
     well_y0,well_y1=27.04,34.45
     start_x,turn_x=4.8,28.55
+    well_head=(4.45,-4.70)
     def center_y(x):
         t=sclip((x-start_x)/(turn_x-start_x))
         return -7.7-2.89*(t*t*(3-2*t))
@@ -248,7 +249,7 @@ def build_exterior_site():
         walk_cuts.append([(a,a0),(b,b0),(b,b1),(a,a1)])
     # Side-by-side timber retaining walls close the lower stair cut.
     walk_cuts.append([(-2.425,-9.71),(4.97,-9.71),(4.97,-5.69),(-2.425,-5.69)])
-    fs,indices=pave_frontage(v,kept,ids,local,half_plane,usable,zone,walk_cuts)
+    fs,indices=pave_frontage(v,kept,ids,local,half_plane,usable,zone,walk_cuts,well_head)
     land=uvmesh('Wooded terrain · local grading inferred',v,fs,forest,2.4)
     land.data.materials.append(turf);land.data.materials.append(crushed);land.data.materials.append(pavement)
     asphalt=mapped('Front motor court · weathered asphalt','Road surface.jpg')
@@ -554,6 +555,38 @@ def build_exterior_site():
     finish=uvmesh('Front walk · gravel terraces and entry apron',walkway_verts,walkway_faces,entrance_stone,.59)
     finish['references']='L1040560; L1040561; 2024 appraisal front photograph p.15. Centerline, width and stair rise are estimated.'
     helper('WalkSurface_FrontGravelPath',walkway_verts,walkway_faces)
+    # The blue well cap is beside the uphill, cabin-side newel in L1040557,
+    # L1040561 and the winter stair photo. Height and diameter are estimated.
+    casing=mat('Water well · oxidized steel casing','#584b40',.17,.76)
+    cap=mat('Water well · cobalt enamel cap','#1b58a8',.34,.36)
+    conduit=mat('Water well · black conduit and gasket','#35383a',.12,.66)
+    bolts=mat('Water well · weathered cap bolts','#aca597',.53,.52)
+    base=Vector(wpos(*well_head))
+    up=Vector((0,0,1))
+    def well_ring(m,offset,h0,h1,r0,r1,sides=36):
+        tube(m,base+offset+up*h0,base+offset+up*h1,r0,r1,sides)
+    center=Vector((0,0,0))
+    wire=Vector((.019,.090,0))
+    well_ring(casing,center,-.040,.251,.080,.080)
+    well_ring(conduit,center,.246,.255,.094,.094)
+    well_ring(cap,center,.253,.267,.094,.101)
+    well_ring(cap,center,.267,.285,.101,.101)
+    well_ring(cap,center,.285,.299,.101,.088)
+    well_ring(cap,center,.299,.306,.088,.061)
+    well_ring(conduit,wire,-.026,.234,.011,.011,14)
+    well_ring(bolts,wire,.218,.249,.015,.015,6)
+    well_ring(cap,wire,.246,.289,.026,.026,24)
+    well_ring(cap,wire,.289,.301,.026,.022,24)
+    for j in range(4):
+        angle=(j+.23)*math.tau/4
+        lug=.100*Vector((math.cos(angle),math.sin(angle),0))
+        well_ring(cap,lug,.253,.286,.013,.013,16)
+        well_ring(bolts,lug,.286,.294,.0065,.0065,6)
+    round_blocker('WellCasing',base-up*.035,.115,.115,.346)
+    for name,location in [('TourEye_well',pos(8.67,-7.32,walk_grade(8.67)+1.59)),
+                          ('TourLook_well',base+up*.20)]:
+        anchor=bpy.data.objects.new(name,None);site_group.objects.link(anchor)
+        anchor.location=location;anchor.empty_display_size=.04
     pathlamp=mat('Path lights · aged pewter','#726e62',.50,.48)
     opal=mat('Path lights · frosted lens','#b7b3a4',.04,.38)
     for xx in (4.2,10.6,19.15,27.5):

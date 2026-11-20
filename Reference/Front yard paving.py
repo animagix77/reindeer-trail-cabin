@@ -1,5 +1,5 @@
 """Finish the two front courts on the terrain and cut out the timber and gravel paths."""
-def pave_frontage(vertices,faces,materials,local_xy,half_plane,usable,ground,walk_cuts):
+def pave_frontage(vertices,faces,materials,local_xy,half_plane,usable,ground,walk_cuts,well_head):
     # Tree shadows obscure the downhill edge in the six-inch aerial. Blend the
     # estimated garage court into the flared roadside opening visible from ground level.
     garage=[(-30.9,-25.3),(-2.4,-25.3),(.48,-8),(.48,29.4),(-4,32.4),(-24,32.4),(-30.9,29)]
@@ -16,7 +16,11 @@ def pave_frontage(vertices,faces,materials,local_xy,half_plane,usable,ground,wal
           (gate_right+1.1,-16.2),(gate_left-.7,-16.2)]
     def ellipse(x,y,rx,ry):
         return [(x+rx*math.cos(k*math.tau/20),y+ry*math.sin(k*math.tau/20)) for k in range(20)]
-    beds=[ellipse(-32,-8,2.05,1.89),ellipse(10.5,-16.2,1.55,1.45),ellipse(gate_right+.38,roadside_line(gate_right)+1.81,1.52,1.43),
+    # L1040557 and 0561 show soil around the well on the house side of the treads.
+    wx,wy=well_head
+    well_soil=[(-.70,2.7),(-.70,-5.69),(wx+.52,wy-1.14),
+              (wx+1.83,wy-.40),(wx+4.55,wy+3.40),(wx+4.62,wy+4.8)]
+    beds=[well_soil,ellipse(-32,-8,2.05,1.89),ellipse(10.5,-16.2,1.55,1.45),ellipse(gate_right+.38,roadside_line(gate_right)+1.81,1.52,1.43),
           ellipse(40.1,-11.0,4.70,3.43)]
     def bounds(points):
         return min(v[0] for v in points),max(v[0] for v in points),min(v[1] for v in points),max(v[1] for v in points)
@@ -40,7 +44,7 @@ def pave_frontage(vertices,faces,materials,local_xy,half_plane,usable,ground,wal
     zones=[(outline,None) for outline in walk_cuts]+[(bed,0) for bed in beds]
     zones.extend(((gate,5),(light,5),(gray,6),(garage,4),(throat,4)))
     outlines=[(ring,finish,bounds(ring)) for ring,finish in zones]
-    result=[];ids=[]
+    result=[];ids=[];patches=[]
     for face,finish in zip(faces,materials):
         source=[vertices[k] for k in face]
         pts=[(*local_xy(p[0]+OX,p[1]+OY),p[2]+OZ) for p in source]
@@ -73,8 +77,44 @@ def pave_frontage(vertices,faces,materials,local_xy,half_plane,usable,ground,wal
                                 if usable(pp):divided.append(pp)
                         else:divided.append(part)
                     pieces=divided
-            for part in pieces:
-                start=len(vertices)
-                vertices.extend(pos(x,y,ground(x,y)) for x,y,_ in part)
-                result.append(tuple(range(start,len(vertices))));ids.append(material)
+            patches.extend((part,material) for part in pieces)
+    # Material cuts introduce vertices midway down neighbouring edges. On
+    # sloping grades those points must belong to BOTH faces, or eye-level
+    # views see daylight through the mismatched edges beside the steps.
+    grid={};index={}
+    def vertex(x,y):
+        key=(round(x,6),round(y,6))
+        if key not in index:
+            idx=len(vertices);index[key]=idx
+            vertices.append(pos(x,y,ground(x,y)))
+            grid.setdefault((math.floor(x),math.floor(y)),[]).append((x,y,idx))
+        return index[key]
+    for part,_ in patches:
+        for x,y,_ in part:vertex(x,y)
+    for part,material in patches:
+        ring=[];divided=False
+        for a,b in zip(part,part[1:]+part[:1]):
+            ax,ay=a[:2];bx,by=b[:2]
+            dx=bx-ax;dy=by-ay;length2=dx*dx+dy*dy
+            if length2<1e-12:continue
+            along=[]
+            for ix in range(math.floor(min(ax,bx)-1e-6),math.floor(max(ax,bx)+1e-6)+1):
+                for iy in range(math.floor(min(ay,by)-1e-6),math.floor(max(ay,by)+1e-6)+1):
+                    for x,y,idx in grid.get((ix,iy),()):
+                        t=((x-ax)*dx+(y-ay)*dy)/length2
+                        cross=(x-ax)*dy-(y-ay)*dx
+                        if 1e-6<t<1-1e-6 and cross*cross<1e-12*length2:along.append((t,idx))
+            ring.append(vertex(ax,ay))
+            if along:
+                divided=True;ring.extend(idx for _,idx in sorted(along))
+        unique=list(dict.fromkeys(ring))
+        if len(unique)<3:continue
+        if divided:
+            # A fan preserves every short boundary segment during GLB export.
+            middle=len(vertices)
+            vertices.append(tuple(sum(vertices[i][axis] for i in unique)/len(unique) for axis in (0,1,2)))
+            for a,b in zip(unique,unique[1:]+unique[:1]):
+                result.append((a,b,middle));ids.append(material)
+        else:
+            result.append(tuple(unique));ids.append(material)
     return result,ids

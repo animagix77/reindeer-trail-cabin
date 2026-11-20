@@ -158,7 +158,7 @@ export function createSplitPhysics({root,groundAt,onContact}){
       const direction=new Vec3(side*cut.nx,0,side*cut.nz);
       const offset=new Vec3(cut.x-body.position.x,height*.27,cut.z-body.position.z);
       body.applyImpulse(new Vec3(direction.x*impulse,mass*.21,direction.z*impulse),offset);
-      const item={mesh,body,unpack:null,restAt:world.time,restPos:body.position.clone(),restRot:body.quaternion.clone()};
+      const item={mesh,body,unpack:null,nudges:0,restAt:world.time,restPos:body.position.clone(),restRot:body.quaternion.clone()};
       pieces.push(item);
       body.addEventListener('sleep',()=>{regroup=true;});
       body.addEventListener('wakeup',()=>{item.unpack?.();item.restAt=world.time;active=true;});
@@ -179,12 +179,14 @@ export function createSplitPhysics({root,groundAt,onContact}){
   function clearBlock(){
     let count=0;
     for(const item of pieces){
-      if(!blocksReload(item))continue;
-      const b=item.body,direction=new Vec3(b.position.x,0,b.position.z);
-      if(direction.lengthSquared()<.0004)direction.set(0,0,-1);
-      direction.normalize();
-      // Nudge a lodged half over the lip with the side of the next round.
-      b.wakeUp();b.applyImpulse(new Vec3(direction.x*b.mass*1.7,.65*b.mass,direction.z*b.mass*1.7),
+      if(!blocksReload(item)){item.nudges=0;continue;}
+      const b=item.body,n=item.nudges++;
+      const radial=Math.hypot(b.position.x,b.position.z)<.02?-Math.PI/2:Math.atan2(b.position.z,b.position.x);
+      // When the surrounding heap catches a half, lever it up and work around
+      // that obstruction from alternate sides instead of repeating the same push.
+      const angle=radial+(n===0?0:(n%2?1:-1)*Math.min(.88,.38+.15*n));
+      const lift=Math.min(2.3,.65+.65*n),speed=Math.min(2.2,1.7+.15*n);
+      b.wakeUp();b.applyImpulse(new Vec3(Math.cos(angle)*b.mass*speed,lift*b.mass,Math.sin(angle)*b.mass*speed),
         new Vec3(0,.03,0));count++;
     }
     if(count)active=true;

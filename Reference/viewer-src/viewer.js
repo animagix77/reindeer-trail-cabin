@@ -1,6 +1,9 @@
 import {installCabinSurfaces} from './cabin-surfaces.js';
 import {cabinFilm} from './cabin-film.js';
 import {walkingGait} from './footsteps.js';
+import {installHallReflections} from './hall-reflections.js';
+import {installMotionFloodlights} from './motion-floodlights.js';
+import {installWalkingFlashlight} from './walking-flashlight.js';
 import {installTreeLights} from './tree-lights.js';
 import {installParty} from './party.js';
 import {installGrill} from './grill.js';
@@ -47,6 +50,8 @@ const center = new THREE.Vector3();
 const camera = new THREE.PerspectiveCamera(39,1,0.03,4000);
 const world = new THREE.Scene();
 const woodland=installWoodlandSound();
+const flashlightButton=element('flashlight');
+let flashlight,floodlights,hallReflections,flashlightOn=false;
 let lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
 let renderer,orbit,span=0,distance=1;
 
@@ -73,7 +78,7 @@ function footSurface(){
     const hits=finishRay.intersectObjects(finishMeshes,false);
     if(hits.length){
       const name=hits[0].object.material.name;
-      if(/porcelain/i.test(name))return 'tile';
+      if(/porcelain|charcoal.gray tile/i.test(name))return 'tile';
       if(/asphalt|pavement|concrete/i.test(name))return 'pavement';
       if(/gravel|crushed stone|aggregate/i.test(name))return 'gravel';
     }
@@ -97,6 +102,7 @@ function paceRenderer(time){
   }
 }
 const walkKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
+const turnSpeed=THREE.MathUtils.degToRad(100);
 const walking=()=>activeView!=='property' && body!==null;
 function stopWalking() {
   camera.position.y-=bob;bob=0;gait.reset();velocity.set(0,0);
@@ -114,10 +120,15 @@ function nextFrame(t) {
     render();return;
   }
   const elapsed=lastTime?t-lastTime:16;
-  const dt=Math.min(.085,Math.max(.008,elapsed/1000));
+  const dt=Math.min(.085,Math.max(0,elapsed/1000));
   lastTime=t;
   const on=(a,b)=>Number(held.has(a)||held.has(b));
-  let sideways=on('KeyD','ArrowRight')-on('KeyA','ArrowLeft')+axes.x;
+  const turn=on('KeyA','ArrowLeft')-on('KeyD','ArrowRight');
+  if(turn){
+    yaw+=turn*turnSpeed*dt;
+    camera.rotation.set(pitch,yaw,0,'YXZ');
+  }
+  let sideways=axes.x;
   let forward=on('KeyW','ArrowUp')-on('KeyS','ArrowDown')-axes.y;
   const norm=Math.max(1,Math.hypot(sideways,forward));
   const speed=/loft/i.test(body.label)?1.02:1.71;
@@ -138,7 +149,7 @@ function nextFrame(t) {
   if(!travel && Math.abs(bob)<.0003)bob=0;
   camera.position.y=THREE.MathUtils.lerp(eyeHeight,wanted,1-Math.exp(-15*dt))+bob;
   render();
-  if(sideways || forward || velocity.lengthSq() || bob || Math.abs(camera.position.y-wanted)>.002) schedule();
+  if(held.size || sideways || forward || velocity.lengthSq() || bob || Math.abs(camera.position.y-wanted)>.002) schedule();
   else lastTime=0;
 }
 function schedule(){if(!frame) frame=requestAnimationFrame(nextFrame);}
@@ -175,23 +186,31 @@ for(const type of ['pointerup','lostpointercapture','pointercancel']) stick.addE
   if(stickPointer!==e.pointerId)return;
   axes.x=axes.y=0;stickPointer=null;element('nub').style.transform='';
 });
+const touchControls=matchMedia('(pointer: coarse)');
 function hint() {
   if(activeView==='property') return 'Drag to orbit · Scroll or pinch to zoom';
   if(!walking()) return 'Drag to look around · Scroll or pinch to zoom';
-  if(matchMedia('(pointer: coarse), (max-width:700px)').matches) return 'Move with the pad · Drag to look';
-  return document.pointerLockElement===canvas?'WASD or arrows to walk · Mouse to look · Esc to release':'WASD or arrows to walk · Drag to look';
+  if(document.pointerLockElement===canvas) return 'Mouse to look · Esc to release';
+  return touchControls.matches?'Move with the pad · Drag to look':'Drag to look';
 }
 function updateLookControls(){
-  element('hint').textContent=hint();
+  element('walk-keys').hidden=!walking() || touchControls.matches;
+  element('look-gesture').textContent=hint();
   element('lock').hidden=!walking() || !canvas.requestPointerLock;
   element('lock').textContent=document.pointerLockElement===canvas?'Release mouse':'Mouse look';
-  element('stick').hidden=!walking();
+  element('stick').hidden=!walking() || !matchMedia('(any-pointer: coarse)').matches;
+  let label='Cabin view. Drag or use the arrow keys to look around.';
+  if(activeView==='property') label='Property view. Drag or use the arrow keys to orbit.';
+  if(walking()) label=touchControls.matches?'Walk with the movement pad and drag to look around.':
+    'Walk forward with W and back with S. Turn left with A and right with D. The arrow keys also walk and turn. Drag to look around.';
+  canvas.setAttribute('aria-label',label);
 }
+touchControls.addEventListener('change',updateLookControls);
 element('lock').addEventListener('click',async()=>{
   if(document.pointerLockElement===canvas) document.exitPointerLock();
   else {
     try {await canvas.requestPointerLock();}
-    catch {element('hint').textContent='Mouse capture is unavailable here. Drag to look · WASD or arrows to walk';}
+    catch {element('look-gesture').textContent='Drag to look · Mouse capture unavailable';}
   }
 });
 document.addEventListener('pointerlockchange',()=>{held.clear();pointers.clear();updateLookControls();});
@@ -221,7 +240,7 @@ function look() {
   render();
 }
 const viewSlugs = {
-  splitting:'wood-splitting', wood:'woodpile', stars:'stargazing', entry:'front-entry', grill:'deck-grill', cook:'grilling', deer:'backyard-deer', tree:'christmas-tree', hearth:'propane-furnace', property:'property', outside:'outside', porch:'covered-porch', yard:'fire-pit', path:'front-path', hall:'front-hall', frontbed:'front-bedroom',
+  splitting:'wood-splitting', wood:'woodpile', stars:'stargazing', entry:'front-entry', well:'well-casing', grill:'deck-grill', cook:'grilling', deer:'backyard-deer', tree:'christmas-tree', hearth:'propane-furnace', property:'property', outside:'outside', porch:'covered-porch', yard:'fire-pit', path:'front-path', hall:'front-hall', frontbed:'front-bedroom',
   master:'master-and-bath', bath:'bathroom', primary:'master-bedroom', vault:'kitchen-vault', kitchenwork:'island-cooler', kitchen:'kitchen', living:'living-room', bunk:'bunk-room', loft:'loft'
 };
 const locationPicker=element('location');
@@ -258,14 +277,12 @@ function changeView(view) {
   for(const button of viewButtons) {
     updateState(button,button.dataset.view===view);
   }
-  canvas.setAttribute('aria-label',inside?'Interior view. Drag or use the arrow keys to look around.':'Property view. Drag or use the arrow keys to orbit.');
-  element('hint').textContent=inside?'Drag to look around · Scroll or pinch to zoom':'Drag to orbit · Scroll or pinch to zoom';
   reset();
   if(view==='stars')sceneControls.stargaze();
   activities.destination(view);
   woodControls.destination(view);
   updateLookControls();
-  if(body) canvas.setAttribute('aria-label','Walk with WASD or arrows. Drag to look, or enable mouse look.');
+  flashlightButton.hidden=!walking();
   if(inside) canvas.focus({preventScroll:true});
 }
 for(const button of viewButtons) {
@@ -419,6 +436,7 @@ const party=installParty({
   apply:(s,guest)=>sceneControls.apply(s,guest),solo:()=>sceneControls.solo()
 });
 const waterNotes=installWaterNotes({
+  visitWell:()=>chooseView('well'),
   pause(){stopWalking();pointers.clear();},
   resume(){if(span)schedule();}
 });
@@ -436,6 +454,8 @@ function render(firstFrame=false){
   const seconds=performance.now()/1000;
   const outside=outdoorsFloor(body?.label);
   lighting?.update(camera.position,activeView,seconds,camera,outside);
+  flashlight?.update(camera,walking(),outside,flashlightOn);
+  const animateFlood=floodlights?.update(camera.position,walking() && outside,lighting?.daylight??1,seconds,activeView!=='property');
   const animateSplitting=woodSplit?.update(activeView,seconds,velocity.lengthSq()>.0025);
   const animateWood=firewood?.update(body,activeView,seconds,activities.offeringFood);
   const animateFire=fires?.update(camera,activeView,seconds);
@@ -448,10 +468,11 @@ function render(firstFrame=false){
   const animateDoors=entryDoors?.update(camera,walking(),seconds);
   const animateGrill=grill?.update(camera,activeView,seconds);
   const animateDeer=wildlife?.update(camera,activeView,seconds);
+  hallReflections?.update(camera,walking(),seconds,lighting?.daylight??1);
   const cinematic=film && walking();
   const adapting=cinematic?film.render(world,camera,lighting,outside,seconds):false;
   if(!cinematic)renderer.render(world,camera);
-  if(!document.hidden && (adapting || animateSplitting || animateWood || animateLeaves || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
+  if(!document.hidden && (adapting || animateFlood || animateSplitting || animateWood || animateLeaves || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
 }
 function reset() {
   if(activeView!=='property') {resetInterior();return;}
@@ -505,6 +526,21 @@ element('imagery').addEventListener('click',event=>{
   render();
 });
 element('reset').addEventListener('click',reset);
+function toggleFlashlight(){
+  if(!walking())return;
+  flashlightOn=!flashlightOn;
+  updateState(flashlightButton,flashlightOn);
+  render();
+}
+flashlightButton.addEventListener('click',()=>{
+  toggleFlashlight();
+  canvas.focus({preventScroll:true});
+});
+window.addEventListener('keydown',event=>{
+  if(event.code!=='KeyL' || event.repeat || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey ||
+     (event.target!==canvas && event.target!==document.body) || document.querySelector('dialog[open]'))return;
+  if(walking()){event.preventDefault();toggleFlashlight();}
+});
 function zoom(factor) {
   if(activeView!=='property') {
     camera.fov=THREE.MathUtils.clamp(camera.fov*factor,30,94);
@@ -521,12 +557,13 @@ function zoom(factor) {
 element('near').addEventListener('click',()=>zoom(.78));
 element('far').addEventListener('click',()=>zoom(1/.78));
 canvas.addEventListener('keydown',e=>{
-  if (!orbit || !span || (walking() && walkKeys.has(e.code))) return;
-  if(activeView!=='property' && e.key.startsWith('Arrow')) {
-    if(e.key==='ArrowLeft') yaw+=.10;
-    if(e.key==='ArrowRight') yaw-=.10;
-    if(e.key==='ArrowUp') pitch+=.10;
-    if(e.key==='ArrowDown') pitch-=.10;
+  if (!orbit || !span || e.metaKey || e.ctrlKey || e.altKey || (walking() && walkKeys.has(e.code))) return;
+  const key=e.code==='KeyA'?'ArrowLeft':e.code==='KeyD'?'ArrowRight':e.key;
+  if(activeView!=='property' && key.startsWith('Arrow')) {
+    if(key==='ArrowLeft') yaw+=.10;
+    if(key==='ArrowRight') yaw-=.10;
+    if(key==='ArrowUp') pitch+=.10;
+    if(key==='ArrowDown') pitch-=.10;
     pitch=THREE.MathUtils.clamp(pitch,-1.47,1.47);
     e.preventDefault();
     look();
@@ -534,7 +571,7 @@ canvas.addEventListener('keydown',e=>{
   }
   const vec=camera.position.clone().sub(orbit.target);
   const s=new THREE.Spherical().setFromVector3(vec);
-  switch (e.key){
+  switch (key){
     case 'ArrowLeft': s.theta-=.12;break;
     case 'ArrowRight': s.theta+=.12;break;
     case 'ArrowUp': s.phi=Math.max(.02,s.phi-.13);break;
@@ -579,7 +616,7 @@ async function show() {
       object.visible=false;
     }
     if(!object.isMesh) return;
-    if(/asphalt|pavement|poured concrete|fescue|leaf litter|brushed greige floor porcelain|blue-gray crushed stone/i.test(object.material.name) && !/shingle/i.test(object.material.name))finishMeshes.push(object);
+    if(/asphalt|pavement|poured concrete|fescue|leaf litter|brushed greige floor porcelain|charcoal.gray tile|blue-gray crushed stone/i.test(object.material.name) && !/shingle/i.test(object.material.name))finishMeshes.push(object);
     let helper=object;
     while(helper && !/^Walk(Surface|Block)_/i.test(helper.name)) helper=helper.parent;
     if(!helper) return;
@@ -594,7 +631,7 @@ async function show() {
       interiorCameras[key]={
         eye:eye.getWorldPosition(new THREE.Vector3()).toArray(),
         target:target.getWorldPosition(new THREE.Vector3()).toArray(),
-        fov:({entry:55,cook:57,tree:66,grill:66,hearth:58,kitchenwork:67,kitchen:70,vault:56,master:76,bath:68,primary:68,hall:68})[key] || 66
+        fov:({entry:55,well:56,cook:57,tree:66,grill:66,hearth:58,kitchenwork:67,kitchen:70,vault:56,master:76,bath:68,primary:68,hall:68})[key] || 66
       };
     }
   }
@@ -624,6 +661,7 @@ async function show() {
     button.hidden=key!=='property' && !interiorCameras[key];
     if(!button.hidden) locationPicker.add(new Option(button.textContent,key));
   }
+  element('water-visit').hidden=!interiorCameras.well;
   locationPicker.value='property';
   const arrival=sceneControls.conditions();
   lighting=installTourLighting(world,renderer,gltf.scene,arrival);
@@ -677,8 +715,11 @@ async function show() {
     item.originalGeometry=item.mesh.geometry;
   }
   await loading.preparing(3,'Lighting and drawing your first view');
+  floodlights=installMotionFloodlights(world,gltf.scene,schedule);
   batchStatic(gltf.scene);
   lighting.captureExterior();
+  flashlight=installWalkingFlashlight(world);
+  hallReflections=installHallReflections(world,gltf.scene,renderer);
   film=cabinFilm(renderer);
   const bounds=new THREE.Box3();
   gltf.scene.traverseVisible(object=>{

@@ -154,6 +154,62 @@ function traverseRoute(label,points,startingHeight=0){
   }
   return body;
 }
+// Check the actual published surfaces as well as the collision lane. A clear
+// centerline alone would miss the false recess formerly behind the pedal bin.
+const hallWalls=[],counterWall=[],hallCeiling=[],hallLintel=[],shoeRack=[];
+scene.traverse(mesh=>{
+  if(!mesh.isMesh)return;
+  const part=mesh.userData.part;
+  if(/^(Full bedroom and front hall|Front hall · straight wall to counter|Bathroom to entry passage)/.test(part))hallWalls.push(mesh);
+  if(/^Full bedroom to kitchen/.test(part))counterWall.push(mesh);
+  if(/^(Interior · front hall gabled ceiling|Front hall · plaster soffit at kitchen entry|Kitchen vault · ivory plaster on hall side)/.test(part))hallCeiling.push(mesh);
+  if(/^Front hall · plaster lintel/.test(part))hallLintel.push(mesh);
+  if(/^Front hall [|] shoe bench/.test(part))shoeRack.push(mesh);
+});
+const axisX=at(1,0,0).sub(at(0,0,0)).normalize(),againstX=axisX.clone().negate();
+for(const y of [1.0,2.5,6.5,8.0,8.8,9.8,10.5,11.8,12.4]){
+  for(const h of [.30,1.63]){
+    const from=at(31,y,h);
+    const right=hits(hallWalls,from,axisX)[0];
+    assert(right && Math.abs(right.distance-1.75*feet)<.003,'Bedroom-side hall wall must remain straight at '+[y,h]);
+    if(y<10.25){
+      const left=hits(hallWalls,from,againstX)[0];
+      assert(left && Math.abs(left.distance-1.96*feet)<.003,'Bathroom-side hall wall must remain straight at '+[y,h]);
+    }
+  }
+}
+for(const x of [32.79,33.0,33.46,34.02,35.85,39.9]){
+  for(const h of [.15,.92,1.7,2.15]){
+    const hit=hits(counterWall,at(x,15,h),inward.clone().negate())[0];
+    assert(hit && Math.abs(hit.distance-(15-12.49)*feet)<.004,'Counter and bin need a continuous wall behind them at '+[x,h]);
+  }
+}
+for(const x of [29.24,31.0,32.62]){
+  for(const y of [.33,2.22,4.15,7.84,9.90,10.22,11.50,12.59]){
+    const hit=hits(hallCeiling,at(x,y,1.70),down.clone().negate())[0];
+    assert(hit && hit.distance>.20 && hit.distance<1.4,'Unfinished ceiling over the hall at '+[x,y]);
+  }
+  for(const h of [2.06,2.21,2.37,2.74]){
+    const hit=hits(hallLintel,at(x,9.2,h),inward)[0];
+    assert(hit && Math.abs(hit.distance-.87*feet)<.003,'Gap in solid kitchen-end lintel at '+[x,h]);
+  }
+}
+assert(shoeRack.length,'Missing shoe bench');
+for(const mesh of shoeRack){
+  const positions=mesh.geometry.getAttribute('position');
+  for(let i=0;i<positions.count;i++){
+    const from=new T.Vector3().fromBufferAttribute(positions,i).applyMatrix4(mesh.matrixWorld);
+    assert(from.sub(at(29.04,0,0)).dot(axisX)<.003,'Shoe bench protrudes into the hall opening');
+  }
+}
+for(const x of [30.54,31,31.64]){
+  const lane=[[x,-.50],[x,1.1],[x,5.9],[x,10.35],[x,15.8]];
+  traverseRoute('Straight front-door to kitchen route',lane);
+  traverseRoute('Straight kitchen to front-door route',[...lane].reverse());
+}
+traverseRoute('Hall to front bedroom',[[31,4.30],[32.75,4.30],[33.72,4.30]]);
+traverseRoute('Kitchen to bathroom beside the shoe rack',[[26.55,13],[26.55,10.20],[26.55,9.14]]);
+assert(scene.getObjectByName('TourEye_hall') && names.includes('Front hall · Be Our Guest'),'Missing photographed hall viewpoint or sign');
 // The dedicated view should see the decorated face around the finished
 // projection, the way the stair-side tree appears in the December photographs.
 const treeEye=scene.getObjectByName('TourEye_tree').getWorldPosition(new T.Vector3());
@@ -194,6 +250,38 @@ for(let x=-27.375;x<42;x++)for(let y=-21.625;y<3;y++){
 }
 const hardFinishes=['Front motor court · weathered asphalt',
   'Street gate and upper court · aged poured concrete','Uphill front court · weathered gray pavement'];
+// The blue well cap is visible from the upper path beside the cabin-facing
+// stair post. Check the visible model, the soil line and the actual walk route.
+const wellParts=[],wellSight=[];
+scene.traverse(o=>{
+  if(!o.isMesh)return;
+  if(o.material.name.startsWith('Water well ·'))wellParts.push(o);
+  if(/^(Wooded terrain|Front walk ·|Driveway steps ·|Exterior details · (Weathered|Entry · weathered|Water well ·))/.test(o.userData.part))wellSight.push(o);
+});
+const wellProbe=at(4.45,-4.70,5),grade=hits(land,wellProbe,down)[0];
+assert.equal(grade?.object.material.name,'Leaf litter and low cover','Well should rise from the soil beside the steps');
+const cap=hits(wellParts,wellProbe,down)[0];
+assert.equal(cap?.object.material.name,'Water well · cobalt enamel cap','Missing photographed blue well cap');
+assert(cap.point.y-grade.point.y>.25 && cap.point.y-grade.point.y<.34,'Well cap at wrong height above the soil');
+const wellBlock=scene.getObjectByName('WalkBlock_WellCasing');
+const wellFootprint=new T.Box3().setFromObject(wellBlock).getSize(new T.Vector3());
+assert(wellFootprint.x<.25 && wellFootprint.z<.25,'The well collision footprint obstructs the landing');
+assert.equal(walks.spawn(wellProbe.x,wellProbe.z,grade.point.y+1.59,grade.point.y),null,'Visitors can walk through the casing');
+const wellEye=scene.getObjectByName('TourEye_well').getWorldPosition(new T.Vector3());
+const wellLook=scene.getObjectByName('TourLook_well').getWorldPosition(new T.Vector3());
+assert(hits(wellSight,wellEye,wellLook.sub(wellEye).normalize())[0]?.object.material.name.startsWith('Water well ·'),
+  'Well is hidden by the stairs from its own viewpoint');
+// Sight along the soil/path seam from uphill. Both surfaces passed the old
+// vertical coverage check despite a daylight crack at eye level.
+const uphill=at(8.8,-9.,-.02),pathGround=[...land,...frontWalk];
+for(const x of [4.53,4.68,4.83,4.98,5.09]){
+  for(let j=0;j<12;j++){
+    const target=at(x,-5.38+j*.006,-1.64);
+    assert(hits(pathGround,uphill,target.sub(uphill).normalize())[0]?.distance<4,
+      'Daylight through soil beside the driveway landing at '+[x,j]);
+  }
+}
+traverseRoute('Driveway steps and upper path past well',[[-3.15,-7.70],[4.85,-7.70],[8.8,-8.0]],-2.75);
 for(const finish of hardFinishes)assert(counts[finish]>40,'Missing front paving finish '+finish);
 const sampleCount=Object.values(counts).reduce((a,b)=>a+b,0);
 const paved=hardFinishes.reduce((sum,key)=>sum+counts[key],0)/sampleCount;
@@ -201,5 +289,5 @@ assert(paved>.63,'Paving should cover roughly two-thirds of the developed fronta
 for(const [x,y,expected] of [[21.38,-20.7,hardFinishes[1]],[21.38,-17,hardFinishes[1]],[28,-15.9,hardFinishes[2]]]){
   assert.equal(hits(land,at(x,y,10),down)[0]?.object.material.name,expected,'Frontage finish at '+[x,y]);
 }
-console.log(`Checked ${primitives} mesh primitives, ${triangles.toLocaleString()} triangles and ${spawns} authored walk starts. Entry, front ground, pergola and deck lighting, tree nook closure, primary passage and loft stair checks passed.`);
+console.log(`Checked ${primitives} mesh primitives, ${triangles.toLocaleString()} triangles and ${spawns} authored walk starts. Straight front hall, kitchen counter backing, side doorways, entry, front ground, well casing and stair access, pergola and deck lighting, tree nook closure, primary passage and loft stair checks passed.`);
 console.log('Developed frontage paving',Math.round(paved*1000)/10+'%',counts);

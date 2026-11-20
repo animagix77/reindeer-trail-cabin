@@ -8,7 +8,7 @@ import {installWeather} from './tour-weather.js';
 
 // Capture the property's photo-textured roof, timber, tree crowns and ground once.
 // Use albedo and a sky fill for the capture, so the probe cannot sample itself.
-const reflectingSurfaces=/^(Grill ·|Front sash glass|Front basement window · glazing|Rear basement window · glazing|Fire ring · galvanized|Garden drain · galvanized|Patio stove · galvanized|Rear landing · galvanized|Propane cylinders|Suspension chains|Garden · steel|Path lights · aged pewter)/;
+const reflectingSurfaces=/^(Water well · (?:cobalt enamel cap|weathered cap bolts|black conduit and gasket)|Grill ·|Front sash glass|Front basement window · glazing|Rear basement window · glazing|Fire ring · galvanized|Garden drain · galvanized|Patio stove · galvanized|Rear landing · galvanized|Propane cylinders|Suspension chains|Garden · steel|Path lights · aged pewter)/;
 const scenery=/^(Backdrop_|Light.*broadleaf|Daylight broadleaf|Hardwood bark|Oak and maple|Leaf litter|Cool-season|Paved public road|Street gate|Uphill front court|Front motor court|Blue lap siding|Midnight blue siding|Entry wing|Entry ·|Garage ·|Asphalt shingle|Porch ·|Timber$|Deck boards|Rainwater goods|Painted (?:block|fascia)|Weathered (?:fieldstone|timber|railing)|Fire circle|Firewood|Fire pit|Glacial boulder|Adirondack|Roadside masonry|Fine crushed gravel|Rear landing · weathered|Utility apron)/i;
 
 function yardReflection(model,renderer,point) {

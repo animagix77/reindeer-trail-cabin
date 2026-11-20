@@ -176,23 +176,42 @@ export function makeDeer({buck=false,young=false,phase=0}={}){
     }
     shadow.rotation.set(-Math.atan(along/(1.46*s)),object.rotation.y,Math.atan(across/(.55*s)),'YXZ');
   }
-  return {object,muzzle,fitHooves,pose(time,stride,speed,lower,chew,look=0) {
-    const walk=Math.min(1,speed/.63);
+  let flag=0,lastPose=null;
+  return {object,muzzle,fitHooves,pose(time,stride,speed,lower,chew,look=0,alarmed=false) {
+    const dt=lastPose===null?0:Math.min(.14,Math.max(0,time-lastPose));
+    lastPose=time;
+    flag=T.MathUtils.damp(flag,alarmed?1:0,alarmed?11:2.2,dt);
+    const walk=T.MathUtils.smoothstep(speed,0,.65);
+    const bound=T.MathUtils.smoothstep(speed,1.05,2.35);
     const cyc=stride*tau,breath=Math.sin(time*2.05+phase);
-    mesh.position.y=walk*.016*Math.sin(cyc*2)+.0028*breath;
-    bones[neck].rotation.x=mix(.025+.025*Math.sin(time*.97+phase)+.026*Math.sin(cyc)*walk,2.29,lower);
-    bones[neck].rotation.y=look*(1-lower)*.60+.035*Math.sin(time*.63+phase);
-    bones[head].rotation.x=mix(.018*Math.sin(time*1.42+phase),-.62,lower)+chew*.047*(.5+.5*Math.sin(time*8));
-    bones[head].rotation.y=look*(1-lower)*.30;
-    ears.forEach((ear,i)=>{ear.rotation.z=.045*Math.sin(time*1.7+phase+i)+.20*Math.pow(Math.max(0,Math.sin(time*1.14+phase+i*2.2)),18);ear.rotation.y=.11*Math.sin(time*.8+i*2.6+phase);});
+    const lift=Math.max(0,Math.sin(cyc));
+    // At a walk each foot lands in sequence. In flight, the hind legs gather
+    // and push together, with the forelegs reaching to catch the body.
+    mesh.position.y=.0028*breath+walk*mix(.012*Math.sin(2*cyc),.074*lift*lift,bound);
+    mesh.rotation.x=bound*(.078*Math.cos(cyc)-.025);
+    mesh.rotation.z=.012*walk*Math.sin(cyc)*(1-bound);
+    const listen=1-lower;
+    bones[neck].rotation.x=mix(.025+.025*Math.sin(time*.97+phase)+.026*Math.sin(cyc)*walk-.12*flag+.115*bound*Math.cos(cyc),2.29,lower);
+    bones[neck].rotation.y=look*listen*.60+.035*Math.sin(time*.63+phase)*listen;
+    bones[head].rotation.x=mix(.018*Math.sin(time*1.42+phase)-.07*bound*Math.cos(cyc),-.62,lower)+chew*.047*(.5+.5*Math.sin(time*8));
+    bones[head].rotation.y=look*listen*.30;
+    ears.forEach((ear,i)=>{
+      const side=i?1:-1,beat=time*(i?1.31:1.07)+phase+i*2.2;
+      const swivel=Math.max(0,Math.sin(beat))**7;
+      ear.rotation.y=side*(.27*swivel+.14*Math.sin(time*.78+phase+i))*(1-flag)+look*.4*listen;
+      ear.rotation.z=side*(.055*Math.sin(beat)+.16*swivel-.16*flag);
+    });
+    bones[tail].rotation.x=1.58*flag+.14*bound*Math.cos(cyc);
     bones[tail].rotation.z=.10*Math.sin(time*.75+phase)+.32*Math.pow(Math.max(0,Math.sin(time*1.16+phase)),18);
     for(const l of legs){
-      const t=cyc+(l.side>0?Math.PI:0)+(l.hind?-.46:Math.PI*.73);
-      const lift=Math.max(0,Math.cos(t));
-      l.upper.rotation.x=.34*walk*Math.sin(t);
-      l.mid.rotation.x=walk*(l.hind?-.34:.28)*lift;
-      l.hock.rotation.x=walk*(l.hind?.48:.33)*lift;
-      l.foot.rotation.x=-.17*walk*Math.sin(t)-.13*walk*lift;
+      const walkPhase=cyc+(l.side>0?Math.PI:0)+(l.hind?-.46:Math.PI*.73);
+      const runPhase=cyc+(l.hind?.82:3.73)+(l.side>0?.37:0);
+      const swing=mix(Math.sin(walkPhase),Math.sin(runPhase),bound);
+      const fold=mix(Math.max(0,Math.cos(walkPhase)),Math.max(0,Math.cos(runPhase)),bound);
+      l.upper.rotation.x=walk*mix(.34,.61,bound)*swing;
+      l.mid.rotation.x=walk*(l.hind?-.34:.28)*(1+bound*.65)*fold;
+      l.hock.rotation.x=walk*(l.hind?.48:.33)*(1+bound*.55)*fold;
+      l.foot.rotation.x=walk*(-.17*swing-.13*fold)*(1+bound*.5);
     }
   }};
 }

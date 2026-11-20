@@ -35,7 +35,7 @@ def fitted_bathroom():
         face('Bathroom · vanity wall paint',[(29.015,lo,.02),(29.015,lo,local_ceiling(29.04,lo)),
                 (29.015,hi,local_ceiling(29.04,hi)),(29.015,hi,.02)],softgreen)
     # Entrance wall and far wall get the bathroom finish on their inward faces.
-    for x0,x1,low,high in [(21.38,26.02,0,None),(28.78,29.04,0,None),(26.02,28.78,2.04,None)]:
+    for x0,x1,low,high in [(21.38,bath_open[0],0,None),(bath_open[1],29.04,0,None),(*bath_open,2.04,None)]:
         face('Bathroom · inside of barn door wall',[(x0,10.22,low),(x1,10.22,low),(x1,10.22,local_ceiling(x1,10.22)),(x0,10.22,local_ceiling(x0,10.22))],softgreen)
     for x0,x1,lo,hi in [(22.20,24.35,0,None),(26.85,29.04,0,None),(24.35,26.85,0,.82),(24.35,26.85,1.74,None)]:
         face('Bathroom · window return plaster',[(x0,.152,lo),(x1,.152,lo),(x1,.152,hi or local_ceiling(x1,.15)),(x0,.152,hi or local_ceiling(x0,.15))],softgreen)
@@ -43,7 +43,7 @@ def fitted_bathroom():
     for i in range(5):
         z0=.078+.177*i
         bx(trim,28.957,29.006,.20,10.19,z0,z0+.173,snow)
-        bx(trim,28.78,29.01,10.149,10.21,z0,z0+.173,snow)
+        bx(trim,bath_open[1],29.01,10.149,10.21,z0,z0+.173,snow)
     bx(trim,28.928,29.008,.2,10.19,.961,.984,snow)
     slat=material('Bath · blind warm white','#e0e1d7',0,.68)
     for i in range(35):
