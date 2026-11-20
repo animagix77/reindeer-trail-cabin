@@ -10,11 +10,13 @@ const skies={
 export function validWeather(weather){return Object.hasOwn(skies,weather);}
 const color=hex=>new THREE.Color(hex);
 
-// A representative equinox solar path at Smallwood. East is +X and north is -Z.
-export function atmosphere(hour,weather) {
+// The manual clock uses a representative equinox. Local time supplies the
+// actual seasonal solar direction in the same east, up, south coordinate frame.
+export function atmosphere(hour,weather,sunDirection=null) {
   const weatherData=skies[weather],cover=weatherData.clouds;
   const angle=(hour-12)*Math.PI/12,latitude=41.67*Math.PI/180;
-  const direction=new THREE.Vector3(-Math.sin(angle),Math.cos(latitude)*Math.cos(angle),Math.sin(latitude)*Math.cos(angle)).normalize();
+  const direction=sunDirection?new THREE.Vector3().fromArray(sunDirection).normalize():
+    new THREE.Vector3(-Math.sin(angle),Math.cos(latitude)*Math.cos(angle),Math.sin(latitude)*Math.cos(angle)).normalize();
   const alt=direction.y,day=smooth(-.11,.19,alt);
   const twilight=1-smooth(.015,.30,Math.abs(alt+.015));
   const golden=smooth(-.095,.035,alt)*(1-smooth(.085,.38,alt));

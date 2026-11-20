@@ -12,6 +12,7 @@ import {installFirewoodControls} from './firewood-controls.js';
 import {installFirewood} from './firewood.js';
 import {installTourFires} from './fires.js';
 import {installWelcome} from './welcome.js';
+import {installWaterNotes} from './water-notes.js';
 import {readModel,ModelDownloadError} from './model-loading.js';
 import {installLoadingScreen,afterPaint} from './loading-screen.js';
 import {installPropertyMap} from './property-map.js';
@@ -145,7 +146,7 @@ function usableTarget(target) {
   return target===document.body || target===canvas || target.matches?.('button');
 }
 window.addEventListener('keydown',e=>{
-  if(sceneControls.contains(e.target) || party.open || propertyMap.open || welcome.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
+  if(sceneControls.contains(e.target) || party.open || propertyMap.open || welcome.open || waterNotes.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
   e.preventDefault();
   held.add(e.code);
   if(!frame) nextFrame(performance.now());
@@ -332,7 +333,8 @@ function resized() {
   if (span) render();
 }
 const sceneControls=installSceneControls({
-  setConditions(settings){lighting.setConditions(settings);surfaces?.setWeather(settings.weather);woodland.conditions(settings);fires?.setWeather(settings.weather);party.conditions();render();},
+  setConditions(settings){lighting?.setConditions(settings);surfaces?.setWeather(settings.weather);woodland.conditions(settings);fires?.setWeather(settings.weather);render();},
+  share(){party.conditions();},
   async setSound(on){const enabled=await woodland.enable(on);if(span)schedule();return enabled;},
   viewStars(){chooseView('stars');},
   setFurnace(on){fires.setFurnaceOn(on);party.conditions();render();},
@@ -414,7 +416,11 @@ const party=installParty({
   applyFuel:state=>{fires?.applyFuel(state);render();},
   addRemoteFuel:kind=>{fires?.addFuel(kind);render();},
   snapshot:()=>sceneControls.snapshot(),
-  apply:s=>sceneControls.apply(s)
+  apply:(s,guest)=>sceneControls.apply(s,guest),solo:()=>sceneControls.solo()
+});
+const waterNotes=installWaterNotes({
+  pause(){stopWalking();pointers.clear();},
+  resume(){if(span)schedule();}
 });
 const welcome=installWelcome({
   pause(){stopWalking();pointers.clear();},
@@ -426,7 +432,7 @@ const welcome=installWelcome({
   }
 });
 function render(firstFrame=false){
-  if(!sceneCanRender || (firstFrame!==true && (propertyMap.open || welcome.open)))return;
+  if(!sceneCanRender || (firstFrame!==true && (propertyMap.open || welcome.open || waterNotes.open)))return;
   const seconds=performance.now()/1000;
   const outside=outdoorsFloor(body?.label);
   lighting?.update(camera.position,activeView,seconds,camera,outside);
@@ -617,7 +623,7 @@ async function show() {
     if(!button.hidden) locationPicker.add(new Option(button.textContent,key));
   }
   locationPicker.value='property';
-  const arrival=sceneControls.snapshot();
+  const arrival=sceneControls.conditions();
   lighting=installTourLighting(world,renderer,gltf.scene,arrival);
   woodland.conditions(arrival);
   const imagerySource=element('ortho').textContent.trim();

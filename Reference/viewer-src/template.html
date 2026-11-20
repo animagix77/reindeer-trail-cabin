@@ -103,7 +103,23 @@ header,#views,.dock{z-index:2}
 #party [hidden]{display:none}#party input:focus-visible,#party button:focus-visible{outline:2px solid #3d624a;outline-offset:2px}
 @media(max-width:350px){#party .party-choice{padding:4px;gap:4px}.party-choice img{width:26px}}
 @media(max-width:460px){.view-picker select{max-width:33vw}.view-picker{gap:2px;padding-left:4px}#views{max-width:calc(100vw - 16px);left:8px}#views>button{font-size:.8rem;padding:4px 7px}}
-header #welcome-again{pointer-events:auto;color:inherit;font:inherit;line-height:1.2;min-width:0;min-height:0;padding:2px;background:none;border:0;border-radius:2px;text-decoration:underline;text-decoration-color:currentColor;text-underline-offset:3px;text-shadow:inherit}
+header :is(#welcome-again,#water-open){pointer-events:auto;color:inherit;font:inherit;line-height:1.2;min-width:0;min-height:0;padding:2px;background:none;border:0;border-radius:2px;text-decoration:underline;text-decoration-color:currentColor;text-underline-offset:3px;text-shadow:inherit}
+#water-notes{width:min(460px,calc(100vw - 24px));max-width:calc(100vw - 16px);max-height:calc(100dvh - 24px);margin:auto;padding:clamp(20px,4vw,32px);overflow:auto;overscroll-behavior:contain;border:1px solid #c6cebd;border-radius:16px;color:#203a2c;background:#faf9f2;box-shadow:0 20px 70px #0b21194d;color-scheme:light}
+#water-notes::backdrop{background:#15281fa3}
+.water-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+#water-title{margin:0;font:400 clamp(2.25rem,5vw,3rem)/1 "Baskervville","Iowan Old Style",Georgia,serif;letter-spacing:-.045em}
+#water-close{width:38px;min-width:38px;height:38px;min-height:38px;padding:0;line-height:1;border:1px solid #bccabe;border-radius:50%;background:#edf1e8;color:#274b38;font-size:1.4rem}
+#water-notes h3{font-size:1rem;line-height:1.2;font-weight:650;margin:.9rem 0 .38rem}
+#water-notes p{font-size:.95rem;line-height:1.48;margin:.32rem 0 .68rem}
+#water-notes a{color:#345a42;text-underline-offset:3px}
+#water-notes :is(a,button):focus-visible{outline:2px solid #2b6641;outline-offset:3px}
+.water-reading{margin-top:19px;padding:15px 16px 12px;border:1px solid #cdd8c8;border-radius:8px;background:#eef2e9}
+#water-notes .water-reading h3{margin:0 0 .36rem}
+#water-notes .water-source,#water-notes #water-status,#water-notes #water-observed{font-size:.81rem;color:#496052}
+#water-notes #water-level{margin:.7rem 0 0;color:#264634;font-size:.9rem}
+#water-depth{font:500 2rem/1.05 "Baskervville","Iowan Old Style",Georgia,serif;letter-spacing:-.035em;font-variant-numeric:lining-nums tabular-nums;margin-right:.2rem}
+#water-retry{padding:4px 8px;min-height:30px;margin:0 8px 2px 0;border:1px solid #9eb09e;border-radius:5px;color:#345a42;background:transparent;font:inherit}
+#water-notes .water-source{margin:.3rem 0 0}
 #tour-controls{position:absolute;z-index:4;top:clamp(16px,3vw,42px);right:clamp(16px,3vw,46px);display:grid;gap:5px;justify-items:end;pointer-events:none}
 #tour-controls>*{pointer-events:auto}
 #tour-controls #views{position:static;max-width:100%;padding:4px;flex-wrap:nowrap;border-radius:14px}
@@ -125,6 +141,20 @@ header #welcome-again{pointer-events:auto;color:inherit;font:inherit;line-height
 #scene-panel button span{font-size:.63rem;font-weight:700}
 #scene-panel button[aria-pressed=true]{background:#f4e4cd;border-color:#bd9569;color:#623716}
 #scene-panel :is(select,input,button):focus-visible{outline:2px solid #375e3d;outline-offset:1px}
+.local-controls{grid-column:1/-1;display:flex;gap:10px;align-items:center;border-top:1px solid #899a882e;padding:4px 3px 0;color:inherit}
+.local-controls>span{font-weight:600;margin-right:auto}
+#scene-panel .local-controls label{display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:.76rem;color:inherit;min-height:25px}
+.local-controls input{appearance:none;margin:0;width:25px;height:15px;border:1px solid #8b9b8d;border-radius:10px;background:#737f7630;cursor:pointer;position:relative}
+.local-controls input::before{content:"";position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:#87938a}
+.local-controls input:checked{background:#356144;border-color:#6b806b}
+.local-controls input:checked::before{left:12px;background:#fff7db}
+.inside .local-controls input:checked{background:#c9ab74;border-color:#dcc392}
+.inside .local-controls input:checked::before{background:#23322c}
+#local-weather-note{grid-column:1/-1;margin:0 3px 3px;font-size:.75rem;line-height:1.35}
+#local-weather-note a,#scene-panel #local-weather-retry{color:inherit;text-underline-offset:2px}
+#scene-panel #local-weather-retry{display:inline;min-height:0;padding:1px 3px;background:none;border:0;text-decoration:underline}
+#scene-panel :is(#scene-hour,#scene-weather):disabled{cursor:default;opacity:.72}
+@media(forced-colors:active){.local-controls input{appearance:auto}}
 @media(max-width:790px) and (min-height:471px){
   header,.inside header{top:12px;left:14px}
   header h1,.inside header h1{font-size:clamp(1.65rem,5vw,2.1rem)}
@@ -169,6 +199,10 @@ header #welcome-again{pointer-events:auto;color:inherit;font:inherit;line-height
 }
 @media(max-width:350px){
   #scene-panel button{font-size:.68rem;gap:2px;padding:3px 1px}
+  .local-controls{gap:5px;flex-wrap:wrap}
+  .local-controls>span,#scene-panel .local-controls label{font-size:.7rem;white-space:nowrap}
+  .local-controls .local-prefix{display:none}
+  .local-controls label>span::first-letter{text-transform:uppercase}
   #scene-panel button span{font-size:.59rem}
   .environment{grid-template-columns:minmax(0,1.32fr) minmax(0,1fr);gap:9px}
   #activity{max-height:calc(100dvh - 245px);overflow:auto}
@@ -225,7 +259,12 @@ main:has(#activity:not([hidden])) #firewood-hud{display:none}
 @media(max-width:700px){#firewood-hud{right:9px;bottom:max(70px,calc(env(safe-area-inset-bottom) + 59px));width:min(270px,calc(100vw - 123px));padding:8px 9px}
   main:has(#firewood-hud:not([hidden])) .dock .hint{display:none}}
 @media(min-width:701px) and (pointer:fine){#firewood-hud{left:clamp(12px,4vw,64px);right:auto}}
-@media(max-width:700px) and (min-height:471px){#firewood-hud[data-carrying]{top:198px;bottom:auto}}
+@media(max-width:700px) and (min-height:471px){
+  @supports(top:anchor(bottom)){
+    #tour-controls{anchor-name:--scene-controls}
+    #firewood-hud[data-carrying]{position-anchor:--scene-controls;top:calc(anchor(bottom) + 6px);bottom:auto}
+  }
+}
 @media(max-height:470px){#firewood-hud{right:9px;bottom:max(47px,calc(env(safe-area-inset-bottom) + 38px));max-height:calc(100dvh - 157px);overflow:auto;padding:7px 9px}}
 #woodwork{position:absolute;z-index:4;bottom:max(82px,env(safe-area-inset-bottom));left:clamp(12px,3vw,55px);width:min(276px,calc(100vw - 24px));padding:11px 14px;border:1px solid var(--hud-line,#849185);border-radius:10px;background:linear-gradient(125deg,#25362ff5,#17231ff2);color:#faf6e9;box-shadow:0 4px 18px #0d171d40;max-height:49dvh;overflow:auto}
 #woodwork h2{font:500 1.19rem/1.1 "Baskervville","Iowan Old Style",Georgia,serif;margin:0}#woodwork .wood-heading{display:flex;align-items:center;justify-content:space-between}
@@ -326,7 +365,7 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
         document.querySelector('#status [data-load-quote]').textContent=lines[Math.floor(Math.random()*lines.length)];
       }</script>
     </div>
-  </section><header><h1>The Reindeer Trail</h1><p>Smallwood, NY · <button type="button" id="welcome-again" aria-haspopup="dialog" aria-controls="welcome">About the cabin</button></p></header><div id="tour-controls" hidden><nav aria-label="Choose a viewpoint" id="views" hidden><button data-view="property" aria-pressed="true">Property</button><button data-view="outside" aria-pressed="false">Driveway</button><button data-view="splitting" aria-pressed="false">Wood splitting</button><button data-view="path" aria-pressed="false">Front path</button><button data-view="entry" aria-pressed="false">Front entry</button><button data-view="porch" aria-pressed="false">Covered porch</button><button data-view="grill" aria-pressed="false">Deck barbecue</button><button data-view="cook" aria-pressed="false">Cook at the grill</button><button data-view="wood" aria-pressed="false">Woodpile</button><button data-view="yard" aria-pressed="false">Fire pit</button><button data-view="stars" aria-pressed="false">Stargazing</button><button data-view="deer" aria-pressed="false">Deer meadow</button><button data-view="hall" aria-pressed="false">Front hall</button><button data-view="frontbed" aria-pressed="false">Front bedroom</button><button data-view="master" aria-pressed="false">Master &amp; bath</button><button data-view="bath" aria-pressed="false">Bathroom</button><button data-view="primary" aria-pressed="false">Master bedroom</button><button data-view="vault" aria-pressed="false">Kitchen vault</button><button data-view="kitchen" aria-pressed="false">Kitchen</button><button data-view="kitchenwork" aria-pressed="false">Island worktop</button><button data-view="living" aria-pressed="false">Living room</button><button data-view="hearth" aria-pressed="false">Propane furnace</button><button data-view="bunk" aria-pressed="false">Bunk room</button><button data-view="loft" aria-pressed="false">Loft</button><button data-view="tree" aria-pressed="false">Christmas tree</button><label class="view-picker">View <select id="location" aria-label="Tour location"></select></label>
+  </section><header><h1>The Reindeer Trail</h1><p>Smallwood, NY · <button type="button" id="welcome-again" aria-haspopup="dialog" aria-controls="welcome">About the cabin</button> · <button type="button" id="water-open" aria-haspopup="dialog" aria-controls="water-notes" aria-expanded="false">Water notes</button></p></header><div id="tour-controls" hidden><nav aria-label="Choose a viewpoint" id="views" hidden><button data-view="property" aria-pressed="true">Property</button><button data-view="outside" aria-pressed="false">Driveway</button><button data-view="splitting" aria-pressed="false">Wood splitting</button><button data-view="path" aria-pressed="false">Front path</button><button data-view="entry" aria-pressed="false">Front entry</button><button data-view="porch" aria-pressed="false">Covered porch</button><button data-view="grill" aria-pressed="false">Deck barbecue</button><button data-view="cook" aria-pressed="false">Cook at the grill</button><button data-view="wood" aria-pressed="false">Woodpile</button><button data-view="yard" aria-pressed="false">Fire pit</button><button data-view="stars" aria-pressed="false">Stargazing</button><button data-view="deer" aria-pressed="false">Deer meadow</button><button data-view="hall" aria-pressed="false">Front hall</button><button data-view="frontbed" aria-pressed="false">Front bedroom</button><button data-view="master" aria-pressed="false">Master &amp; bath</button><button data-view="bath" aria-pressed="false">Bathroom</button><button data-view="primary" aria-pressed="false">Master bedroom</button><button data-view="vault" aria-pressed="false">Kitchen vault</button><button data-view="kitchen" aria-pressed="false">Kitchen</button><button data-view="kitchenwork" aria-pressed="false">Island worktop</button><button data-view="living" aria-pressed="false">Living room</button><button data-view="hearth" aria-pressed="false">Propane furnace</button><button data-view="bunk" aria-pressed="false">Bunk room</button><button data-view="loft" aria-pressed="false">Loft</button><button data-view="tree" aria-pressed="false">Christmas tree</button><label class="view-picker">View <select id="location" aria-label="Tour location"></select></label>
 <button type="button" id="map-toggle" aria-haspopup="dialog" aria-controls="property-map" aria-expanded="false">Map</button>
 <button id="party-toggle" aria-haspopup="dialog" aria-controls="party">Friends</button>
 </nav>
@@ -347,6 +386,12 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
     <button type="button" id="scene-stars" title="Look at the backyard night sky">Stargaze</button>
     <button type="button" id="scene-deer" aria-controls="activity" aria-expanded="false" title="Visit Deer meadow and feed the herd">Feed deer</button>
   </div>
+  <div class="local-controls" role="group" aria-label="Follow conditions in Smallwood">
+    <span>Follow Smallwood</span>
+    <label><input id="local-time" type="checkbox" role="switch" aria-label="Follow Smallwood time"><span><span class="local-prefix">Local </span>time</span></label>
+    <label><input id="local-weather" type="checkbox" role="switch" aria-label="Follow Smallwood weather" aria-describedby="local-weather-note"><span><span class="local-prefix">Local </span>weather</span></label>
+  </div>
+  <p id="local-weather-note" hidden><span id="local-weather-status" role="status"></span> <a href="https://www.weather.gov/wrh/timeseries?site=KMSV" target="_blank" rel="noopener noreferrer">NWS · Sullivan County Airport</a> <button id="local-weather-retry" type="button" hidden>Retry</button></p>
 </section></div>
 <span id="split-reticle" aria-hidden="true" hidden></span>
 <section id="woodwork" aria-labelledby="split-title" hidden>
@@ -397,6 +442,23 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
     <script>document.getElementById("load-photo").src=document.querySelector(".welcome-image").src;</script>
     <button type="button" id="welcome-close" aria-label="Close cabin welcome">×</button>
   </div>
+</dialog>
+<dialog id="water-notes" aria-labelledby="water-title">
+  <div class="water-heading"><h2 id="water-title">Water notes</h2><button type="button" id="water-close" aria-label="Close water notes">×</button></div>
+  <h3>From the well to the tap</h3>
+  <p>A submerged pump draws water from the cabin’s own well. Compressed air in a pressure tank keeps the taps flowing between pump cycles.</p>
+  <p>The January 2024 inspection also recorded a separate 40-gallon tank for hot water.</p>
+  <p class="water-source"><a href="https://www.health.ny.gov/environmental/water/drinking/regulations/fact_sheets/docs/fs7_individual_water_supply_wells.pdf" target="_blank" rel="noopener noreferrer">How a well works · New York State</a></p>
+  <section class="water-reading" aria-labelledby="water-station-title">
+    <h3 id="water-station-title">Groundwater at Woodbourne</h3>
+    <div aria-live="polite" aria-atomic="true">
+      <p id="water-level" hidden><strong id="water-depth"></strong> <span id="water-unit">ft below ground</span></p>
+      <p id="water-observed" hidden></p>
+      <p id="water-status"></p>
+    </div>
+    <p>This USGS well is about 12 miles northeast of the cabin. The depth is measured at Woodbourne. Groundwater can sit at a different depth beneath the cabin.</p>
+    <p class="water-source"><button type="button" id="water-retry" hidden>Check again</button><a id="water-station" target="_blank" rel="noopener noreferrer">View the USGS station</a></p>
+  </section>
 </dialog>
 <dialog id="party" aria-labelledby="party-title">
 <button id="party-close" type="button" aria-label="Close group chat">×</button><h2 id="party-title">Visit with friends</h2>

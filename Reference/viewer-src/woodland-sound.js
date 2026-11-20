@@ -104,7 +104,7 @@ function swingSound(ctx){
 }
 export function installWoodlandSound() {
   let audio=null,bus,muffle,pan,enabled=false,revision=0;
-  let hour,weather='clear',day=1;
+  let hour,sunDirection,weather='clear',day=1;
   const tracks={},right=new THREE.Vector3(),toward=new THREE.Vector3(),up=new THREE.Vector3(0,1,0);
   const last={},steps=new Map(),impacts=new Map();
   let stepNumber=0,swingBuffer;
@@ -192,7 +192,8 @@ export function installWoodlandSound() {
     },
     conditions(settings){
       hour=settings.hour??hour;weather=settings.weather??weather;
-      if(Number.isFinite(hour))day=atmosphere(hour,weather).day;
+      if('sunDirection' in settings)sunDirection=settings.sunDirection;
+      if(Number.isFinite(hour))day=atmosphere(hour,weather,sunDirection).day;
     },
     update(camera,outside,walking,ring,fire){
       if(!enabled||!audio||!tracks.fire)return;

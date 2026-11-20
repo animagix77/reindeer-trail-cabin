@@ -6,6 +6,11 @@ const rad=Math.PI/180,latitude=41.67*rad,longitude=-74.82;
 const nyClock=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',hourCycle:'h23'});
 
 // Greenwich mean sidereal time, US Naval Observatory, aa.usno.navy.mil/faq/GAST.
+function siderealAtInstant(instant){
+  const days=(instant-Date.UTC(2000,0,1,12))/86400000;
+  return ((18.697375+24.065709824279*days+longitude/15)%24)*15*rad;
+}
+
 // Apply Smallwood's civil clock to its local calendar date, including DST.
 export function localSidereal(hour,now=new Date()){
   const parts=Object.fromEntries(nyClock.formatToParts(now).map(({type,value})=>[type,value]));
@@ -15,8 +20,7 @@ export function localSidereal(hour,now=new Date()){
   const actual=Object.fromEntries(nyClock.formatToParts(approximate).map(({type,value})=>[type,value]));
   const offset=(Date.UTC(+actual.year,+actual.month-1,+actual.day,+actual.hour)-
     Math.floor(approximate.getTime()/3600000)*3600000)/3600000;
-  const days=(civil-offset*3600000-Date.UTC(2000,0,1,12))/86400000;
-  return ((18.697375+24.065709824279*days+longitude/15)%24)*15*rad;
+  return siderealAtInstant(civil-offset*3600000);
 }
 function starField(uniforms) {
   const positions=[],strength=[],color=[],cool=new THREE.Color('#d8e7ff'),warm=new THREE.Color('#ffc08a');
@@ -91,8 +95,8 @@ export function installNightSky(scene){
     begin=elapsed;span=.7+Math.random()*.52;next=elapsed+19+Math.random()*47;
   }
   return {
-    set(hour,air){
-      const hourAngle=localSidereal(hour);
+    set(hour,air,instant=null){
+      const hourAngle=instant===null?localSidereal(hour):siderealAtInstant(instant);
       uniforms.sidereal.value.set(Math.cos(hourAngle),Math.sin(hourAngle));
       uniforms.clouds.value=air.clouds;
       uniforms.night.value=(1-air.day)*(1-air.twilight*.85)*(1-THREE.MathUtils.smoothstep(air.clouds,.28,.75));

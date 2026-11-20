@@ -1,8 +1,9 @@
-// Scene settings follow the visitor between destinations for the current tour.
-export function installSceneControls({setConditions,setFurnace,setFirePit,setSound,viewStars,stopMovement}) {
+import {installSceneEnvironment} from './scene-environment.js';
+
+export function installSceneControls({setConditions,share,setFurnace,setFirePit,setSound,viewStars,stopMovement}) {
   const get=id=>document.getElementById(id);
-  const panel=get('scene-panel'), hour=get('scene-hour'), time=get('scene-clock');
-  const weather=get('scene-weather'), furnace=get('scene-furnace');
+  const environment=installSceneEnvironment({setConditions,share});
+  const panel=get('scene-panel'), furnace=get('scene-furnace');
   const pit=get('scene-fire');
   const sound=get('scene-sound'), soundState=get('scene-sound-status');
   const mutePreference='reindeer-woodland-sound';
@@ -57,13 +58,6 @@ export function installSceneControls({setConditions,setFurnace,setFirePit,setSou
     pit.title=burning?'Extinguish the outdoor fire pit':'Start the outdoor fire pit';
     pit.setAttribute('aria-pressed',String(burning));
   }
-  function changeWeather() {
-    const h=Number(hour.value), whole=Math.floor(h);
-    const label=(whole%12||12)+':'+String(Math.round((h-whole)*60)).padStart(2,'0')+(whole>=12?' PM':' AM');
-    time.value=label;
-    hour.setAttribute('aria-valuetext',label);
-    setConditions({hour:h,weather:weather.value});
-  }
   function changeFire() {
     burning=!burning;
     syncFire();
@@ -74,8 +68,6 @@ export function installSceneControls({setConditions,setFurnace,setFirePit,setSou
     if(e.key==='Escape')get('view').focus({preventScroll:true});
   });
   get('scene-stars').addEventListener('click',()=>viewStars());
-  hour.addEventListener('input',changeWeather);
-  weather.addEventListener('change',changeWeather);
   furnace.addEventListener('click',()=>{
     const on=furnace.getAttribute('aria-checked')!=='true';
     furnace.setAttribute('aria-checked',String(on));
@@ -92,16 +84,12 @@ export function installSceneControls({setConditions,setFurnace,setFirePit,setSou
   syncFire();
   return {
     contains:target=>panel.contains(target),
-    snapshot(){return {hour:Number(hour.value),weather:weather.value,furnace:furnace.getAttribute('aria-checked')==='true',fire:burning};},
-    apply(s){
-      if(Number(hour.value)!==s.hour || weather.value!==s.weather){hour.value=s.hour;weather.value=s.weather;changeWeather();}
+    conditions:environment.settings,solo:environment.solo,stargaze:environment.stargaze,
+    snapshot(){return {...environment.snapshot(),furnace:furnace.getAttribute('aria-checked')==='true',fire:burning};},
+    apply(s,guest){
+      environment.apply(s,guest);
       if((furnace.getAttribute('aria-checked')==='true')!==s.furnace)furnace.click();
       if(burning!==s.fire)changeFire();
-    },
-    stargaze(){
-      const h=Number(hour.value);
-      if(h>=5 && h<20)hour.value='22';
-      weather.value='clear';changeWeather();
     },
     setNearFire(near,atStars){
       if(nearPit!==near || lookingUp!==atStars){

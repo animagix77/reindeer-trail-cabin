@@ -8,8 +8,15 @@ const validName=s=>typeof s==='string' && s.trim().length>0 && s.length<=28;
 const validAvatar=a=>a==='man'||a==='woman';
 const validPose=p=>p && typeof p.view==='string' && /^[a-z]{1,18}$/.test(p.view) &&
   [p.x,p.y,p.z,p.yaw].every(n=>Number.isFinite(n) && Math.abs(n)<500);
-const validScene=s=>s && Number.isFinite(s.hour) && s.hour>=0 && s.hour<=23.75 &&
-  ['clear','rain','snow','cloudy'].includes(s.weather) && typeof s.furnace==='boolean' && typeof s.fire==='boolean';
+const weatherPreset=w=>['clear','rain','snow','cloudy'].includes(w);
+const validReport=r=>r==null || (['ready','loading','stale','unavailable'].includes(r.status) &&
+  typeof r.label==='string' && r.label.length<=200 && (r.observedAt===null ||
+    (typeof r.observedAt==='string' && r.observedAt.length<=40 && Number.isFinite(Date.parse(r.observedAt)))));
+const validScene=s=>s && Number.isFinite(s.hour) && s.hour>=0 && s.hour<24 &&
+  weatherPreset(s.weather) && typeof s.furnace==='boolean' && typeof s.fire==='boolean' &&
+  (s.localTime===undefined || typeof s.localTime==='boolean') && (s.localWeather===undefined || typeof s.localWeather==='boolean') &&
+  (s.manualHour===undefined || (Number.isFinite(s.manualHour) && s.manualHour>=0 && s.manualHour<=23.75)) &&
+  (s.manualWeather===undefined || weatherPreset(s.manualWeather)) && validReport(s.weatherReport);
 const fuelLimit={twigs:176,sticks:440,logs:960};
 const validWood=kind=>typeof kind==='string' && Object.hasOwn(fuelLimit,kind);
 const validFuel=f=>f && Object.entries(fuelLimit).every(([kind,limit])=>
@@ -121,7 +128,7 @@ export function openTourRoom({invite,name,avatar,onReady,onEnd,onRoster,onMessag
         if(now-lastWood>=300){lastWood=now;onAddFuel(m.kind);publishFuel();}
         else safeSend(c,{t:'fuelState',fuel:snapshotFuel?.()});
       }
-      if(m.t==='scene' && validScene(m.scene)){onScene(m.scene);broadcast({t:'scene',scene:m.scene});}
+      if(m.t==='scene' && validScene(m.scene)){onScene(m.scene);broadcast({t:'scene',scene:snapshot()});}
     });
     const drop=()=>{pending.delete(c);if(links.get(c.peer)===c){links.delete(c.peer);members.delete(c.peer);if(!ended)publishRoster();}};
     c.on('close',drop);c.on('error',drop);

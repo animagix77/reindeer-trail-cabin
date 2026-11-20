@@ -12,6 +12,8 @@ You arrive on the driveway at golden hour. Walk with WASD, the arrow keys or the
 - Choose **Feed deer** to visit the meadow. Walk too close and the herd scatters. Stand still with an apple, carrot or greens and a curious deer may take it from your hand. You can also toss food and refill the basket.
 - Visit the Christmas tree beside the loft stairs. Choose **Stargazing** for a clear night at the fire pit. Facing north, look for Polaris above the trees.
 - Open **Map** for the state aerial and neighborhood satellite views. The parcel, road and historic building outlines can be switched individually. Map pins take you to the front approach and covered porch.
+- Under **Follow Smallwood**, switch on **Local time** for the cabin’s Eastern clock and seasonal sunlight, or **Local weather** for conditions reported at Sullivan County International Airport. Each switch restores its previous manual setting when turned off. [National Weather Service station](https://www.weather.gov/wrh/timeseries?site=KMSV)
+- Open **Water notes** for the cabin’s private well, pressure tank and separate 40-gallon hot-water heater. With an internet connection you can also see the latest dated groundwater observation from Woodbourne, about 12 miles northeast. The cabin’s own groundwater depth would require an on-site reading. [USGS Woodbourne well](https://waterdata.usgs.gov/monitoring-location/USGS-414525074360601/)
 
 ## Visit with friends
 

@@ -1,7 +1,7 @@
 import {guestMarker} from './guest-marker.js';
 import {openTourRoom,readRoom} from './tour-room.js';
 
-export function installParty({world,getPose,joined,meet,label,snapshot,apply,snapshotFuel,applyFuel,addRemoteFuel,stop,schedule}){
+export function installParty({world,getPose,joined,meet,label,snapshot,apply,solo,snapshotFuel,applyFuel,addRemoteFuel,stop,schedule}){
   const get=id=>document.getElementById(id);
   const dialog=get('party'),button=get('party-toggle'),start=get('party-start'),notice=get('party-status');
   const details=get('party-details'),join=get('party-join'),share=get('party-link'),log=get('party-log');
@@ -90,7 +90,7 @@ export function installParty({world,getPose,joined,meet,label,snapshot,apply,sna
     ready=false;own='';room=null;unread=0;active='';if(hadRoom){invite='';address('');}
     for(const m of markers.values())removeMarker(m);markers.clear();speakerLabels.clear();
     log.replaceChildren();share.value='';get('party-people').replaceChildren();badge();lobby();
-    notice.textContent=reason;if(!dialog.open&&hadRoom)open();schedule();
+    solo();notice.textContent=reason;if(!dialog.open&&hadRoom)open();schedule();
   }
   function begin(e){
     e.preventDefault();if(room)return;
@@ -103,7 +103,7 @@ export function installParty({world,getPose,joined,meet,label,snapshot,apply,sna
       room=openTourRoom({name,avatar,invite,snapshot,onEnd:end,onRoster:members,onPose:pose,onMessage:message,
         snapshotFuel,onFuelState:applyFuel,onAddFuel:addRemoteFuel,
         onPlace(p){if(dialog.open)dialog.close();meetAt(p);},
-        onScene(s){applying=true;try{apply(s);}finally{applying=false;}},
+        onScene(s){applying=true;try{apply(s,!isHost);}finally{applying=false;}},
         async onReady(token,arrival){
           ready=true;slot=arrival.index;active=token;address(token);
           // The first shared pose must be at the guest's assigned arrival slot.

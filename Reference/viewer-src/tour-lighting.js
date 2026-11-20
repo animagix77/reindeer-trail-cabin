@@ -129,7 +129,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
   const cafeLights=installCafeLights(scene,model);
   const lamps=Array.from({length:3},()=>{const l=new THREE.PointLight(0xffffff,0,4,2);scene.add(l);return l;});
   let zoneKey=null,stateKey='',lampGain=1,daylight=1,lowSun=0;
-  let {hour,weather}=arrival;
+  let {hour,weather,sunDirection}=arrival;
   let yard=null,outdoor=false,roomGain=.34,skyGain=.62,metalGain=1;
   const reflectedSky={value:new THREE.Color(1,1,1)};
   function applyEnvironment(){
@@ -160,8 +160,9 @@ export function installTourLighting(scene,renderer,model,arrival) {
   function setConditions(conditions={}) {
     if(Number.isFinite(conditions.hour))hour=(conditions.hour%24+24)%24;
     if(validWeather(conditions.weather))weather=conditions.weather;
-    const a=atmosphere(hour,weather);
-    sky.set(a);stars.set(hour,a);
+    if('sunDirection' in conditions)sunDirection=conditions.sunDirection;
+    const a=atmosphere(hour,weather,sunDirection);
+    sky.set(a);stars.set(hour,a,sunDirection?Date.now():null);
     lowSun=a.golden*(1-a.clouds);
     air.color.copy(a.horizon).lerp(a.sunTint,.42*lowSun);
     air.density=a.fog+.004*lowSun;
