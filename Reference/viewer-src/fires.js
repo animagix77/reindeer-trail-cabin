@@ -322,7 +322,7 @@ export function installTourFires(scene,model) {
   const hearth=glass?fitHearth(scene,glass,clock):null;
   const pit=ring?fitFirePit(scene,model,ring,clock):null;
   const forward=new THREE.Vector3(),offset=new THREE.Vector3();
-  let furnaceOn=true,pitOn=false,amount=0,from=0,startTime=null,heat=0,previous=null,weather='clear';
+  let furnaceOn=true,pitOn=false,amount=0,from=0,startTime=null,heat=0,plume=0,previous=null,weather='clear';
   const fuel={twigs:0,sticks:0,logs:0};
   let fuelTime=null;
   function burnFuel(time=performance.now()*.001){
@@ -376,8 +376,10 @@ export function installTourFires(scene,model) {
       amount=THREE.MathUtils.lerp(from,Number(pitOn),progress*progress*(3-2*progress));
       const dt=previous===null?0:Math.max(0,time-previous);previous=time;
       heat=THREE.MathUtils.damp(heat,amount,amount>=heat?1.8:.58,dt);
+      const targetPlume=pitOn?fuelLevel():0;
+      plume=THREE.MathUtils.damp(plume,targetPlume,targetPlume>plume?1.35:.65,dt);
       if(!pitOn && amount===0 && heat<.006)heat=0;
-      pit?.update(amount,heat,camera.position,time,pulse,weather,fuelLevel());
+      pit?.update(amount,heat,camera.position,time,pulse,weather,plume);
       camera.getWorldDirection(forward);
       return (hearth && furnaceOn && mode!=='property' && inView(camera,hearth.center,2.4,9,false))
         || (pit && ((progress<1 && from!==Number(pitOn))
