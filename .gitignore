@@ -1,0 +1,33 @@
+# Track only the tour, its editable sources, and the inputs used to rebuild it.
+*
+!/.gitignore
+!/.gitattributes
+!/README.md
+!/Explore the property.html
+!/Reindeer Trail.blend
+!/Reindeer Trail.glb
+!/Reference/
+!/Reference/*.py
+!/Reference/model-geometry.json
+!/Reference/lidar-parcel.csv
+!/Reference/terrain-provenance.json
+!/Reference/lidar-provenance.json
+!/Reference/State aerial.jpg
+!/Reference/Exterior materials/
+!/Reference/Exterior materials/*.jpg
+!/Reference/Exterior materials/*.png
+!/Reference/Interior materials/
+!/Reference/Interior materials/*.jpg
+!/Reference/Interior materials/*.png
+!/Reference/Woodland context/
+!/Reference/Woodland context/Woodland canopy.json
+!/Reference/Woodland context/Woodland heights.npz
+!/Reference/Woodland context/Woodland terrain.jpg
+!/Reference/Woodland context/Hardwood silhouettes.png
+!/Reference/viewer-src/
+!/Reference/viewer-src/*.js
+!/Reference/viewer-src/*.mjs
+!/Reference/viewer-src/package.json
+!/Reference/viewer-src/package-lock.json
+!/Reference/viewer-src/template.html
+!/Reference/viewer-src/THREE-LICENSE.txt

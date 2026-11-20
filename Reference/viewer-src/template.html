@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#eff3f0"><title>The Reindeer Trail · Property model</title>
+<style>
+:root{font-family:"DM Sans","Avenir Next",system-ui,sans-serif;color:#253c34;background:#ecf1ee;color-scheme:light}*{box-sizing:border-box}body{margin:0}main{position:relative;height:100vh;height:100dvh;min-height:300px;overflow:hidden;background:radial-gradient(ellipse at 40% 38%,#fff 0%,#f5f8f6 38%,#dce6e0 100%)}header{position:absolute;top:clamp(18px,4.5vw,58px);left:clamp(18px,4.5vw,70px);pointer-events:none}h1{font-family:"Baskervville","Iowan Old Style",Georgia,serif;font-size:clamp(2rem,4.5vw,4.4rem);font-weight:400;letter-spacing:-.065em;line-height:1.06;margin:0}header p{font-size:1rem;letter-spacing:.012em;margin:.45rem 0 0;color:#40564d}.view{position:absolute;inset:0;width:100%;height:100%;display:block;outline-offset:-4px;touch-action:none}.dock{position:absolute;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 24px);text-align:center}nav{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:3px;padding:5px;border:1px solid #bdc9c0;border-radius:24px;background:#fdfefd;box-shadow:0 7px 23px #1a31291a}button{min-height:42px;min-width:42px;font:inherit;font-size:.9rem;font-weight:550;border:0;border-radius:18px;background:transparent;color:#263d35;padding:7px 13px;cursor:pointer}button[aria-pressed=true]{background:#dce9df;color:#173d29}button:hover{background:#edf1ee}button:focus-visible,.view:focus-visible{outline:2px solid #296743}.zoom{font-size:1.4rem;font-weight:400;padding:0}.hint{color:#40564d;margin:0 0 10px;font-size:.84rem}.status{position:absolute;top:48%;left:50%;transform:translate(-50%,-50%);padding:12px 18px;border-radius:10px;background:white;max-width:85%;text-align:center}.status:empty,[hidden]{display:none!important}@media(max-width:520px){header{top:20px}button{padding:6px 10px}.dock{bottom:max(14px,env(safe-area-inset-bottom))}.hint{font-size:.78rem}header p{font-size:.9rem}}@media(max-height:470px){header{top:12px;left:20px}h1{font-size:2rem}.dock{bottom:10px}.hint{display:none}}
+
+#views{position:absolute;right:clamp(18px,4.5vw,70px);top:clamp(18px,4.5vw,58px)}
+#views button[aria-pressed=true]{background:#305749;color:white}
+.inside :is(#roof,#imagery,#canopy){display:none}
+.inside header,.inside #hint{color:white;text-shadow:0 1px 4px #000}
+.inside h1{font-size:clamp(1.75rem,2.8vw,2.7rem)}.inside header p{color:white;font-size:.9rem}
+.inside main::before{content:"";position:absolute;pointer-events:none;inset:0;z-index:1;background:linear-gradient(180deg,#1721198c,transparent 24%,transparent 80%,#16211b78)}
+header,#views,.dock{z-index:2}
+@media(max-width:790px){#views{top:clamp(100px,16vh,128px);left:clamp(18px,4.5vw,70px);right:auto}}
+@media(max-height:470px){#views{left:auto;right:12px;top:12px}}
+
+#stick{display:none;position:absolute;left:max(16px,env(safe-area-inset-left));bottom:106px;width:96px;height:96px;z-index:3;border-radius:50%;touch-action:none;background:#152a2380;border:2px solid #ffffffa8;box-shadow:0 1px 6px #18272033}
+#nub{width:38px;height:38px;position:absolute;left:calc(50% - 19px);top:calc(50% - 19px);border-radius:50%;background:#f5faf2bf;border:1px solid white;pointer-events:none}
+@media(pointer:coarse),(max-width:700px){#stick:not([hidden]){display:block}}
+@media(pointer:coarse){#lock{display:none}}
+@media(max-height:470px) and (pointer:coarse){#stick{bottom:16px;width:80px;height:80px}}
+@media(max-width:415px){#views button{min-width:33px;padding:6px 8px}}
+
+.view-picker{display:none;align-items:center;gap:.55rem;padding:0 .3rem 0 .7rem;color:#476156;font-size:.86rem}
+.view-picker select{max-width:100%;min-height:40px;border:0;border-radius:16px;padding:0 .35rem;background:#f3f7f3;color:#203d30;font:inherit;font-weight:650;cursor:pointer}
+@media(max-width:2220px){#views button[data-view]{display:none}.view-picker{display:flex}#views{border-radius:20px}}
+@media (max-width:790px) and (min-height:471px){#views{top:94px;left:clamp(18px,4.5vw,70px)}}
+
+#views{z-index:4;max-width:calc(100vw - 32px)}
+#scene-toggle{color:#244734;background:#eef3ed}
+#scene-toggle[aria-expanded=true],#scene-toggle:hover{background:#d9e7da}
+#scene-panel{position:absolute;top:calc(100% + 8px);right:0;width:min(292px,calc(100vw - 36px));box-sizing:border-box;
+  padding:16px 18px 9px;border:1px solid #bdc9c0;border-radius:17px;background:#fdfefd;color:#203d30;
+  box-shadow:0 8px 28px #152a2338;font-size:.9rem;text-align:left;max-height:calc(100dvh - 130px);overflow:auto;overscroll-behavior:contain}
+.time-setting{display:grid;grid-template-columns:1fr auto;align-items:center;row-gap:5px;margin-bottom:6px}
+#scene-clock{font-variant-numeric:tabular-nums;color:#42624f}
+#scene-hour{grid-column:1/-1;width:100%;margin:0;min-height:30px;accent-color:#396448;cursor:pointer}
+.scene-row{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #e2e9e2;min-height:46px}
+#scene-panel :is(select,button){font:inherit;font-weight:600;font-size:.84rem;min-height:33px;background:#edf3ed;color:#254932;border:0;border-radius:10px;padding:5px 10px;cursor:pointer}
+#scene-panel button[aria-checked=true]{background:#305749;color:white}
+#nearby-fire{color:#773b18;background:#f6e8d9}
+@media(max-width:790px) and (min-height:471px){#scene-panel{left:0;right:auto;max-height:calc(100dvh - 155px)}}
+@media(max-width:350px){.view-picker{gap:.2rem;padding-left:.2rem}.view-picker select{max-width:47vw}}
+@media(max-height:470px){#scene-panel{max-height:calc(100dvh - 76px)}}
+</style></head><body><main><canvas id="view" class="view" tabindex="0" aria-label="Interactive model. Drag or use arrow keys to orbit. Use plus and minus to zoom. Home resets the view."></canvas><header><h1>The Reindeer Trail</h1><p>Smallwood, NY · Property model</p></header><nav aria-label="Choose a viewpoint" id="views" hidden><button data-view="property" aria-pressed="true">Property</button><button data-view="outside" aria-pressed="false">Driveway</button><button data-view="path" aria-pressed="false">Front path</button><button data-view="porch" aria-pressed="false">Covered porch</button><button data-view="grill" aria-pressed="false">Deck barbecue</button><button data-view="yard" aria-pressed="false">Fire pit</button><button data-view="hall" aria-pressed="false">Front hall</button><button data-view="frontbed" aria-pressed="false">Front bedroom</button><button data-view="master" aria-pressed="false">Master &amp; bath</button><button data-view="bath" aria-pressed="false">Bathroom</button><button data-view="primary" aria-pressed="false">Master bedroom</button><button data-view="vault" aria-pressed="false">Kitchen vault</button><button data-view="kitchen" aria-pressed="false">Kitchen</button><button data-view="kitchenwork" aria-pressed="false">Island worktop</button><button data-view="living" aria-pressed="false">Living room</button><button data-view="hearth" aria-pressed="false">Propane furnace</button><button data-view="bunk" aria-pressed="false">Bunk room</button><button data-view="loft" aria-pressed="false">Loft</button><label class="view-picker">View <select id="location" aria-label="Tour location"></select></label>
+<button id="scene-toggle" aria-controls="scene-panel" aria-expanded="false">Scene</button>
+<section id="scene-panel" aria-label="Scene settings" hidden>
+  <div class="time-setting"><label for="scene-hour">Time of day</label><output id="scene-clock" for="scene-hour">2:00 PM</output>
+  <input id="scene-hour" type="range" min="0" max="23.75" step=".25" value="14" aria-valuetext="2:00 PM"></div>
+  <div class="scene-row"><label for="scene-weather">Weather</label><select id="scene-weather"><option value="clear">Clear</option><option value="cloudy">Overcast</option><option value="rain">Rain</option><option value="snow">Snow</option></select></div>
+  <div class="scene-row"><span id="furnace-label">Propane furnace</span><button id="scene-furnace" role="switch" aria-checked="true" aria-labelledby="furnace-label">On</button></div>
+  <div class="scene-row"><span>Outdoor fire pit</span><button id="scene-fire">Start fire</button></div>
+</section></nav><div class="status" id="status" role="status">Opening the property model…</div><div id="stick" role="group" aria-label="Movement pad" hidden><span id="nub"></span></div><div class="dock" id="tools" hidden><p class="hint" id="hint">Drag to orbit · Scroll or pinch to zoom</p><nav aria-label="Model controls"><button id="roof" aria-pressed="true">Roof</button><button id="imagery" aria-pressed="true">Aerial</button><button id="canopy" aria-pressed="false">Tree canopy</button><button id="nearby-fire" hidden>Start fire</button><button id="lock" hidden>Mouse look</button><button id="far" class="zoom" aria-label="Zoom out">−</button><button id="near" class="zoom" aria-label="Zoom in">+</button><button id="reset">Reset view</button></nav></div></main><script type="application/octet-stream" id="ortho">%%ORTHO%%</script><script type="application/octet-stream" id="model">%%GLB%%</script><script>%%JS%%</script></body></html>

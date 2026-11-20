@@ -1,0 +1,4 @@
+# The offline tour embeds the GLB and bundled shaders; review its editable sources.
+"Explore the property.html" -diff -merge -text linguist-generated
+*.blend binary
+*.glb binary

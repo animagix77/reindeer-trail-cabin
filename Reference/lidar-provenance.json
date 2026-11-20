@@ -1,0 +1,39 @@
+{
+  "source": "https://usgs-lidar-public.s3.us-west-2.amazonaws.com/NY_FEMAR2_Central_5_2018/ept.json",
+  "original_title": "USGS Lidar Point Cloud NY_FEMAR2_Central_2018_D19 e1737n2267, 2018 project, published 2022-12-23",
+  "data_source": "USGS 3DEP, FEMA Region II Central NY",
+  "catalog": "https://www.sciencebase.gov/catalog/item/63b78e67d34e92aad3cb3e60",
+  "crs": "EPSG:26918 NAD83 / UTM 18N",
+  "source_z_unit": "meter",
+  "z_conversion": 1,
+  "z_unit": "m NAVD88",
+  "DEM_delta_m_median": -0.00221679687501819,
+  "class_codes": {
+    "1": "unclassified",
+    "2": "ground",
+    "3": "low vegetation",
+    "4": "medium vegetation",
+    "5": "high vegetation",
+    "6": "building",
+    "7": "low noise",
+    "9": "water",
+    "17": "bridge deck",
+    "18": "high noise"
+  },
+  "parcel_results": {
+    "1": 5792,
+    "2": 2077,
+    "7": 31
+  },
+  "footprint_results": {
+    "1": 483,
+    "2": 67,
+    "7": 6
+  },
+  "context_results": {
+    "1": 77743,
+    "2": 31175,
+    "7": 156
+  },
+  "spatialExtent": "parcel polygon plus 45 meter buffer for context; separate CSV clipped to parcel. Building flag is a NYS planimetric polygon association, not proof of class."
+}

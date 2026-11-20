@@ -1,0 +1,64 @@
+{
+  "boundaryCenterLonLat": [
+    -74.803745,
+    41.663539
+  ],
+  "crs": 26918,
+  "centerUTM": [
+    516339,
+    4612439
+  ],
+  "boundsUTM": [
+    516189,
+    4612289,
+    516489,
+    4612589
+  ],
+  "extent_m": [
+    300,
+    300
+  ],
+  "north_up": true,
+  "dem": {
+    "file": "dem.tif",
+    "binary": "dem.f32",
+    "binaryEncoding": "little-endian Float32 row-major north to south, west to east",
+    "rows": 300,
+    "cols": 300,
+    "pixel_m": 1,
+    "elevation_units": "meters NAVD88",
+    "source": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/NY_FEMAR2_Central_2018_D19/TIFF/USGS_1M_18_x51y462_NY_FEMAR2_Central_2018_D19.tif",
+    "catalog": "https://www.sciencebase.gov/catalog/item/65af59b7d34ef34c3506dd41",
+    "vintage": "FEMA Region 2 Central New York 2018 project D19, product published 2024-01-04",
+    "geotransform": [
+      516189.0,
+      1.0,
+      0.0,
+      4612589.0,
+      0.0,
+      -1.0
+    ],
+    "minimum": 349.11151123046875,
+    "maximum": 389.2690734863281,
+    "center": 366.1331481933594
+  },
+  "ortho": {
+    "file": "ortho.tif",
+    "color_image": "ortho.png",
+    "source": "https://orthos.its.ny.gov/arcgis/rest/services/wms/2021/MapServer",
+    "request": "https://orthos.its.ny.gov/arcgis/rest/services/wms/2021/MapServer/export?f=pjson&bbox=516189%2C4612289%2C516489%2C4612589&bboxSR=26918&imageSR=26918&size=1000%2C1000&format=png24",
+    "index": "https://services6.arcgis.com/EbVsqZ18sv1kVJ3k/arcgis/rest/services/NYS_Orthoimagery_Latest_Index/FeatureServer/0",
+    "vintage": "Spring 2021, NYS Digital Orthoimagery Program, latest index; color map service approximately 12-inch resolution; 0.30m exported grid",
+    "rows": 1000,
+    "cols": 1000,
+    "pixel_m": 0.3,
+    "geotransform": [
+      516189.0,
+      0.3,
+      0.0,
+      4612589.0,
+      0.0,
+      -0.3
+    ]
+  }
+}
