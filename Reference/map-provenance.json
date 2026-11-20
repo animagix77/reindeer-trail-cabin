@@ -1,0 +1,151 @@
+{
+  "horizontalCRS": "EPSG:26918 (NAD83 / UTM zone 18N, meters)",
+  "imageBoundsConvention": "[west, south, east, north], pixel outer edges. Images are north-up.",
+  "propertyOrthophoto": {
+    "provider": "New York State ITS Geospatial Services, NY Statewide Digital Orthoimagery Program, Sullivan County, 2025",
+    "index": "https://orthos.its.ny.gov/arcgis/rest/services/vector/ortho_indexes/MapServer",
+    "nativeTile": "e_04081030_06_12600_4bd_2025.jp2",
+    "sourceArchive": "https://gisdata.ny.gov/ortho/nysdop11/sullivan/spcs/tiles/e_04081030_06_12600_4bd_2025.zip",
+    "nativeCRS": "EPSG:6537 (NAD83(2011) / New York East, US survey feet)",
+    "nativeResolutionFeet": 0.5,
+    "nativeBands": [
+      "red",
+      "green",
+      "blue",
+      "near infrared"
+    ],
+    "sourceJP2SHA256": "442ef9919ac1d425688266c4077c48e1c935f3f241b397aaac4153ee7b084398",
+    "export": "Native bands 1–3 reprojected with cubic resampling for these crops. The model uses ground photographs and estimated heights below canopy cover.",
+    "products": {
+      "State aerial.jpg": {
+        "bounds": [
+          516316,
+          4612417,
+          516360,
+          4612462
+        ],
+        "size": [
+          294,
+          300
+        ]
+      },
+      "Property aerial.jpg": {
+        "bounds": [
+          516308,
+          4612407,
+          516373,
+          4612472
+        ],
+        "size": [
+          430,
+          430
+        ]
+      }
+    }
+  },
+  "countyRoad": {
+    "feature": 4344,
+    "source": "https://gis.sullivanny.us/arcgis/rest/services/911_Addressing_Data/MapServer/1/query?objectIds=4344&outFields=%2A&outSR=4326&f=geojson",
+    "measurement": "Model feet y = −34.2221 − 0.01804675 x fits the centerline across the frontage. Traveled width 19.6 ft is an estimate."
+  },
+  "countyParcel": {
+    "feature": 15758,
+    "source": "https://gis.sullivanny.us/arcgis/rest/services/Parcels/MapServer/1/query?objectIds=15758&outFields=%2A&outSR=4326&f=geojson",
+    "use": "Tax mapping controls the approximate lot extent. It is not a boundary survey."
+  },
+  "neighborhoodSatellite": {
+    "provider": "Copernicus Sentinel-2C MSI, Level-2A bottom-of-atmosphere reflectance; Element 84 Earth Search and Microsoft Planetary Computer",
+    "product": "S2C_MSIL2A_20250603T155001_N0511_R054_T18TWM_20250603T210916.SAFE",
+    "tile": "18TWM",
+    "processingBaseline": "05.11",
+    "observationUTC": "2025-06-03T16:01:53.689000Z",
+    "item": "https://earth-search.aws.element84.com/v1/collections/sentinel-2-l2a/items/S2C_18TWM_20250603_0_L2A",
+    "independentItem": "https://planetarycomputer.microsoft.com/api/stac/v1/collections/sentinel-2-l2a/items/S2C_MSIL2A_20250603T155001_R054_T18TWM_20250603T210916",
+    "bands": {
+      "visual": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/18/T/WM/2025/6/S2C_18TWM_20250603_0_L2A/TCI.tif",
+      "red": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/18/T/WM/2025/6/S2C_18TWM_20250603_0_L2A/B04.tif",
+      "nir": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/18/T/WM/2025/6/S2C_18TWM_20250603_0_L2A/B08.tif",
+      "scl": "https://sentinel-cogs.s3.us-west-2.amazonaws.com/sentinel-s2-l2a-cogs/18/T/WM/2025/6/S2C_18TWM_20250603_0_L2A/SCL.tif"
+    },
+    "nominalCellMeters": 10,
+    "classMaskNativeMeters": 20,
+    "radiometry": {
+      "SAFEQuantification": 10000,
+      "SAFEAddOffsetDN": -1000,
+      "earthSearchConversion": "B04 and B08 reflectance = COG DN / 10000. The COG has already removed the baseline offset.",
+      "crossCheck": [
+        {
+          "band": "B04",
+          "validCells": 8100,
+          "originalMinusCOGDN": 1000
+        },
+        {
+          "band": "B08",
+          "validCells": 8100,
+          "originalMinusCOGDN": 1000
+        }
+      ],
+      "method": "Nearest sampling of the same 90-by-90 map grid from both vendors. Every corresponding red and near infrared cell in the independent copy is exactly 1000 DN higher. The independent SAFE product metadata lists BOA_ADD_OFFSET −1000 and BOA_QUANTIFICATION_VALUE 10000."
+    },
+    "products": {
+      "Neighborhood satellite.jpg": {
+        "source": "Native three-band true-color image (TCI), resampled to the 90-by-90 neighborhood grid using nearest neighbors; no local color stretching.",
+        "bounds": [
+          515880,
+          4611990,
+          516780,
+          4612890
+        ],
+        "size": [
+          90,
+          90
+        ],
+        "sourceByteRangeRGB": [
+          [
+            30,
+            165
+          ],
+          [
+            50,
+            143
+          ],
+          [
+            38,
+            127
+          ]
+        ]
+      },
+      "Woodland context/Summer vegetation.json": {
+        "source": "NDVI = (B08 − B04)/(B08 + B04). Only positive jointly valid observations classified by the nearest 20 m SCL cell as vegetation, bare ground, water or unclassified (4, 5, 6 or 7) are retained.",
+        "bounds": [
+          516180,
+          4612280,
+          516490,
+          4612590
+        ],
+        "size": [
+          31,
+          31
+        ],
+        "encoding": "Integer percent; -128 = no observation.",
+        "validCells": 961,
+        "percentMinMedianMax": [
+          40.0,
+          76.0,
+          85.0
+        ],
+        "use": "Thins existing off-parcel understory candidates. Mixed 10 m pixels do not resolve individual trees or plants."
+      }
+    }
+  },
+  "woodlandBackdrop": {
+    "texture": "Woodland context/Woodland terrain.jpg",
+    "extentMeters": [
+      300,
+      300
+    ],
+    "year": 2021,
+    "source": "terrain-provenance.json",
+    "detail": "Existing subdued leaf-off NYS image across the wider background. LiDAR locates approximate crown peaks; details in lidar-provenance.json."
+  }
+}

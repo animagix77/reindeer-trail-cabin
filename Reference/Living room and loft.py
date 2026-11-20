@@ -84,9 +84,12 @@ def hole_object(ob,holes,axes):
 def soffit(u,v):return roofZ(u,v,1)-main-.14
 # The exterior version used simple overlays to indicate openings. Replace the two that
 # belong to this room with framed openings through the wall and the new interior lining.
-east_window=(18.6,26.0,.73,1.87)
+# Fixed floor datum for the ordinary main-floor sash openings. Counter-height
+# kitchen windows and the upper loft glazing each occupy a separate level.
+room_sash_levels=(.82,1.74)
+east_window=(18.6,26.0,*room_sash_levels)
 loft_window=(16.25,18.05,2.65,3.40)
-south_window=(6.9,14.1,.78,1.88)
+south_window=(6.9,14.1,*room_sash_levels)
 for ob in list(inter.objects):
     if ob.name.startswith(('East gable windows B','Rear living area windows')):bpy.data.objects.remove(ob,do_unlink=True)
 for ob in list(structure.objects):
@@ -187,6 +190,21 @@ def sash(name,rect,endwall=False,small=False):
     band=.19 if small else .22;m=darkwood if small else white
     for p in [a,b]:strip(' · side frame',p-band,p+band*.5,z0-.07,z1+.07,m)
     for h in [z0,z1]:strip(' · casing',a-band,b+band*.5,h-.04,h+.045,m)
+    # The liner covers the exposed wall thickness all the way to the trim.
+    def reveal(left,right,low,high):
+        if endwall:block(name+' · jamb lining',-.04,.181,left,right,low,high,m)
+        else:block(name+' · jamb lining',left,right,ym-.002,29.041,low,high,m)
+    for l,r in ((a-.02,a+.035),(b-.035,b+.02)):reveal(l,r,z0,z1)
+    reveal(a+.035,b-.035,z0-.006,z0+.02)
+    reveal(a+.035,b-.035,z1-.02,z1+.006)
+    # Outside the lap siding the living and loft sashes also have a weather
+    # casing, centered on the same level cutout as the interior frames.
+    def weather_trim(left,right,low,high):
+        if endwall:block(name+' · exterior casing',-.155,-.035,left,right,low,high,white)
+        else:block(name+' · exterior casing',left,right,29.035,29.155,low,high,white)
+    for l,r in ((a-.19,a+.035),(b-.035,b+.19)):weather_trim(l,r,z0-.017,z1+.018)
+    weather_trim(a-.20,b+.20,z1+.018,z1+.069)
+    weather_trim(a-.23,b+.23,z0-.066,z0-.017)
     if not small:
         fractions=(.25,.75) if endwall else (1/3,2/3)
         left,right=[a+(b-a)*f for f in fractions]
@@ -206,14 +224,14 @@ for x0,x1 in [(5.45,7.7),(13.35,15.68)]:
         for i in range(cols+1):
             u=i/cols; x=x0+(x1-x0)*u+.04*math.sin(6*t+4*u)*t
             y=ym-.53-.085*(1+.45*(1-t))*math.sin(8*math.pi*u)
-            z=(.50+.03*math.cos(8*math.pi*u))*(1-t)+2.27*t
+            z=(.50+.03*math.cos(8*math.pi*u))*(1-t)+(south_window[3]+.105)*t
             verts.append(point(x,y,z))
     for j in range(rows):
         for i in range(cols):
             k=j*(cols+1)+i;faces.append((k,k+1,k+cols+2,k+cols+1))
     ob=mesh('Living room · gathered olive curtain',verts,faces,curtainmat,room)
     for p in ob.data.polygons:p.use_smooth=True
-beam('Window · curtain rod',(5.24,ym-.51,2.30),(15.90,ym-.51,2.30),.035,.035,brass)
+beam('Window · curtain rod',(5.24,ym-.51,south_window[3]+.126),(15.90,ym-.51,south_window[3]+.126),.035,.035,brass)
 # Loft access: open treads, stringers, one guard along the open side, clear landing.
 sx0=15.85; stair_y0=ynorth+.18; stair_y1=18.1;count=10
 for j in range(count):
@@ -225,14 +243,14 @@ guard=stair_y1-.08
 for j in range(11):
     frac=j/10;x=sx0+(front-sx0)*frac;z=loftdeck*frac
     beam('Stair · baluster',(x,guard,z+.025),(x,guard,z+.79),.047,.047,oak)
-beam('Stair · handrail',(sx0+.1,guard,.80),(front-.12,guard,loftdeck+.80),.086,.080,oak)
+beam('Stair · handrail',(sx0+.1,guard,.80),(front-.12,guard,loftdeck+.80),.0889,.0381,oak)
 beam('Loft · edge beam',(front,guard,loftdeck-.045),(front,yback,loftdeck-.045),.16,.20,darkwood)
 guardtop=loftdeck+.77;end=25.0
 for j in range(10):
     y=guard+.15+(end-guard-.15)*j/9
     h=min(guardtop,top(front,y)-.055)
     if h>loftdeck+.10:beam('Loft · square baluster',(front-.12,y,loftdeck),(front-.12,y,h),.061,.061,oak)
-beam('Loft · handrail',(front-.12,guard,guardtop),(front-.12,end,min(guardtop,top(front,end)-.045)),.099,.084,oak)
+beam('Loft · handrail',(front-.12,guard,guardtop),(front-.12,end,min(guardtop,top(front,end)-.045)),.0889,.0381,oak)
 verts=[(front, end,loftdeck),(front,ym,loftdeck),(front,ym,top(front,ym)),(front,end,top(front,end))]
 wallmaterial('Loft · timber edge return',verts,lining,axes=(1,2))
 beam('Loft · ridge timber',(.22,ridge(.22,1),top(.22,ridge(.22,1))-.05),(front,ridge(front,1),top(front,ridge(front,1))-.05),.14,.14,darkwood)
@@ -291,7 +309,7 @@ def loft_and_hearth_accessories():
             fan.tube([(-radius,.021,height),(-radius,.055,.043),(-radius*.79,.047,.021),
                       (radius*.79,.047,.021),(radius,.055,.043),(radius,.021,height)],.014,graphite)
         place(fan,name,x,y,h,yaw)
-    fan('Living room · pedestal fan beside the heater',17.19,27.86,.017,1.12,.19,-25)
+    fan('Living room · pedestal fan beside the heater',17.19,27.86,.109,1.12,.19,-25)
     fan('Loft · portable pivot fan',7.05,23.18,loftdeck+.006,.188,.142,98)
 
     # Small caged reading light suspended from the timber edge of the right rooflight.
@@ -372,7 +390,7 @@ for f in hearth.data.polygons:
 for i,v in enumerate(hearth.data.vertices):
     h=v.co.z
     if i in masonry or h>2.352:
-        target=top(20.72-v.co.x/ft,28.68-v.co.y/ft)-.012
+        target=top(20.72-v.co.x/ft,28.68-v.co.y/ft)-.023
         v.co.z=h*target/2.37
 # Keep the photographed courses level where the top of the wall meets the vault.
 stone=next(m for m in hearth.data.materials if 'Ledgestone split face' in m.name)

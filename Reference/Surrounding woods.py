@@ -11,6 +11,7 @@ def build_surrounding_woods():
     c = coll('Backdrop_Woodland context · walking views')
     folder = work / 'Woodland context'
     measures = json.loads((folder / 'Woodland canopy.json').read_text())
+    summer = json.loads((folder / 'Summer vegetation.json').read_text())
     with np.load(folder / 'Woodland heights.npz') as heights:
         grid = heights['cm'].astype('f4') / 100
 
@@ -132,7 +133,27 @@ def build_surrounding_woods():
         obj['basis'] = 'Thinned peaks from 2018 airborne returns outside mapped parcel, roads, and buildings. Positions approximate.'
         return obj
     trees(measures['crowns'],'Mixed hardwood crowns')
-    trees(measures['understory'],'Low woodland regrowth',True)
+    # Each 10 m Sentinel-2 sample measures mixed canopy and ground cover.
+    # Thin only the existing off-parcel regrowth candidates in less green cells.
+    # Missing observations leave the lidar interpretation intact.
+    sample_grid = summer['values']
+    density_rng = random.Random(20250603)
+    regrowth = []
+    for record in measures['understory']:
+        x, y = record[:2]
+        col = math.floor((OX+x-summer['west'])/summer['cell'])
+        row = math.floor((summer['north']-OY-y)/summer['cell'])
+        keep = 1.
+        if 0 <= row < len(sample_grid) and 0 <= col < len(sample_grid[row]):
+            ndvi = sample_grid[row][col]
+            if ndvi != summer['nodata']:
+                keep = max(.18, min(1., (ndvi-35)/48))
+        if density_rng.random() < keep:
+            regrowth.append(record)
+    low = trees(regrowth,'Low woodland regrowth',True)
+    low['basis'] = 'Off-parcel lidar candidates, thinned using 10 m Sentinel-2 vegetation index from 2025-06-03. Individual understory locations are illustrative.'
+    low['lidar_candidates'] = len(measures['understory'])
+    low['retained_candidates'] = len(regrowth)
     return c
 
 context_extra = build_surrounding_woods()

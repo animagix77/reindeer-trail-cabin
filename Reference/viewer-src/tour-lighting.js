@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 
 import {atmosphere,createSky,validWeather} from './tour-sky.js';
+import {installNightSky} from './night-sky.js';
 import {installWeather} from './tour-weather.js';
 
 // RoomEnvironment gives the brushed metal, glazing and table edges genuine reflected highlights.
@@ -20,6 +21,7 @@ export function installTourLighting(scene,renderer,model) {
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   renderer.shadowMap.autoUpdate=false;
   const sky=createSky(scene);
+  const stars=installNightSky(scene);
   const weatherFX=installWeather(scene,model);
   const air=new THREE.FogExp2(0xd9e4e7,.0022);
   const hemisphere=new THREE.HemisphereLight(0xfff6e8,0xb3a28f,.91);
@@ -38,6 +40,16 @@ export function installTourLighting(scene,renderer,model) {
     if(!obj.isMesh)return;
     const mats=Array.isArray(obj.material)?obj.material:[obj.material];
     for(const mat of mats) {
+      if(mat.name==='Front sash glass · shaded street exposure'){
+        // Outward faces show the darker street exposure in the owner photo.
+        // Looking out from inside, preserve the original clear pane transmission.
+        mat.side=THREE.DoubleSide;
+        mat.forceSinglePass=true;
+        mat.onBeforeCompile=shader=>{
+          shader.fragmentShader=shader.fragmentShader.replace('#include <alphamap_fragment>',
+            '#include <alphamap_fragment>\nif (!gl_FrontFacing) diffuseColor.a = 0.085;');
+        };
+      }
       if(/Backdrop_Hardwood cutouts|Daylight through rooflights|Kitchen fabric/i.test(mat.name))daylightMaterials.set(mat,mat.emissiveIntensity);
       if(/Warm opal shade|Frosted sconce shade|amber wire filaments|String bulbs|warm milk.glass shades/i.test(mat.name))lampMaterials.set(mat,mat.emissiveIntensity);
     }
@@ -65,7 +77,7 @@ export function installTourLighting(scene,renderer,model) {
     if(Number.isFinite(conditions.hour))hour=(conditions.hour%24+24)%24;
     if(validWeather(conditions.weather))weather=conditions.weather;
     const a=atmosphere(hour,weather);
-    sky.set(a);
+    sky.set(a);stars.set(hour,a);
     air.color.copy(a.horizon);
     air.density=a.fog;
     const availableLight=a.day*a.light;
@@ -91,10 +103,11 @@ export function installTourLighting(scene,renderer,model) {
   setConditions();
   return {
     setConditions,
-    get animated(){return weatherFX.animated;},
-    update(eye,mode,seconds=performance.now()/1000){
+    get animated(){return weatherFX.animated || stars.animated;},
+    update(eye,mode,seconds=performance.now()/1000,camera,outdoors=false){
       const walking=mode!=='property';
       sky.place(eye,walking);
+      if(camera)stars.update(camera,mode,seconds,renderer.getPixelRatio(),outdoors);
       // In the cutaway the eye orbits high above the landscape. Keep plan details legible.
       scene.fog=walking?air:null;
       weatherFX.update(eye,!walking,seconds,renderer.domElement.height);

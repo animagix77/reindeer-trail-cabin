@@ -111,7 +111,7 @@ def build_carriage_doors_and_shutters():
         # Narrow dark paired panels in the owner's front-elevation photograph.
         center=edge+sign*.65
         unit=Fitting('Primary front window · louvered shutter',lambda a,d,z:pos(center+a/ft,3.08-d/ft,main+z))
-        half=.157;sill=.805;head=1.817;middle=(sill+head)/2
+        half=.157;sill=.82-.057;head=1.74+.072;middle=(sill+head)/2
         unit.strip(-half,middle,half,middle,head-sill,.039,.051,deep)
         for a in (-half+.015,half-.015):unit.strip(a,sill,a,head,.030,.05,.073,shutter)
         for z in (sill+.017,middle,head-.017):
@@ -184,7 +184,7 @@ def build_photo_facades(grade):
         mid=bottom+(top-bottom)*(.50 if front else .53)
         moulding('meeting rail',left,right,mid-.011,mid+.011,-.04,-.009,metal)
     sash(True,6.0,-1.32,-.353)
-    sash(False,4.6,-1.24,-.242)
+    sash(False,4.6,-1.32,-.353)
 
     # Rectangular gutter sections, hydraulic elbows and their stand-off clips.
     # The front lower leg follows the ground leftward in both 557 and 561.
@@ -202,8 +202,8 @@ def build_photo_facades(grade):
         return mesh('Gutter · '+('front' if face==-1 else 'rear')+' eave',pts,faces,paint,structure,True)
 
     level_gutter(-.68,21.92,2.20,-1,0)
-    level_gutter(22.01,28.43,-.8,-1,0)
-    level_gutter(33.57,41.76,-.8,-1,0)
+    level_gutter(22.01,27.90,-.8,-1,0)
+    level_gutter(34.10,41.76,-.8,-1,0)
     level_gutter(-.68,20.9,29.8,1,1)
 
     def downpipe(x,wall_y,eave_y,k,direction,extension=0):

@@ -2,7 +2,9 @@
 # toward the landing from the deck. IMG_3953 shows a four-burner Nexgrill with
 # a fifth control on the covered right shelf. Absolute dimensions are inferred.
 def build_deck_barbecue():
-    centre_x, centre_y = 39.44, 28.82
+    # The hinged dial and rolled cover sweep 0.573 m behind the grate center.
+    # Keep that full sweep inside the short guard while the steps stay to the left.
+    centre_x, centre_y = 38.49, 28.82
     enamel = mat('Grill · porcelain enamel', '#252b2b', .34, .24)
     iron = mat('Grill · cast firebox', '#383b39', .42, .49)
     steel = mat('Grill · brushed stainless', '#bec2bf', .64, .37)
@@ -49,12 +51,37 @@ def build_deck_barbecue():
             layer.data[loop.index].uv=uv[loop.vertex_index]
 
     # Brushed steel, with a short upright skirt below the rolled cover.
-    extrusion('Barbecue · firebox',-.345,.345,[(-.24,.82),(-.16,.69),(.16,.69),(.233,.82),(.233,.88),(-.24,.88)],iron)
-    hood=[(-.248,.870),(.235,.870)]
-    for i in range(33):
-        theta=math.pi*i/32
-        hood.append((-.006+.242*math.cos(theta),.932+.254*math.sin(theta)))
-    extrusion('Barbecue · brushed stainless roll hood',-.326,.326,hood,steel)
+    # An open firebox and folded lid share a real hinge with the walkthrough.
+    front,back=-.240,.233
+    box('Barbecue · heat tray',-.345,.345,front,back,.685,.698,iron)
+    for wall_depth in (front,back-.009):
+        box('Barbecue · firebox rim',-.345,.345,wall_depth,wall_depth+.009,.698,.879,iron)
+    for wall_x in (-.345,.336):
+        box('Barbecue · firebox cheek',wall_x,wall_x+.009,front,back,.698,.879,iron)
+    for i in range(26):
+        u=-.312+i*.025
+        rod('seasoned iron grate',(u,-.218,.873),(u,.210,.873),.0048,iron,10)
+    for dbar in (-.204,0,.198):
+        rod('grate crossbar',(-.325,dbar,.866),(.325,dbar,.866),.005,iron,10)
+    for u in (-.24,-.08,.08,.24):
+        extrusion('Barbecue · burner heat tent',u-.047,u+.047,[(-.20,.798),(.19,.798),(.19,.806),(-.20,.806)],iron)
+    def anchor(label,coordinates):
+        obj=bpy.data.objects.new(label,None)
+        deck.objects.link(obj)
+        obj.location=place(*coordinates)
+        obj.empty_display_size=.035
+        return obj
+    anchor('GrillSurface',(0,0,.879))
+    anchor('GrillWidthAxis',(1,0,.879))
+    hinge=anchor('GrillLidHinge',(0,.228,.880))
+    before=set(deck.objects)
+    outer=[(-.248,.870),(-.248,.932)]
+    outer += [(-.006+.242*math.cos(theta),.932+.254*math.sin(theta))
+              for theta in [math.pi*(1-i/32) for i in range(1,33)]]
+    outer.append((.236,.870))
+    inner=[(d*.976,.932+(h-.932)*.975-.002) for d,h in reversed(outer)]
+    extrusion('Barbecue · brushed stainless roll hood',-.326,.326,outer+inner,steel)
+    hood=outer
     for sign in (-1,1):
         extrusion('Barbecue · formed hood end',sign*.326,sign*.349,hood,steel)
         rod('handle socket',(sign*.276,-.246,.915),(sign*.276,-.261,.915),.021,iron)
@@ -73,6 +100,14 @@ def build_deck_barbecue():
         verts.extend([place(.112,d,h),place(-.112,d,h)]);uv.extend([(0,i/5),(1,i/5)])
         if i:faces.append((2*i-2,2*i-1,2*i+1,2*i))
     finish_from_photo('embossed Nexgrill badge','Nexgrill embossed badge.png',verts,faces,uv,.42,.48,True)
+
+    # Mesh vertices are authored in world coordinates. Keep them in place at
+    # rest while exposing the hinge axis to renderers that animate the lid.
+    bpy.context.view_layer.update()
+    inverse=hinge.matrix_world.inverted()
+    for part in set(deck.objects)-before:
+        part.parent=hinge
+        part.matrix_parent_inverse=inverse
 
     box('Barbecue · black control fascia',-.349,.349,-.252,-.205,.688,.868,enamel)
     corners=[place(.347,-.2529,.688),place(-.347,-.2529,.688),place(-.347,-.2529,.867),place(.347,-.2529,.867)]
@@ -138,5 +173,10 @@ def build_deck_barbecue():
     obstacle=box('WalkBlock_DeckBarbecue',-.699,.699,-.319,.238,0,1.19,None)
     obstacle.display_type='WIRE'
     obstacle.hide_render=True
+    # The narrow strip behind the firebox is occupied by the swinging hood
+    # when cooking. Its collision width ends at the hood cheeks, before the shelves.
+    swept=box('WalkBlock_GrillHoodTravel',-.351,.351,.232,.579,0,1.46,None)
+    swept.display_type='WIRE'
+    swept.hide_render=True
 
 build_deck_barbecue()

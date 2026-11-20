@@ -100,6 +100,8 @@ def media_details():
     jacket(B,.360,-.029,.127,.433,.232,.048,cream,(5,661,508,715))
     jacket(B,.344,-.040,.177,.483,.268,.051,cream,(449,451,989,511),(449,519,990,654))
     console=finish(B,'Cabin | Dark media console with fish plaque, mountain trio, brass star and games')
+    # Pull the carcass clear of the deep baseboard and the bunk-door casing.
+    console.location += point(0,.15,0)-point(0,0,0)
     console['source']='Owner photograph L1040632. Photo-derived labels and carving, reconstructed cabinet dimensions.'
     # The original under-stair sled sits beside the cabinet with its curved bow toward the console.
     S=Builder()
@@ -126,7 +128,7 @@ def media_details():
     sled['source']='Owner photograph L1040632. Vintage runner sled tucked beneath the lift of the stairs.'
     prev=bpy.data.objects.get('WalkBlock_MediaConsole')
     if prev:bpy.data.objects.remove(prev,do_unlink=True)
-    for label,x0,x1,y0,y1,h in [('MediaConsole',4.99,10.25,15.25,16.60,.647),('RunnerSled',10.36,14.46,15.38,16.60,.283)]:
+    for label,x0,x1,y0,y1,h in [('MediaConsole',4.99,10.25,15.40,16.75,.647),('RunnerSled',10.36,14.46,15.38,16.60,.283)]:
         o=box('WalkBlock_'+label,x0,x1,y0,y1,main+.018,main+h,None,fitout)
         o.hide_render=True;o.display_type='WIRE'
 media_details()

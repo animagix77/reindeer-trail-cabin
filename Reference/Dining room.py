@@ -4,7 +4,7 @@ def build_dining_room():
     napkin=texmat('Dining · dotted navy placemats','Dining - navy placemat.jpg')
     pine=texmat('Floor · photograph of clear-finished knotty pine','Dining - honey pine floor.jpg')
     pine.node_tree.nodes.get('Principled BSDF').inputs['Roughness'].default_value=.55
-    for name in ('Pine in kitchen and dining','Pine entry','Front bedroom pine','Bedside floor','Primary pine return'):
+    for name in ('Pine in kitchen and dining','Pine entry','Front bedroom pine · entry end','Front bedroom pine · wider hall end','Bedside floor','Primary pine return'):
         obj=bpy.data.objects.get(name)
         if not obj:continue
         obj.data.materials[0]=pine
@@ -22,7 +22,7 @@ def build_dining_room():
         face('Dining · sloping plaster header',[(x,ya,la),(x,yb,lb),(x,yb,zb),(x,ya,za)],ochre)
         face('Dining · painted opening reveal',[(x,ya,la),(21.006,ya,la),(21.006,yb,lb),(x,yb,lb)],ceilingmat)
     black=material('Dining chairs · dark stained wood','#262522',.02,.51)
-    tx,ty,hw,hd=24.55,24.36,2.04,1.43
+    tx,ty,hw,hd=24.55,24.17,2.04,1.43
     # In L1040608 the top nearly reaches the window sill. IMG_4658
     # shows it at island height, with tall seats and low foot rails.
     table_rise=.145
@@ -83,15 +83,15 @@ def build_dining_room():
         collider('dining_chair_'+label,cx-rx,cx+rx,cy-ry,cy+ry,.015,.94+table_rise)
     side=group('Dining | window and slider blinds, display shelf and framed sign')
     for j in range(43):
-        h=1.793-j*.016
+        h=dinwin[3]-.037-j*.016
         bx(side,23.12,25.96,25.695,25.755,h,h+.012,cream)
-    bx(side,23.06,26.0,25.64,25.81,1.792,1.836,cream)
-    for x in (23.3,25.82):line(side,(x,25.711,1.12),(x,25.711,1.805),.0015,paper)
+    bx(side,23.06,26.0,25.64,25.81,dinwin[3]-.038,dinwin[3]+.006,cream)
+    for x in (23.3,25.82):line(side,(x,25.711,dinwin[3]-.71),(x,25.711,dinwin[3]-.025),.0015,paper)
     # The open patio leaf stacks over the stationary, internally blinded panel.
     for j in range(81):
         h=1.945-j*.023
-        bx(side,32.40,35.35,25.897,25.911,h,h+.018,cream)
-    bx(side,32.39,35.36,25.888,25.916,1.941,1.967,cream)
+        bx(side,32.40,35.35,25.889,25.901,h,h+.018,cream)
+    bx(side,32.39,35.36,25.881,25.907,1.929,1.958,cream)
     line(side,(32.49,25.874,.915),(32.49,25.835,.949),.009,cream,12)
     line(side,(32.49,25.835,.949),(32.49,25.835,1.117),.009,cream,12)
     line(side,(32.49,25.835,1.117),(32.49,25.874,1.151),.009,cream,12)
@@ -122,7 +122,7 @@ def build_dining_room():
     enamel=material('Mini-split · white enamel','#efeeeb',.04,.34)
     grille=material('Mini-split · outlet shadow','#383d3c',0,.75)
     blade=material('Mini-split · outlet vanes','#d1d2ce',.04,.47)
-    left,right=20.50,22.94
+    left,right=20.81,22.83
     top,base=2.075,1.795
     def casing_section(x0,x1,profile,surface):
         # Counterclockwise cross sections in the wall-depth / height plane.
@@ -133,8 +133,8 @@ def build_dining_room():
             j=(i+1)%len(profile)
             unit.face([ends[0][i],ends[0][j],ends[1][j],ends[1][i]],surface)
     casing_section(left,right,[(25.21,top-.015),(25.23,base+.079),
-                   (25.51,base+.053),(25.56,base+.013),(25.86,base+.013),
-                   (25.86,top-.004),(25.27,top)],enamel)
+                   (25.51,base+.053),(25.56,base+.013),(25.843,base+.013),
+                   (25.843,top-.004),(25.27,top)],enamel)
     endcap=[(25.23,base+.080),(25.35,base+.010),(25.54,base),
             (25.85,base+.004),(25.85,base+.093)]
     casing_section(left,left+.12,endcap,enamel)

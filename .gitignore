@@ -31,3 +31,14 @@
 !/Reference/viewer-src/package-lock.json
 !/Reference/viewer-src/template.html
 !/Reference/viewer-src/THREE-LICENSE.txt
+
+!/Reference/Property aerial.jpg
+!/Reference/Neighborhood satellite.jpg
+!/Reference/Map layers.json
+!/Reference/map-provenance.json
+!/Reference/Woodland context/Summer vegetation.json
+!/Reference/viewer-src/welcome-yard.webp
+!/.github/
+!/.github/workflows/
+!/.github/workflows/pages.yml
+!/Reference/viewer-src/hipparcos-bright.json

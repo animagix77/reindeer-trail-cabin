@@ -95,13 +95,43 @@ def build_exterior_site():
         rise=.065
         return (mix(lower_landing,porch_apron-2*rise,sclip((x-start_x)/(turn_x-start_x)))
                 +rise*(x>=11.15)+rise*(x>=19.25))
+    stations=(start_x,6.1,7.8,9.3,11.15,12.9,14.7,16.2,18.0,19.25,21.0,23.0,25.0,26.8,turn_x,33.58)
+    def sides(x):
+        half=mix(1.99,2.20,sclip((x-start_x)/(turn_x-start_x)))
+        return center_y(x)-half,center_y(x)+half
+    def shoulder_width(x,sign):
+        return .43+.07*math.sin(x*.81+sign)
+    def upper_finish(x,y):
+        # A continuous ramp outside the two sleeper checks, with a gentle
+        # crossfall away from the house. Its edges meet the gravel shoulders.
+        t=sclip((x-start_x)/(turn_x-start_x))
+        z=mix(lower_landing,porch_apron,t)
+        y0,y1=sides(x)
+        z+=.004*(max(0,y-y1)+min(0,y-y0))+.005*max(0,x-turn_x)
+        return z-.012
+    def drive_grade(x,y):
+        return low-.018+max(-25,min(.1,x))*.0115+max(0,-14-y)*.013
+    def terrace_grade(x,y,z):
+        if x<-30 or x>48 or y<-25.5 or y>7:return z
+        # The timber retainer is vertical along the lower stair flight. Beyond
+        # its ends the adjoining ground opens into a sloping roadside bank.
+        end=max(0,-14-y,y-2.7)
+        left=-1.05-min(7,end)
+        right=-.38+min(6,end)
+        cross=sclip((x-left)/(right-left))
+        center=mix(drive_grade(x,y),upper_finish(x,y),cross)
+        edge=max(0.,-27-x,x-42.1,y-3.2)
+        inner=fade(edge,5)
+        gate_zone=fade(max(0,gate_left-x,x-gate_right),2.5)
+        south=mix(-19.25,roadside_line(x)-1.24,gate_zone)
+        width=4.2 if x<3 else 3.4
+        return mix(z,center,inner*fade(max(0,south-y),width))
     def zone(x,y):
         base=terrainZ(*eastnorth(x,y)); z=base
         # Graded access at the two daylight-basement garage thresholds.
         west_edge=0.1 if y>=1 else max(-2.35,min(.1,(y-1)*.76))
-        driveDist=extents(x,y,-26,west_edge,-25,32)
-        track=low-.018+max(-25,min(.1,x))*.0115
-        track+=max(0,-14-y)*.013
+        driveDist=extents(x,y,-30.85,west_edge,-25,32)
+        track=drive_grade(x,y)
         z=mix(z,track,fade(driveDist,4))
         d=extents(x,y,service_toe-2.0,service_head,service_front,service_rail)
         flight=(service_z-.96)+.96*sclip((x-service_toe)/(service_head-service_toe))
@@ -118,26 +148,12 @@ def build_exterior_site():
         r=math.hypot((x-24.85)/9.65,(y-55.4)/13.0)
         pad_edge=min(max(0,r-1)*9.65,extents(x,y,29.3,38.55,45.35,63.65))
         z=mix(z,366.75+.0015*(x-25),fade(pad_edge,4.5))
-        # Bring the surveyed ground down beneath the actual path and its porch
-        # apron. The detailed stone surface, below, restores the finish grade.
-        ymid=center_y(x)
-        d=extents(x,y,start_x,32.48,ymid-2.46,ymid+2.46)
-        apron_dist=extents(x,y,28.30,33.60,-12.65,-8.87)
-        d=min(d,apron_dist)
-        z=mix(z,walk_grade(x)-.108,fade(d,2.10))
-        # Footing beneath the four open-front porch treads, keeping turf out of the timberwork.
-        d=extents(x,y,28.85,33.15,-9.0,-4.94)
-        z=mix(z,porch_apron-.03,fade(d,1.2))
-        # Excavate below the open stair treads, with short transitions beyond the retainers.
-        d=extents(x,y,-2.6,5.,-9.7,-5.7)
-        under=mix(low-.045,lower_landing,sclip((x+2.4)/7.2))-.035
-        z=mix(z,under,fade(d,.75))
-        return z
+        return terrace_grade(x,y,z+retained_bank(x,y))
     build_photo_facades(zone)
     def wpos(x,y,extra=0):return pos(x,y,zone(x,y)+extra)
     # Preserve the original NYS orthophoto/DEM reference in the source file.
     ref.objects.link(ground);site.objects.unlink(ground)
-    ground.name='2021 aerial on original USGS terrain · optional reference'
+    ground.name='2025 aerial on original USGS terrain · optional reference'
     def uvmesh(name,verts,faces,material,scale):
         ob=mesh(name,verts,faces,material,site_group)
         if ob.data.polygons:
@@ -161,23 +177,26 @@ def build_exterior_site():
             if ix<exN and jy<nyN:
                 k=len(v)-1;fs.append((k,k+1,k+exN+2,k+exN+1))
                 # Road centerline runs along north frontage, slightly skew to parcel.
-                ry=-34.65-.016*x
+                ry=-34.2221-.01804675*x
                 if abs(y-ry)<9.8: idx=3
                 elif (-26 < x < (min(.1,(y-1)*.76) if y<1 else .1) and -26<y<32):idx=2
+                elif -1<x<60 and ry+9.8<y<roadside_line(x)+1:idx=1
                 elif x< -27 or x>45 or y>38 or y<-22:idx=0
                 else:idx=1
                 indices.append(idx)
     # Subtract the measured stepped foundation in plan from every intersecting cell.
     # This preserves the exterior DEM edge and open daylight basement without
     # forcing a vertical slope down through the building.
-    def slice_ring(points,axis,edge,sign):
+    def half_plane(points,distance):
         keep=[]
         for a,b in zip(points,points[1:]+points[:1]):
-            da=(a[axis]-edge)*sign;db=(b[axis]-edge)*sign
+            da=distance(a);db=distance(b)
             if da>=0: keep.append(a)
             if da*db<0:
                 k=da/(da-db);keep.append(tuple(a[d]+(b[d]-a[d])*k for d in range(3)))
         return keep
+    def slice_ring(points,axis,edge,sign):
+        return half_plane(points,lambda p:(p[axis]-edge)*sign)
     def usable(p):
         return len(p)>2 and abs(sum(a[0]*b[1]-a[1]*b[0] for a,b in zip(p,p[1:]+p[:1])))>1e-7
     def cut_rect(points,rect):
@@ -191,6 +210,22 @@ def build_exterior_site():
     kept=[];ids=[]
     for face,idx in zip(fs,indices):
         pts=[(*local(v[k][0]+OX,v[k][1]+OY),v[k][2]+OZ) for k in face]
+        # Split at both surveyed road margins so the grass shoulder meets the road
+        # without a square grid-cell zigzag when seen from the old entrance piers.
+        levels=[p[1]+34.2221+.01804675*p[0] for p in pts]
+        edge=next((margin for margin in (-9.8,9.8) if min(levels)<margin<max(levels)),None)
+        if edge is not None:
+            dist=lambda p:p[1]+34.2221+.01804675*p[0]-edge
+            for sign in (-1,1):
+                piece=half_plane(pts,lambda p:sign*dist(p))
+                if not usable(piece):continue
+                k=len(v);v.extend(pos(*pt) for pt in piece)
+                kept.append(tuple(range(k,len(v))))
+                xmid=sum(pt[0] for pt in piece)/len(piece)
+                paved=(sign<0) if edge>0 else (sign>0)
+                verge=(1 if edge>0 and -1<xmid<60 else 2 if edge>0 and -26<xmid<-1 else 0)
+                ids.append(3 if paved else verge)
+            continue
         if max(a[0] for a in pts)<=0 or min(a[0] for a in pts)>=41 or max(a[1] for a in pts)<=0 or min(a[1] for a in pts)>=service_back:
             kept.append(face);ids.append(idx);continue
         parts=[pts]
@@ -204,10 +239,28 @@ def build_exterior_site():
         for piece in parts:
             k=len(v);v.extend(pos(*pt) for pt in piece)
             kept.append(tuple(range(k,len(v))));ids.append(idx)
-    fs=kept;indices=ids
+    def walk_boundary(x):
+        a,b=sides(x)
+        return a-shoulder_width(x,-1),b+shoulder_width(x,1)
+    walk_cuts=[]
+    for a,b in zip(stations,stations[1:]):
+        a0,a1=walk_boundary(a);b0,b1=walk_boundary(b)
+        walk_cuts.append([(a,a0),(b,b0),(b,b1),(a,a1)])
+    # Side-by-side timber retaining walls close the lower stair cut.
+    walk_cuts.append([(-2.425,-9.71),(4.97,-9.71),(4.97,-5.69),(-2.425,-5.69)])
+    fs,indices=pave_frontage(v,kept,ids,local,half_plane,usable,zone,walk_cuts)
     land=uvmesh('Wooded terrain · local grading inferred',v,fs,forest,2.4)
     land.data.materials.append(turf);land.data.materials.append(crushed);land.data.materials.append(pavement)
-    for j,f in enumerate(land.data.polygons):f.material_index=indices[j];f.use_smooth=True
+    asphalt=mapped('Front motor court · weathered asphalt','Road surface.jpg')
+    asphalt.node_tree.nodes.get('Principled BSDF').inputs['Roughness'].default_value=.94
+    land.data.materials.append(asphalt)
+    land.data.materials.append(mapped('Street gate and upper court · aged poured concrete','Front court concrete.jpg'))
+    land.data.materials.append(mapped('Uphill front court · weathered gray pavement','Uphill gray paving.jpg'))
+    for j,f in enumerate(land.data.polygons):
+        f.material_index=indices[j];f.use_smooth=True
+        if f.material_index==4:
+            for i in f.loop_indices:
+                land.data.uv_layers.active.data[i].uv*=1.45
     land['basis']='USGS 1 m DEM. Apron, timber stairs, fire circle and pedestrian paths are photo-guided estimates.'
     # Helper geometry is hidden by the viewer. Each support polygon has no underside.
     def helper(name,verts,faces):
@@ -249,7 +302,8 @@ def build_exterior_site():
     v=[];fs=[]
     for j,y in enumerate(Y):
         for i,x in enumerate(X):
-            v.append(wpos(x,y,.012))
+            in_path=start_x<=x<=33.58 and sides(x)[0]<=y<=sides(x)[1]
+            v.append(wpos(x,y,-.055 if in_path else .010))
             if i+1==len(X) or j+1==len(Y):continue
             midx=(x+X[i+1])*.5;midy=(y+Y[j+1])*.5
             if not contained(midx,midy):continue
@@ -276,22 +330,21 @@ def build_exterior_site():
         for x0,x1 in ((29.28,30.93),(31.07,32.72)):
             plank(graphite,x0,x1,ya+.22,yb-.18,z+.0008,z+.0025)
         rectsurf('FrontStep%02d'%j,29.0,33.0,ya,yb,z+.003)
+    entry_rails=Timberwork('Entry · cedar landing and sloping 2x4 handrails',entry_wood,deck)
     for side in (28.98,33.02):
         toe=-5-entry_steps
-        prism(entry_wood,pos(side,toe+.06,porch_apron+.045),pos(side,-4.83,dp-.045),.065,.195)
-        prism(entry_wood,pos(side,toe+.07,porch_apron+.90),pos(side,-4.89,dp+.90),.082,.055)
-        prism(entry_wood,pos(side,toe+.07,porch_apron+.18),pos(side,-4.89,dp+.18),.058,.054)
-        for j in range(8):
-            t=j/7;yy=mix(toe+.10,-4.90,t);zz=mix(porch_apron,dp,t)
-            width=.080 if j in (0,7) else .033
-            prism(entry_wood,pos(side,yy,zz+.095),pos(side,yy,zz+.91),width)
+        entry_rails.member((side,toe+.06,porch_apron+.045),(side,-4.83,dp-.045),.050,.195)
+        sawn_guard(entry_rails,(side,toe+.07,porch_apron),(side,-4.89,dp))
+        sawn_guard(entry_rails,(side,-4.89,dp),(side,-.1,dp),(False,True))
         blocker('FrontStairRailing'+('A' if side<31 else 'B'),
                 pos(side,toe+.06,porch_apron),pos(side,-4.89,dp-.06),.059,.98)
+    entry_rails.finish()
     rectsurf('CoveredDeck',23,41,26,36,dp+.02)
     # Facing the landing, the grill stands on the right behind the short guard.
     # IMG_4462 and IMG_7629 show two timber treads followed by a concrete
     # landing. IMG_4453 shows the second flight turning toward the garden.
-    wooden_steps=Timberwork('Rear deck · two timber treads and strings',porch_wood,deck)
+    wooden_steps=Timberwork('Rear deck · timber treads, risers and stair strings',porch_wood,deck)
+    landing_z=dp-.435
     for j in range(2):
         x0=41+1.08*j;x1=x0+1.08;z=dp-.145*(j+1)
         for board in range(2):
@@ -301,13 +354,6 @@ def build_exterior_site():
         rectsurf('RearStep%02d'%j,x0,x1,deck_stair_y0,deck_stair_y1,z+.005)
     for y in (deck_stair_y0+.05,deck_stair_y1-.03):
         wooden_steps.member((40.95,y,dp-.095),(stair_toe,y,dp-.41),.050,.165)
-    y=deck_stair_y0+.05
-    for offset in (.38,.91):
-        wooden_steps.member((40.79,y,dp+offset),(stair_toe,y,dp+offset-.405),.056,.075)
-    wooden_steps.member((stair_toe,y,dp-.455),(stair_toe,y,dp+.52),.090,.090)
-    wooden_steps.finish()
-    blocker('RearStepGuardInboard',pos(40.79,y,dp-.15),pos(stair_toe,y,dp-.445),.069,1.03)
-    landing_z=dp-.435
     landing_finish=mapped('Rear landing · weathered concrete','Weathered rear landing.jpg')
     def concrete_slab(name,xa,xb,ya,yb,top,base,finish=landing_finish):
         plank(stone,xa,xb,ya,yb,base,top-.003)
@@ -317,8 +363,39 @@ def build_exterior_site():
     rectsurf('DeckStairLanding',stair_toe,landing_end,deck_stair_y0,deck_stair_y1,landing_z+.002)
     for j in range(2):
         ya=deck_stair_y1+j*1.14;yb=ya+1.14;z=landing_z-.145*(j+1)
-        concrete_slab('Rear landing · old masonry tread',stair_toe,lower_stair_side,ya,yb,z,dp-.90)
+        # The turned flight keeps the photographed masonry footing and cheek.
+        # Two weathered boards span each tread, with the downhill edge over its riser.
+        plank(stone,stair_toe+.02,lower_stair_side-.02,ya,yb-.10,dp-.90,z-.047)
+        for board in range(2):
+            yy=ya+(board+.5)*.57
+            wooden_steps.member((stair_toe,yy,z-.022),(lower_stair_side,yy,z-.022),.57*ft-.004,.044)
+        wooden_steps.member((stair_toe+.015,yb-.085,z-.091),
+                            (lower_stair_side-.015,yb-.085,z-.091),.036,.101)
         rectsurf('RearStoneStep%02d'%j,stair_toe,lower_stair_side,ya,yb,z+.003)
+    for x in (stair_toe+.04,lower_stair_side-.03):
+        wooden_steps.member((x,deck_stair_y1-.055,landing_z-.105),
+                            (x,lower_stair_end-.035,dp-.835),.045,.154)
+    wooden_steps.finish()
+    stair_guards=Timberwork('Rear deck · cedar 2x4 flight and landing guards',porch_wood,deck)
+    outer=landing_end-.11
+    inside=stair_toe+.015
+    upper_y=deck_stair_y0+.055
+    turn_y=deck_stair_y1-.025
+    # The open landing turns ninety degrees, from the two deck treads into
+    # the lower flight. Returns run only along exposed edges of the landing.
+    edges=[
+        ('UpperHouse',(40.75,upper_y,dp),(inside,upper_y,landing_z),(False,True)),
+        ('UpperGarden',(40.75,turn_y,dp),(inside,turn_y,landing_z),(False,True)),
+        ('LandingHouse',(inside,upper_y,landing_z),(outer,upper_y,landing_z),(False,True)),
+        ('LandingEnd',(outer,upper_y,landing_z),(outer,turn_y,landing_z),(False,True)),
+        ('LandingReturn',(outer,turn_y,landing_z),(lower_stair_side-.02,turn_y,landing_z),(False,True)),
+        ('LowerInner',(inside,turn_y,landing_z),(inside,lower_stair_end-.035,dp-.87),(False,True)),
+        ('LowerOuter',(lower_stair_side-.02,turn_y,landing_z),
+                      (lower_stair_side-.02,lower_stair_end-.035,dp-.87),(False,True))]
+    for name,a,b,newels in edges:
+        sawn_guard(stair_guards,a,b,newels)
+        blocker('RearRail'+name,pos(*a),pos(*b),.089,.974)
+    stair_guards.finish()
     concrete_slab('Rear landing · low retaining cheek',lower_stair_side,lower_stair_side+.27,
                   deck_stair_y1,lower_stair_end+.04,landing_z+.018,dp-.90)
     blocker('RearStoneCheek',pos(lower_stair_side+.12,deck_stair_y1,dp-.87),
@@ -411,18 +488,28 @@ def build_exterior_site():
             pos(x2+.012,-5.71,z),pos(x1+.24,-5.71,z)],[(0,1,2,3)],entrance_stone,.52)
         for yy in (-9.69,-5.82):plank(ties,x1+.23,x2+.012,yy,yy+.12,z-.14,z+.007)
         rectsurf('RetainerTread%02d'%j,x1,x2,-9.7,-5.7,z+.009)
+    # The high concrete shoulders are retained beside the timber/gravel flight.
+    # Side cheeks meet the face of each exposed tread along the cut.
+    for j in range(stairCount):
+        xa=footx+j*run;xb=xa+run
+        z=mix(zbot,ztop,(j+1)/(stairCount+1))
+        for y in (-9.71,-5.69):
+            upper=upper_finish(xb,y)
+            if xb>-.7 and upper>z:
+                plank(ties,max(xa,-.70),xb,y-.034,y+.034,z-.015,upper+.014)
     # Landing check closes the last rise beneath the gravel path.
     plank(ties,4.77,4.97,-9.71,-5.69,ztop-.174,ztop+.002)
     for y in (-9.75,-5.65):
-        prism(oak,pos(footx,y,zbot+.9),pos(4.8,y,ztop+.9),.062)
+        prism(entry_wood,pos(footx,y,zbot+.9),pos(4.8,y,ztop+.9),.0381,.0889)
         for x in (footx+.15,4.65):
             z=zbot if x<0 else ztop;prism(oak,pos(x,y,z),pos(x,y,z+.90),.09)
     for seg,(a,b) in enumerate([(-14,-9.85),(-5.55,2.7)]):
-        top=ztop-.10;bottom=min(zone(-1,a),zone(-1,b))-.08
-        for j in range(max(1,math.ceil((top-bottom)/.145))):
-            z=min(top,bottom+j*.145)
-            if z+.12>top+.02:break
-            plank(ties,-1.05,-.38,a,b,z,z+.14)
+        top=ztop+.023;bottom=min(drive_grade(-1.05,a),drive_grade(-1.05,b))-.105
+        courses=max(1,math.ceil((top-bottom)/.145))
+        depth=(top-bottom)/courses
+        for j in range(courses):
+            z=bottom+j*depth
+            plank(ties,-1.05,-.38,a,b,z,z+depth-.0015)
         blocker('DriveRetainer'+str(seg),pos(-.7,a,bottom),pos(-.7,b,bottom),.2,top-bottom)
     # A narrow gravel path ties the upper timber stair landing to the front stair toe.
     def ribbon(name,path,width,material):
@@ -435,7 +522,6 @@ def build_exterior_site():
         return uvmesh(name,vs,face,material,1.8)
     # Build the entire upper walkway as contiguous strips, with a shared final
     # edge at the apron. Width variation follows its crushed-stone shoulders.
-    stations=(start_x,6.1,7.8,9.3,11.15,12.9,14.7,16.2,18.0,19.25,21.0,23.0,25.0,26.8,turn_x)
     walkway_verts=[];walkway_faces=[]
     shoulder_verts=[];shoulder_faces=[]
     def shoulder(xa,aa,za,xb,bb,zb,sign):
@@ -443,23 +529,14 @@ def build_exterior_site():
         # path top and the outer line meets the local terrain without a curb.
         k=len(shoulder_verts)
         for x,y,z in ((xa,aa,za),(xb,bb,zb)):
-            w=.49+.13*math.sin(x*1.61+sign)
+            w=shoulder_width(x,sign)
             shoulder_verts.extend((pos(x,y-sign*.02,z-.003),
-                                   pos(x,y+sign*w,zone(x,y+sign*w)+.012)))
+                                   pos(x,y+sign*w,zone(x,y+sign*w))))
         shoulder_faces.append((k,k+2,k+3,k+1) if sign>0 else (k,k+1,k+3,k+2))
-    def apron_shoulder(a,b,normal):
-        k=len(shoulder_verts)
-        for x,y in (a,b):
-            xx=x+normal[0]*.47;yy=y+normal[1]*.47
-            shoulder_verts.extend((pos(x,y,porch_apron-.003),pos(xx,yy,zone(xx,yy)+.012)))
-        shoulder_faces.append((k,k+2,k+3,k+1))
     def path_strip(xa,xb,ya0,ya1,yb0,yb1,za,zb):
         k=len(walkway_verts)
         walkway_verts.extend((pos(xa,ya0,za),pos(xb,yb0,zb),pos(xb,yb1,zb),pos(xa,ya1,za)))
         walkway_faces.append((k,k+1,k+2,k+3))
-    def sides(x):
-        half=mix(1.99,2.20,sclip((x-start_x)/(turn_x-start_x)))
-        return center_y(x)-half,center_y(x)+half
     for xa,xb in zip(stations,stations[1:]):
         a0,a1=sides(xa);b0,b1=sides(xb)
         za=walk_grade(xa+.002);zb=walk_grade(xb-.002)
@@ -468,12 +545,11 @@ def build_exterior_site():
         shoulder(xa,a1,za,xb,b1,zb,1)
         if xa in (11.15,19.25):
             plank(ties,xa-.083,xa+.087,a0-.035,a1+.035,za-.073,za+.005)
-    # The broad pad is contiguous with the last strip and turns to the porch.
-    a0,a1=sides(turn_x)
-    path_strip(turn_x,33.58,a0,a1,a0,a1,porch_apron,porch_apron)
-
-    shoulder(turn_x,a0,porch_apron,33.58,a0,porch_apron,-1)
-    apron_shoulder((33.58,a0),(33.58,a1),(1,0))
+            for sign,y in ((-1,a0),(1,a1)):
+                outside=y+sign*shoulder_width(xa,sign)
+                k=len(shoulder_verts)
+                shoulder_verts.extend((pos(xa,y,za-.065),pos(xa,y,za),pos(xa,outside,zone(xa,outside))))
+                shoulder_faces.append((k,k+1,k+2))
     uvmesh('Front walk · tapered aggregate shoulders',shoulder_verts,shoulder_faces,entrance_stone,.59)
     finish=uvmesh('Front walk · gravel terraces and entry apron',walkway_verts,walkway_faces,entrance_stone,.59)
     finish['references']='L1040560; L1040561; 2024 appraisal front photograph p.15. Centerline, width and stair rise are estimated.'
@@ -606,7 +682,8 @@ def build_exterior_site():
     picnic_table(ties,site_group,zone,blocker)
     # Horizontal crown centers are local maxima of nearby high unclassified lidar
     # returns, separated by 14 feet. Trunk paths and species are illustrative.
-    trees=[(4,68,26.6),(-10,68,26.3),(4,54,25.2),(18,72,26.1),(32,72,24.7),(-32,-8,24.6),(46,68,20.9),(-24,70,24.9),(-10,54,24.5),(54,6,17.5),(-34,6,16.4),(54,20,16.8),(-34,46,13.6),(48,54,17.7),(54,-8,17.9),(58,76,18.),(56,34,15.8),(-34,60,13.1),(-38,32,14.4),(4,40,24.),(-30,20,14.4),(-20,44,10.1),(22,-20,13.3),(38,-12,10.4),(8,-20,13.4),(-38,74,15.)]
+    # The street reference shows a young tree immediately inside the right gate pier.
+    trees=[(4,68,26.6),(-10,68,26.3),(4,54,25.2),(18,72,26.1),(32,72,24.7),(-32,-8,24.6),(46,68,20.9),(-24,70,24.9),(-10,54,24.5),(54,6,17.5),(-34,6,16.4),(54,20,16.8),(-34,46,13.6),(48,54,17.7),(54,-8,17.9),(58,76,18.),(56,34,15.8),(-34,60,13.1),(-38,32,14.4),(4,40,24.),(-30,20,14.4),(-20,44,10.1),(gate_right+.38,roadside_line(gate_right)+1.81,6.8),(38,-12,10.4),(10.5,-16.2,8.3),(-38,74,15.)]
     cards=[];cardfaces=[];carduv=[]
     def spray(a,d,length,width):
         d=Vector(d).normalized()
@@ -618,6 +695,8 @@ def build_exterior_site():
         k=len(cards);cards.extend([tuple(p) for p in pts]);cardfaces.append((k,k+1,k+2,k+3));carduv.extend([(0,0),(1,0),(1,1),(0,1)])
     for i,(x,y,h) in enumerate(trees):
         root=Vector(wpos(x,y,-.07));rad=.12+h*.008*rng.uniform(.78,1.14)
+        if abs(x-gate_right-.38)<.01:rad=.065
+        if x==10.5:rad=.088
         skew=Vector((rng.uniform(-1.15,1.15),rng.uniform(-1.15,1.15),0))
         def stem(u):return root+skew*u*u+Vector((0,0,h*u))
         segs=[0,.11,.32,.51,.69,.84,.97]
@@ -637,8 +716,7 @@ def build_exterior_site():
                     d=Vector((math.cos(yaw),math.sin(yaw),rng.uniform(-.05,.92)))
                     s=mid+(endp-mid)*(.3+.23*l)
                     spray(s,d,rng.uniform(1.05,1.80),rng.uniform(.89,1.37))
-        # Octagonal collision footprint is cheap for the viewer and excludes no canopy.
-        blocker('HardwoodTrunk%02d'%i,root-Vector((rad*.55,0,0)),root+Vector((rad*.55,0,0)),rad*1.8,2.75)
+        round_blocker('HardwoodTrunk%02d'%i,root,rad,rad,2.75)
     # Keep a walking lane along the cabin wall. The opposite rail holds the
     # woven settee, rectangular table, armchair and portable black stove.
     wicker=mapped('Outdoor wicker · woven taupe','Wicker weave.jpg')
@@ -712,23 +790,7 @@ def build_exterior_site():
     softbox(stove_rust,sx-.60,sx+.60,sy+.005,sy+.52,dp+.773,dp+.884,.025)
     duct=mat('Patio stove · galvanized flue','#acb3b5',.55,.36)
     opening=mat('Patio stove · flue interior','#282b2b')
-    tube(stove,pos(sx,sy+.22,dp+.883),pos(sx,sy+.22,dp+1.025),.078,.078,24)
-    tube(duct,pos(sx,sy+.22,dp+1.025),pos(sx,sy,dp+1.33),.071,.071,24)
-    # Segmented elbow turns toward the corner guard. The black inset leaves
-    # a visible rolled metal lip where the open pipe faces the yard.
-    elbow=[]
-    for j in range(11):
-        bend=math.pi*j/20
-        elbow.append(pos(sx-.60*(1-math.cos(bend)),sy,dp+1.33+.60*ft*math.sin(bend)))
-    for a,b in zip(elbow,elbow[1:]):tube(duct,a,b,.071,.071,24)
-    lip=dp+1.33+.6*ft
-    tube(duct,elbow[-1],pos(23.09,sy,lip),.071,.071,24)
-    tube(duct,pos(23.12,sy,lip),pos(23.07,sy,lip),.075,.075,24)
-    tube(opening,pos(23.069,sy,lip),pos(23.066,sy,lip),.065,.065,24)
-    for j in range(11):
-        zz=dp+1.027+j*.028
-        yy=sy+.22*(1-j/11)
-        tube(duct,pos(sx,yy,zz),pos(sx,yy,zz+.006),.073,.073,24)
+    deck_stove_flue(sx,sy,stove,duct,opening,tube,prism)
     blocker('DeckStove',pos(sx-.34,sy,dp),pos(sx+.34,sy,dp),.35,1.5)
     def ellipsoid(m,ctr,rx,ry,rz,seed,rough=0,nlon=12,nlat=7):
         rng_local=random.Random(seed);p=[];f=[]
@@ -781,6 +843,8 @@ def build_exterior_site():
     br=Vector(wpos(41.1,-10.4));ellipsoid(stone,(br.x,br.y,br.z+.20),.83,.81,.70,3001,.15)
     ellipsoid(moss,(br.x-.08,br.y+.03,br.z+.65),.61,.47,.29,3002,.18)
     blocker('EntryBoulder',br-Vector((.45,0,0)),br+Vector((.45,0,0)),1.19,.91)
+    old_stone=mapped('Roadside masonry · lichen and rock-faced block','Old entrance masonry.jpg')
+    build_roadside_wall(site_group,zone,blocker,old_stone,asset_dir/'Old entrance masonry normal.jpg')
     # Appraisal rear photograph shows two vertical cylinders beside the covered porch.
     for j,xx in enumerate((19.45,17.23)):
         yy=30.15;z=service_z+.060;base=Vector(pos(xx,yy,z))

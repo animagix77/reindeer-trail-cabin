@@ -13,7 +13,7 @@ OX,OY,OZ=516338.,4612439.,365.
 scene['CRS']='NAD83 / UTM Zone 18N (EPSG:26918); vertical NAVD88, meters'
 scene['origin_E_N_Z_m']=[OX,OY,OZ]
 scene['model_status']='Existing conditions study · approximate alignment · November 2026'
-scene['source_summary']='2024 appraisal, county parcel, NY 2021 orthophoto, USGS elevation and lidar, and owner photography. See README.md.'
+scene['source_summary']='2024 appraisal, county parcel and road, 2025 NY orthophoto, USGS elevation and lidar, 2025 Sentinel-2 neighborhood vegetation, and owner photography. See README.md.'
 def coll(name):
  c=bpy.data.collections.new(name);scene.collection.children.link(c);return c
 site=coll('01 · Site and boundary')
@@ -47,9 +47,9 @@ def terrainZ(e,n):
  return (1-v)*((1-u)*g[j][i]+u*g[j][i+1])+v*((1-u)*g[j+1][i]+u*g[j+1][i+1])
 vs=[rel(xmin+i,ymin+j,D['grid'][j][i]) for j in range(ny) for i in range(nx)]
 faces=[(j*nx+i,j*nx+i+1,(j+1)*nx+i+1,(j+1)*nx+i) for j in range(ny-1) for i in range(nx-1)]
-aerial=mat('2021 NY state aerial photograph','#939381')
+aerial=mat('2025 NY state aerial photograph','#939381')
 im=bpy.data.images.load(str(work/D['aerial'])); tex=aerial.node_tree.nodes.new('ShaderNodeTexImage');tex.image=im;aerial.node_tree.links.new(tex.outputs['Color'],aerial.node_tree.nodes.get('Principled BSDF').inputs['Base Color']);im.pack()
-ground=mesh('Terrain · 1 m USGS grid with 2021 aerial',vs,faces,aerial,site)
+ground=mesh('Terrain · 1 m USGS grid with 2025 aerial',vs,faces,aerial,site)
 uv=ground.data.uv_layers.new(name='Map east north')
 for lp in ground.data.loops:
  idx=lp.vertex_index; uv.data[lp.index].uv=((idx%nx)/(nx-1),(idx//nx)/(ny-1))
@@ -69,6 +69,8 @@ def ridge(x,k):
  delta=pz(0,x,0)-pz(k,x,0);slope=pz(0,x,1)-pz(k,x,1)-delta
  return -delta/slope
 def roofZ(x,y,k):return min(pz(0,x,y),pz(k,x,y))
+def entry_rake_z(x):
+ return pz(0,x,-.8)+.96*(1-abs(x-31.0)/3.1)
 # The kitchen has its own symmetrical interior gable within the wider outer
 # roof. The range, the gable crest and the photographs taken along the room
 # establish this axis. Heights and timber sizes are photographic estimates.
@@ -121,11 +123,6 @@ for a,b in zip(sorted([ar,br,26.8]), sorted([ar,br,26.8])[1:]):
 def timberline(name,p,q,r=.044,m=wood,c=deck):
  return curve(name,[pos(*p),pos(*q)],r,m,c)
 def post(name,x,y,z0,z1,w=.36):box(name,x-w/2,x+w/2,y-w/2,y+w/2,z0,z1,wood,deck)
-def rail(name,x1,y1,x2,y2,z):
- length=math.hypot(x2-x1,y2-y1)
- for i in range(math.ceil(length/.58)+1):
-  t=i/math.ceil(length/.58);post(name+' · baluster',x1+(x2-x1)*t,y1+(y2-y1)*t,z+.07,z+.89,.14)
- timberline(name+' · handrail',(x1,y1,z+.90),(x2,y2,z+.90),.055)
 def platform(name,x1,x2,y1,y2,z):
  box(name,x1,x2,y1,y2,z-.20,z,timber,deck)
  for x in (x1+.27,x2-.27):
@@ -136,7 +133,6 @@ exec(compile((work/'Porch and garden.py').read_text(),'Porch and garden.py','exe
 v=[pos(x,y,dp+h) for x,y,h in [(22.4,25.6,2.64),(41.6,25.6,2.64),(41.6,36.6,2.27),(22.4,36.6,2.27)]]
 mesh('Roof · covered deck canopy',v,[(0,1,2,3)],shingle,roof)
 platform('Front landing · appraisal 4 × 5 ft',29,33,-5,0,dp)
-rail('Front landing west',33,-4.8,33,-.1,dp);rail('Front landing east',29,-4.8,29,-.1,dp)
 zground=terrainZ(*eastnorth(31,-10))
 nsteps=max(2,round((dp-zground)/.175))
 for i in range(nsteps):
@@ -165,8 +161,6 @@ win('Rear living area windows','rear east',10.4,7.0,main+.8,1.02)
 win('Rear porch glazed opening','rear west',32,6.0,main+.03,1.97)
 box('Front entry surround',29.35,32.65,-.17,0,main,main+2.1,trim,inter)
 box('Front entry door',29.54,32.46,-.22,-.17,main,main+2.04,door,inter)
-for a,b,z0,z1 in [(28.4,31,2.02,2.65),(31,33.6,2.65,2.02)]:
- mesh('Roof · entry gable canopy',[pos(a,-1.8,main+z0),pos(b,-1.8,main+z1),pos(b,.3,main+z1),pos(a,.3,main+z0)],[(0,1,2,3)],shingle,roof)
 exec(compile((work/'Garage doors and shutters.py').read_text(),'Garage doors and shutters.py','exec'),globals())
 # Non-rendering architecture references, to support refinement without inventing partitions.
 for label,x,y in [('Living room',10,22),('Bath',4,16),('Bedroom 1 | sketch label',5.8,8),('Bedroom 2 | sketch label',16.8,8),('Dining',25,21),('Kitchen',35.5,20.5),('Bedroom 3 | sketch label',35.2,11),('Foyer',30,2.6)]:
@@ -205,13 +199,14 @@ for side,x0,y0,x1,y1 in [('front',.16,3,21.85,3),('rear',.16,29,20.85,29),('gabl
    if z+.09>min(roofZ(xA,yA,1),roofZ(xB,yB,1))-.07:continue
    i=len(boards);boards.extend([pos(xA+ox,yA+oy,z),pos(xB+ox,yB+oy,z),pos(xB+ox*.3,yB+oy*.3,z+.038),pos(xA+ox*.3,yA+oy*.3,z+.038)]);bf.append((i,i+1,i+2,i+3))
 mesh('Blue lap siding · garage wing',boards,bf,sidinglight,structure)
-# Door gable face under the two shingled roof planes.
-mesh('Entry gable · front face',[pos(28.4,-1.79,main+2.02),pos(33.6,-1.79,main+2.02),pos(31,-1.79,main+2.65)],[(0,1,2)],siding,structure)
 exec(compile((work/'Living room and loft.py').read_text(),'Living room and loft.py','exec'),globals())
 # Guest route and private Blender reference layers are built independently.
 exec(compile((work/'Tour details.py').read_text(),'Tour details.py','exec'),globals())
 exec(compile((work/'Remaining interior.py').read_text(),'Remaining interior.py','exec'),globals())
+exec(compile((work/'Front entry junction.py').read_text(),'Front entry junction.py','exec'),globals())
 exec(compile((work/'Media details.py').read_text(),'Media details.py','exec'),globals())
+exec(compile((work/'Roadside wall.py').read_text(),'Roadside wall.py','exec'),globals())
+exec(compile((work/'Front yard paving.py').read_text(),'Front yard paving.py','exec'),globals())
 exec(compile((work/'Exterior site.py').read_text(),'Exterior site.py','exec'),globals())
 exec(compile((work/'Deck barbecue.py').read_text(),'Deck barbecue.py','exec'),globals())
 exec(compile((work/'Surrounding woods.py').read_text(),'Surrounding woods.py','exec'),globals())
@@ -234,7 +229,10 @@ def tour_markers(key,eye,target):
   marker.empty_display_type='PLAIN_AXES'
   marker.empty_display_size=.06
 for key,name,eye,target,lens in [
+ ('living','Living room · toward the sofa and loft',(19.90,19.56,1.52),(6.80,27.04,1.52),20),
  ('','Living room · storage table',(16.4,24.85,1.05),(5.7,23.6,.73),23),
+ ('entry','Front entry · from the road approach',(31,-22.0,terrainZ(*eastnorth(31,-22.0))-main+1.59),(31,0,1.08),23),
+ ('tree','Christmas tree · beside the loft stairs',(25.35,20.16,1.55),(18.50,16.96,.94),23),
  ('vault','Kitchen vault · from the living room',(13.35,22.25,1.59),(40.3,20.80,1.66),24),
  ('kitchen','Kitchen · counter runs',(30.05,24.58,1.59),(38.7,18.55,1.25),18),
  ('kitchenwork','Kitchen · island work face',(36.50,16.78,1.45),(33.40,20.25,.69),22),
@@ -246,8 +244,9 @@ for key,name,eye,target,lens in [
  ('frontbed','Front bedroom · at entrance',(36.95,2.25,1.59),(37.18,10.50,1.01),18),
  ('bunk','Bunk room · from living room',(3.55,17.36,1.59),(4.20,5.6,1.03),21),
  ('hearth','Propane furnace · from the living room',(12.1,23.8,1.51),(19.98,26.7,.63),24),
- ('grill','Deck barbecue · at the garden steps',(33.7,29.85,1.51),(41.2,31.1,.57),22),
- ('porch','Covered porch · toward the garden',(37.1,27.61,1.53),(25.2,34.7,1.13),20),
+ ('cook','Grilling at the open grate',(35.55,28.82,1.52),(38.55,28.82,.83),25),
+ ('grill','Deck barbecue · at the garden steps',(33.7,29.85,1.51),(40.44,31.25,.57),22),
+ ('porch','Covered porch · toward the garden',(36.10,27.61,1.53),(25.2,34.7,1.13),20),
  ('','Fire pit and rear deck',(28.2,66.9,.53),(25.8,49.2,-.25),24.3)]:
  if key:tour_markers(key,eye,target)
  make_view(name,eye,target,lens)
@@ -288,7 +287,19 @@ for ob in bpy.context.selected_objects:ob.select_set(False)
 canopy.hide_viewport=False;canopy.hide_render=False
 for col in (site,structure,deck,roof,inter,canopy,room,fitout,site_extra,details_extra,living_nav,rooms_extra,context_extra):
  for obj in col.all_objects:obj.select_set(True)
-bpy.ops.export_scene.gltf(filepath=str(out/'Reindeer Trail.glb'),export_format='GLB',use_selection=True,export_yup=True,export_extras=False)
+# Blender's tangent generator accepts triangles and quads. Triangulate larger
+# faces for export after saving the editable Blender file with its original faces.
+import bmesh
+export_meshes={obj.data for obj in bpy.context.selected_objects if obj.type=='MESH'}
+for data in export_meshes:
+ if not data.uv_layers or not any(p.loop_total>4 for p in data.polygons):continue
+ bm=bmesh.new()
+ bm.from_mesh(data)
+ bmesh.ops.triangulate(bm,faces=[f for f in bm.faces if len(f.verts)>4],ngon_method='EAR_CLIP')
+ bm.to_mesh(data)
+ bm.free()
+ data.update()
+bpy.ops.export_scene.gltf(filepath=str(out/'Reindeer Trail.glb'),export_format='GLB',use_selection=True,export_yup=True,export_tangents=True,export_extras=False)
 canopy.hide_render=True;canopy.hide_viewport=True
 if '--geometry-only' in sys.argv: sys.exit(0)
 context_extra.hide_render=True

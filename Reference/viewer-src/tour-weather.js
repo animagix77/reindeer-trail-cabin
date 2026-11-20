@@ -9,7 +9,7 @@ function roofCover(model) {
   model.traverse(mesh=>{
     if(!mesh.isMesh) return;
     let node=mesh;
-    while(node && !/^Roof.*(?:North.wing|South.wing|covered.deck.canopy|entry.gable.canopy)|^Skylight.*opal.daylight.glazing/i.test(node.name)) node=node.parent;
+    while(node && !/^Roof.*(?:North.wing|north.pitch.to.entry|entry.cross.gable.shingles|South.wing|covered.deck.canopy|entry.gable.canopy)|^Skylight.*opal.daylight.glazing/i.test(node.name)) node=node.parent;
     if(!node) return;
     const {index,attributes:{position}}=mesh.geometry;
     for(let i=0;i<(index?.count??position.count);i+=3) {

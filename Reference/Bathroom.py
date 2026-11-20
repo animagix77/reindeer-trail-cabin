@@ -45,13 +45,10 @@ def fitted_bathroom():
         bx(trim,28.957,29.006,.20,10.19,z0,z0+.173,snow)
         bx(trim,28.78,29.01,10.149,10.21,z0,z0+.173,snow)
     bx(trim,28.928,29.008,.2,10.19,.961,.984,snow)
-    for x in (24.20,26.84):bx(trim,x,x+.16,.154,.242,.792,1.767,cream)
-    bx(trim,24.18,27.03,.14,.277,.789,.816,cream)
-    bx(trim,24.2,27.0,.145,.227,1.730,1.764,cream)
     slat=material('Bath · blind warm white','#e0e1d7',0,.68)
     for i in range(35):
-        z=1.703-i*.0235;bx(trim,24.41,26.79,.135,.19,z-.017,z,slat)
-    for coord in (24.79,26.35):line(trim,(coord,.185,.867),(coord,.185,1.703),.0015,slat)
+        z=foyerwin[3]-.037-i*.0235;bx(trim,foyerwin[0]+.06,foyerwin[1]-.06,.215,.263,z-.017,z,slat)
+    for coord in (24.79,26.35):line(trim,(coord,.239,foyerwin[2]+.047),(coord,.239,foyerwin[3]-.037),.0015,slat)
     # April's doorway photo shows two small gold-framed wildlife prints,
     # one beside the window and one on the return beyond the mirror.
     artframe=material('Bath · brushed gold picture frames','#aa8c53',.48,.43)
@@ -64,18 +61,22 @@ def fitted_bathroom():
     face('Bathroom · side wall wildlife print',[(28.924,2.205,1.349),(28.924,1.445,1.349),
          (28.924,1.445,1.68),(28.924,2.205,1.68)],side_art,[(0,0),(1,0),(1,1),(0,1)])
     finish(trim)
-    # Full-scale porcelain field tiles with narrow joints continuous across the return.
-    for ya,yb,xleft in extents:
+    # Field tile stops at the enclosure. Inside it the higher hex-tile pan
+    # forms a separate floor, with the white curb between the two surfaces.
+    x0,x1,y0,y1=21.40,24.32,5.17,10.11
+    floor_extents=[extents[0],(3.12,y0-.14,21.38),(y0-.14,y1+.085,x1+.02),(y1+.085,10.25,21.38)]
+    for ya,yb,xleft in floor_extents:
         flat('Bathroom · floor grout',xleft,29.04,ya,yb,.019,grout)
     tiles=group('Bathroom | large rectangular greige porcelain')
     for i in range(8):
         x=21.22+i
         for k in range(6):
             y=.13+k*2
-            for ya,yb,xleft in extents:
+            for ya,yb,xleft in floor_extents:
                 l,r=max(x,xleft+.012),min(x+1,29.028);a,b=max(y,ya),min(y+2,yb)
                 if r>l and b>a:bx(tiles,l+.004,r-.004,a+.004,b-.004,.020,.027,floor_tile)
-    for ya,yb,xleft in extents:bx(tiles,xleft+.016,xleft+.064,ya+.01,yb-.01,.027,.101,floor_tile)
+    for ya,yb,xleft in floor_extents:
+        if xleft<x1:bx(tiles,xleft+.016,xleft+.064,ya+.01,yb-.01,.027,.101,floor_tile)
     # Hexagonal skirting (L1040622) continues under the window behind the towels.
     cove_grout=material('Bath · cove grout','#bcb4a9',0,.77)
     cove_stone=[material('Bath · greige hex '+str(i),c,0,.54)
@@ -101,7 +102,6 @@ def fitted_bathroom():
 
     finish(tiles)
     # An open walk-in pan. Only the curb-length fixed glass and the closed ends block the visitor.
-    x0,x1,y0,y1=21.40,24.32,5.17,10.11
     pan=group('Bathroom | shower threshold, hex mosaic pan and drain')
     bx(pan,x0,x1,y0,y1,.027,.095,ivory)
     bx(pan,x1-.17,x1+.02,y0,y1,.03,.146,counter)
@@ -144,6 +144,11 @@ def fitted_bathroom():
     bx(pan,22.60,22.94,8.69,9.03,.100,.104,rail)
     bx(pan,22.608,22.932,8.698,9.022,.104,.106,nickel)
     finish(pan)
+    for label,left,right,height in (('pan',x0,x1-.17,.100),('curb',x1-.17,x1+.02,.147)):
+        support=face('WalkSurface_Bathroom_'+label,[(left,y0,height),(right,y0,height),
+                    (right,y1,height),(left,y1,height)],empty)
+        support.hide_render=True
+        support.display_type='WIRE'
     shower=group('Bathroom | clear frameless fixed panel, controls and downlight')
     # One transparent sheet avoids four blended faces stacking at grazing angles in WebGL.
     glass_corners=[(x1-.08,7.37,.148),(x1-.08,10.04,.148),(x1-.08,10.04,2.105),(x1-.08,7.37,2.105)]
@@ -316,9 +321,9 @@ def fitted_bathroom():
     bx(store,27.83,28.75,1.093,1.84,.158,.166,stool_top,7)
     for yy in (1.08,1.75):bx(store,27.81,28.76,yy,yy+.10,.029,.14,snow)
     # Small dark pedal bin alongside the toilet, visible in the vanity closeup.
-    cyl(store,28.36,6.84,.028,.271,.085,graphite,24,.092)
-    cyl(store,28.36,6.84,.268,.284,.094,graphite,24)
-    bx(store,28.01,28.13,6.73,6.95,.038,.048,nickel)
+    cyl(store,28.36,6.895,.028,.271,.085,graphite,24,.092)
+    cyl(store,28.36,6.895,.268,.284,.094,graphite,24)
+    bx(store,28.01,28.13,6.785,7.005,.038,.048,nickel)
     for j in range(3):
         yy=2.42+j*.58;cyl(store,28.38,yy,.758,.854,.022,towelm[(j+1)%4],14);cyl(store,28.38,yy,.854,.877,.013,nickel,12)
     sponge=material('Bath mat · charcoal cotton','#373835',0,.94)

@@ -1,6 +1,14 @@
+import {installParty} from './party.js';
+import {installGrill} from './grill.js';
+import {installEntryDoors} from './entry-doors.js';
+import {installWildlife} from './wildlife.js';
+import {activityControls} from './activity-controls.js';
 import {installTourFires} from './fires.js';
+import {installWelcome} from './welcome.js';
+import {installPropertyMap} from './property-map.js';
 import {installSceneControls} from './scene-controls.js';
 import {batchStatic} from './batch.js';
+import {installWoodlandSound,outdoorsFloor} from './woodland-sound.js';
 import {installTourLighting} from './tour-lighting.js';
 import { WalkSpace } from './walking.js';
 import * as THREE from 'three';
@@ -27,7 +35,8 @@ const size = new THREE.Vector3();
 const center = new THREE.Vector3();
 const camera = new THREE.PerspectiveCamera(39,1,0.03,4000);
 const world = new THREE.Scene();
-let lighting,fires,ringCenter;
+const woodland=installWoodlandSound();
+let lighting,fires,ringCenter,grill,wildlife,entryDoors;
 let renderer,orbit,span=0,distance=1;
 
 let activeView='property';
@@ -83,7 +92,7 @@ function usableTarget(target) {
   return target===document.body || target===canvas || target.matches?.('button');
 }
 window.addEventListener('keydown',e=>{
-  if(sceneControls.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
+  if(sceneControls.open || party.open || propertyMap.open || welcome.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
   e.preventDefault();
   held.add(e.code);
   if(!frame) nextFrame(performance.now());
@@ -158,17 +167,17 @@ function look() {
   render();
 }
 const viewSlugs = {
-  grill:'deck-grill', hearth:'propane-furnace', property:'property', outside:'outside', porch:'covered-porch', yard:'fire-pit', path:'front-path', hall:'front-hall', frontbed:'front-bedroom',
+  stars:'stargazing', entry:'front-entry', grill:'deck-grill', cook:'grilling', deer:'backyard-deer', tree:'christmas-tree', hearth:'propane-furnace', property:'property', outside:'outside', porch:'covered-porch', yard:'fire-pit', path:'front-path', hall:'front-hall', frontbed:'front-bedroom',
   master:'master-and-bath', bath:'bathroom', primary:'master-bedroom', vault:'kitchen-vault', kitchenwork:'island-cooler', kitchen:'kitchen', living:'living-room', bunk:'bunk-room', loft:'loft'
 };
 const locationPicker=element('location');
 const viewButtons=[...document.querySelectorAll('[data-view]')];
 function viewFromAddress() {
-  const hash=location.hash.slice(1);
+  const hash=location.hash.slice(1).split('?')[0];
   return Object.keys(interiorCameras).find(key=>viewSlugs[key]===hash) || 'property';
 }
 function chooseView(key) {
-  const hash='#'+viewSlugs[key];
+  const hash='#'+viewSlugs[key]+party.suffix;
   if(location.hash===hash) changeView(key);
   else location.hash=hash;
 }
@@ -198,6 +207,8 @@ function changeView(view) {
   canvas.setAttribute('aria-label',inside?'Interior view. Drag or use the arrow keys to look around.':'Property view. Drag or use the arrow keys to orbit.');
   element('hint').textContent=inside?'Drag to look around · Scroll or pinch to zoom':'Drag to orbit · Scroll or pinch to zoom';
   reset();
+  if(view==='stars')sceneControls.stargaze();
+  activities.destination(view);
   updateLookControls();
   if(body) canvas.setAttribute('aria-label','Walk with WASD or arrows. Drag to look, or enable mouse look.');
   if(inside) canvas.focus({preventScroll:true});
@@ -267,19 +278,81 @@ function resized() {
   if (span) render();
 }
 const sceneControls=installSceneControls({
-  setConditions(settings){lighting.setConditions(settings);render();},
-  setFurnace(on){fires.setFurnaceOn(on);render();},
-  setFirePit(on){fires.setFirePitOn(on);render();},
+  setConditions(settings){lighting.setConditions(settings);woodland.conditions(settings);fires?.setWeather(settings.weather);party.conditions();render();},
+  async setSound(on){const enabled=await woodland.enable(on);render();return enabled;},
+  viewStars(){chooseView('stars');},
+  setFurnace(on){fires.setFurnaceOn(on);party.conditions();render();},
+  setFirePit(on){fires.setFirePitOn(on);party.conditions();render();},
   stopMovement(){stopWalking();render();}
 });
+const activities=activityControls({
+  grill:()=>grill,herd:()=>wildlife,view:()=>activeView,choose:chooseView,schedule,
+  lid:on=>grill?.open(on),closeScene:()=>sceneControls.close()
+});
+const propertyMap=installPropertyMap({
+  stopMovement(){sceneControls.close();stopWalking();pointers.clear();},
+  destinations(){
+    const locations={};
+    for(const key of ['entry','porch']){
+      const eye=interiorCameras[key]?.eye;
+      // The model is centred on this NAD83 / UTM 18N origin, with north along -Z.
+      if(eye) locations[key]=[516338+eye[0],4612439-eye[2]];
+    }
+    return locations;
+  },
+  visit:chooseView, resume(){if(span) schedule();}
+});
+const party=installParty({
+  world,choose:chooseView,schedule,
+  stop(){sceneControls.close();stopWalking();pointers.clear();},
+  label:key=>viewButtons.find(b=>b.dataset.view===key)?.textContent || 'Property',
+  getPose(){
+    const round=n=>Math.round(n*100)/100;
+    return {view:activeView,x:round(body?.x??0),y:round(body?.y??0),z:round(body?.z??0),yaw:round(yaw)};
+  },
+  meet(guest){
+    if(!Object.hasOwn(viewSlugs,guest.view))return;
+    const place=()=>{
+      if(!body || guest.view==='property')return;
+      for(const radius of [1.15,.8,1.55])for(let i=0;i<12;i++){
+        const angle=guest.yaw+i*Math.PI/6;
+        const x=guest.x-radius*Math.sin(angle),z=guest.z-radius*Math.cos(angle);
+        const floor=walkSpace.spawn(x,z,guest.y+(guest.view==='loft'?1:1.59),guest.y);
+        if(!floor || Math.abs(floor.y-guest.y)>.25)continue;
+        body=floor;camera.position.set(body.x,body.y+body.eye,body.z);
+        yaw=Math.atan2(body.x-guest.x,body.z-guest.z);pitch=0;look();return;
+      }
+    };
+    if(activeView===guest.view){place();return;}
+    window.addEventListener('hashchange',()=>{if(activeView===guest.view)place();},{once:true});
+    chooseView(guest.view);
+  },
+  snapshot:()=>sceneControls.snapshot(),
+  apply:s=>sceneControls.apply(s)
+});
+const welcome=installWelcome({
+  pause(){sceneControls.close();stopWalking();pointers.clear();},
+  resume(){if(span) schedule();},
+  enter(){
+    if(span) chooseView('entry');
+    else location.hash=viewSlugs.entry;
+  }
+});
 function render(){
+  if(propertyMap.open || welcome.open)return;
   const seconds=performance.now()/1000;
-  lighting?.update(camera.position,activeView,seconds);
+  const outside=outdoorsFloor(body?.label);
+  lighting?.update(camera.position,activeView,seconds,camera,outside);
   const animateFire=fires?.update(camera,activeView,seconds);
+  woodland.update(camera,outside,walking(),ringCenter,fires?.energy??0);
   sceneControls.setNearFire(Boolean(body && ringCenter && camera.position.distanceToSquared(ringCenter)<49 &&
-    Math.abs(camera.position.y-ringCenter.y)<2.8));
+    Math.abs(camera.position.y-ringCenter.y)<2.8),activeView==='stars');
+  const animateGuests=party.update(seconds);
+  const animateDoors=entryDoors?.update(camera,walking(),seconds);
+  const animateGrill=grill?.update(camera,activeView,seconds);
+  const animateDeer=wildlife?.update(camera,activeView,seconds);
   renderer.render(world,camera);
-  if(!document.hidden && (animateFire || lighting?.animated))schedule();
+  if(!document.hidden && (animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
 }
 function reset() {
   if(activeView!=='property') {resetInterior();return;}
@@ -412,10 +485,20 @@ async function show() {
       interiorCameras[key]={
         eye:eye.getWorldPosition(new THREE.Vector3()).toArray(),
         target:target.getWorldPosition(new THREE.Vector3()).toArray(),
-        fov:({grill:66,hearth:58,kitchenwork:67,kitchen:70,vault:56,master:76,bath:68,primary:68,hall:68})[key] || 66
+        fov:({entry:55,cook:57,tree:66,grill:66,hearth:58,kitchenwork:67,kitchen:70,vault:56,master:76,bath:68,primary:68,hall:68})[key] || 66
       };
     }
   }
+  wildlife=installWildlife(world,walkSpace,camera,{onChange:activities.setDeer});
+  interiorCameras.deer=wildlife.view;
+  if(interiorCameras.yard){
+    const eye=interiorCameras.yard.eye;
+    // Look north from the clearing at the local celestial pole.
+    const elevation=THREE.MathUtils.degToRad(41.67);
+    interiorCameras.stars={eye:[...eye],target:[eye[0],eye[1]+5*Math.sin(elevation),eye[2]-5*Math.cos(elevation)],fov:68};
+  }
+  grill=installGrill(world,gltf.scene,activities.setGrill);
+  entryDoors=installEntryDoors(gltf.scene,()=>{renderer.shadowMap.needsUpdate=true;});
   for(const button of viewButtons){
     const key=button.dataset.view;
     button.hidden=key!=='property' && !interiorCameras[key];
@@ -487,6 +570,7 @@ async function show() {
   controlsPanel.hidden=false;
   element('views').hidden=false;
   status.hidden=true;
+  party.initial();
 }
 class ModelDownloadError extends Error {}
 async function readModel(){

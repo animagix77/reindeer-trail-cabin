@@ -173,7 +173,9 @@ function fitFirePit(scene,ring,clock) {
 
   // Low glowing coals sit between the crossed charred logs that are already
   // present in the GLB. Additional tiny fragments break up the ember bed.
-  const coalMat=new THREE.MeshStandardMaterial({color:0x432720,emissive:0xff4b0c,roughness:.95});
+  const coalMat=new THREE.MeshBasicMaterial({color:0xffffff});
+  const charcoal=new THREE.Color(0x30231e),amber=new THREE.Color(0xff6d12),emberTint=new THREE.Color();
+  const flecks=[];
   const coals=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),coalMat,35);
   const piece=new THREE.Object3D();
   for(let i=0;i<coals.count;i++){
@@ -182,6 +184,7 @@ function fitFirePit(scene,ring,clock) {
     piece.rotation.set(rng()*.30,angle,rng()*.30);
     piece.scale.set(.014+rng()*.054,.013+rng()*.017,.015+rng()*.035);
     piece.updateMatrix();coals.setMatrixAt(i,piece.matrix);
+    flecks.push([rng()*Math.PI*2,.33+.67*rng()]);coals.setColorAt(i,charcoal);
   }
   coals.name='Fire pit · ember bed';group.add(coals);
   const sparkMat=new THREE.MeshBasicMaterial({color:0xffbb54,depthWrite:false});
@@ -191,25 +194,36 @@ function fitFirePit(scene,ring,clock) {
     duration:2.7+rng()*3.4,offset:rng()*6,apex:.65+rng()*.53}));
   const glow=new THREE.PointLight(0xff8632,0,4.8,2);
   glow.position.copy(center);glow.position.y+=.54;scene.add(glow);
-  return {center,update(amount,eye,time,pulse) {
-    group.visible=amount>.001;
-    glow.intensity=amount*(2.35+.32*pulse);
+  return {center,update(amount,heat,eye,time,pulse,weather) {
+    group.visible=amount>.001 || heat>.006;
+    glow.intensity=amount*(2.15+.32*pulse)+heat*.21;
     if(!group.visible)return;
+    flame.visible=amount>.002;
     uniforms.ignition.value=amount;
     flame.worldToLocal(uniforms.localEye.value.copy(eye));
-    coalMat.emissiveIntensity=amount*(.70+.23*pulse);
+    for(let i=0;i<flecks.length;i++){
+      const [phase,brightness]=flecks[i];
+      const flicker=.71+.20*Math.sin(2.6*time+phase)+.09*Math.cos(time*.94+3*phase);
+      coals.setColorAt(i,emberTint.copy(charcoal).lerp(amber,heat*brightness*flicker));
+    }
+    coals.instanceColor.needsUpdate=true;
+    const wind=weather==='rain'?.76:weather==='snow'?.42:.30;
+    const smoke=Math.max(amount*.66,heat*(1.15-.45*amount));
     puffs.forEach(({puff,phase,drift})=>{
       const t=(time*.17+phase)%1;
-      puff.position.set(.015+.24*t*t+.044*Math.sin(3*t+drift*17+time*.59)*t,
-        .43+1.32*t,.051*Math.cos(3.9*t+drift*9+time*.41)*t);
-      puff.scale.setScalar(.16+.84*t);
-      puff.material.opacity=.103*amount*Math.sin(t*Math.PI)**1.4;
+      const curl=3.7*t+time*.44+drift*9;
+      puff.position.set(wind*t*t+.18*Math.sin(curl)*t,
+        .30+.17*amount+1.72*t,.13*Math.cos(curl)*t+.08*t*t);
+      puff.scale.setScalar(.14+1.03*t);
+      puff.material.rotation=drift*9+Math.sin(curl)*.48;
+      puff.material.opacity=.19*smoke*Math.sin(t*Math.PI)**1.35;
     });
     seeds.forEach((seed,i)=>{
       const age=(time+seed.offset)%seed.duration;
       const t=Math.min(1,age/(seed.duration*.57));
-      const size=t<1?(.0039+.0015*Math.sin(t*9))*Math.sin(Math.PI*t)*amount:0;
-      piece.position.set(seed.x+.12*t*t+.033*Math.sin(t*7+seed.offset),
+      const gust=Math.sin(.78*(time-age))*.5+.5;
+      const size=t<1?(.0024+.0048*gust*gust)*Math.sin(Math.PI*t)*amount:0;
+      piece.position.set(seed.x+wind*.77*t*t+.033*Math.sin(t*7+seed.offset),
         .18+t*seed.apex,seed.z+.045*Math.sin(t*6+seed.x*21));
       piece.rotation.set(0,0,.1*Math.sin(t*5));
       piece.scale.set(size,size*2.4,size);piece.updateMatrix();
@@ -227,13 +241,15 @@ export function installTourFires(scene,model) {
   const hearth=glass?fitHearth(scene,glass,clock):null;
   const pit=ring?fitFirePit(scene,ring,clock):null;
   const forward=new THREE.Vector3(),offset=new THREE.Vector3();
-  let furnaceOn=true,pitOn=false,amount=0,from=0,startTime=null;
+  let furnaceOn=true,pitOn=false,amount=0,from=0,startTime=null,heat=0,previous=null,weather='clear';
   function inView(camera,where,near,far,overview) {
     offset.subVectors(where,camera.position);
     const dist=offset.length();
     return dist<near || (dist<(overview?90:far) && offset.dot(forward)>.40*dist);
   }
   return {
+    get energy(){return Math.min(1,amount+.12*heat);},
+    setWeather(value){weather=value;},
     setFurnaceOn(value){furnaceOn=!!value;},
     setFirePitOn(value){
       if(pitOn===!!value)return;
@@ -246,11 +262,14 @@ export function installTourFires(scene,model) {
       if(startTime===null)startTime=time;
       const progress=THREE.MathUtils.clamp((time-startTime)/(pitOn?1.45:.91),0,1);
       amount=THREE.MathUtils.lerp(from,Number(pitOn),progress*progress*(3-2*progress));
-      pit?.update(amount,camera.position,time,pulse);
+      const dt=previous===null?0:Math.max(0,time-previous);previous=time;
+      heat=THREE.MathUtils.damp(heat,amount,amount>=heat?1.8:.58,dt);
+      if(!pitOn && amount===0 && heat<.006)heat=0;
+      pit?.update(amount,heat,camera.position,time,pulse,weather);
       camera.getWorldDirection(forward);
       return (hearth && furnaceOn && mode!=='property' && inView(camera,hearth.center,2.4,9,false))
         || (pit && ((progress<1 && from!==Number(pitOn))
-          || (pitOn && inView(camera,pit.center,5.8,27,mode==='property')))) || false;
+          || ((pitOn || heat>.006) && inView(camera,pit.center,5.8,27,mode==='property')))) || false;
     }
   };
 }

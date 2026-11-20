@@ -34,6 +34,7 @@ def build_details():
         blocker(f'PitchedCeiling_{i:02}',.18,sx0+.42,ya,yb,bottom,max(5.1,bottom+.05))
     # Narrow landing beside a low mattress is kept clear for turning at the top.
     blocker('LoftMattress',*loft_bed_bounds,loftdeck+.01,loftdeck+.29)
+    blocker('LoftReadingLantern',.39,1.19,20.35,21.15,loftdeck+.005,loftdeck+.42)
     # Living room wall except for the swing-clear opening seen to the right of the television.
     blocker('LivingNorthA',.1,1.99,15.16,15.29,0,2.06)
     blocker('LivingNorthB',4.91,20.8,15.16,15.29,0,2.06)

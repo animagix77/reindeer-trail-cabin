@@ -44,6 +44,24 @@ class Timberwork:
         return obj
 
 
+def sawn_guard(boards, start, end, newels=(True, True)):
+    """A cedar cap laid flat on edgewise rails and upright square balusters."""
+    ax, ay, az = start
+    bx, by, bz = end
+    for height, width, depth in ((.125,.0381,.0889), (.887,.0381,.0889), (.95,.0889,.0381)):
+        boards.member((ax,ay,az+height),(bx,by,bz+height),width,depth)
+    spaces = math.ceil(math.hypot(bx-ax,by-ay)*ft/.142)
+    for i in range(spaces+1):
+        joint = i in (0, spaces)
+        if (i == 0 and not newels[0]) or (i == spaces and not newels[1]):
+            continue
+        t = i/spaces
+        x, y, z = ax+(bx-ax)*t, ay+(by-ay)*t, az+(bz-az)*t
+        size = .0889 if joint else .0381
+        boards.member((x,y,z+(-.09 if joint else .166)),
+                      (x,y,z+(.931 if joint else .845)),size,size)
+
+
 def porch_structure(cedar):
     frame = Timberwork('Porch · deck boards, posts and guardrails', cedar, deck)
     roof_frame = Timberwork('Roof · covered porch framing and sheathing', cedar, roof)
@@ -61,14 +79,14 @@ def porch_structure(cedar):
     frame.member((23.02,35.92,dp-.115),(40.98,35.92,dp-.115),.05,.225)
     for x1,y1,x2,y2 in [(23.25,35.70,40.75,35.70),(23.25,26.15,23.25,35.70),
                           (40.75,26.15,40.75,deck_stair_y0)]:
-        for h,w,d in [(.118,.045,.074),(.89,.062,.079),(.942,.129,.030)]:
+        for h,w,d in [(.118,.0381,.0889),(.886,.0381,.0889),(.950,.0889,.0381)]:
             frame.member((x1,y1,dp+h),(x2,y2,dp+h),w,d)
         count=math.ceil(math.hypot(x2-x1,y2-y1)/.49)
         for i in range(1,count):
             t=i/count; x=x1+(x2-x1)*t; y=y1+(y2-y1)*t
             if y>35.3 and any(abs(x-post)<.22 for post in (23.3,32,40.7)):
                 continue
-            frame.member((x,y,dp+.15),(x,y,dp+.851),.037,.037)
+            frame.member((x,y,dp+.159),(x,y,dp+.845),.0381,.0381)
     for x,y in [(23.25,26.15),(40.75,26.15),(40.75,deck_stair_y0)]:
         frame.member((x,y,dp),(x,y,dp+.953),.092,.092)
     frame.finish()
@@ -84,6 +102,62 @@ def porch_structure(cedar):
         x=22.4+(i+.5)*19.2/16
         roof_frame.member((x,25.64,roof_top(25.64)-.014),(x,36.59,roof_top(36.59)-.014),19.2*ft/16-.0012,.020)
     roof_frame.finish()
+
+
+def deck_stove_flue(sx, sy, stove, galvanized, lining, tube, prism):
+    """Continuous crimped duct rising to the open end at the porch eave."""
+    def p(x,y,h):
+        return Vector(pos(x,y,dp+h))
+    tube(stove,p(sx,sy+.22,.883),p(sx,sy+.22,1.056),.078,.078,32)
+    # The garden counterview shows the duct secured beside the outer roof post,
+    # curving under the fascia, with its rolled mouth facing the yard.
+    def cubic(a,b,c,d,t):
+        return a*(1-t)**3+b*(3*t*(1-t)**2)+c*(3*t*t*(1-t))+d*t**3
+    start=p(sx,sy+.22,1.046)
+    elbow=p(23.84,35.11,1.901)
+    end=p(22.26,35.15,2.095)
+    curves=[(start,start+Vector((0,0,.39)),p(24.18,35.08,1.746),elbow),
+            (elbow,p(23.51,35.14,2.051),p(23.13,35.15,2.095),end)]
+    path=[start]
+    for a,b,c,d in curves:
+        path.extend(cubic(a,b,c,d,i/88) for i in range(1,89))
+    vertices, faces, materials=[],[],[]
+    sides=24
+    def ring(center,tangent,radius):
+        across=tangent.cross(Vector((0,1,0))).normalized()
+        normal=tangent.cross(across)
+        base=len(vertices)
+        vertices.extend(tuple(center+radius*(across*math.cos(i*math.tau/sides)+normal*math.sin(i*math.tau/sides)))
+                        for i in range(sides))
+        return base
+    def join(first,second,material):
+        for i in range(sides):
+            j=(i+1)%sides
+            faces.append((first+i,first+j,second+j,second+i))
+            materials.append(material)
+    distance=0
+    for k,center in enumerate(path):
+        tangent=(path[min(k+1,len(path)-1)]-path[max(k-1,0)]).normalized()
+        if k:distance+=(center-path[k-1]).length
+        radius=.072+.0017*math.sin(math.tau*distance/.020)
+        base=ring(center,tangent,radius)
+        if k:join(base-sides,base,0)
+    for depth,radius,material in ((.004,.076,0),(.011,.075,0),(.011,.067,0),(-.109,.066,1)):
+        new=ring(end+tangent*depth,tangent,radius)
+        join(base,new,material)
+        base=new
+    faces.append(tuple(base+i for i in range(sides)));materials.append(1)
+    obj=mesh('Porch · corrugated stove flue to roof edge',vertices,faces,galvanized,deck)
+    obj.data.materials.append(lining)
+    for face,index in zip(obj.data.polygons,materials):
+        face.material_index=index
+        face.use_smooth=len(face.vertices)==4
+    # Two metal cheeks form the hanger on the last rafter. The pipe is just below the timber.
+    for side in (-1,1):
+        yy=35.15+side*.237
+        prism(galvanized,p(22.49,yy,2.022),p(22.49,yy,2.257),.020,.003)
+    prism(galvanized,p(22.49,34.913,2.022),p(22.49,35.387,2.022),.020,.003)
+    return obj
 
 
 def picnic_table(timber, group, zone, blocker):

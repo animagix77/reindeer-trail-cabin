@@ -19,7 +19,9 @@ def fit_kitchen():
     framework=group('Kitchen | window and return base cabinetry')
     # No filled carcass behind the open sink bowl. Drawer reveals remain visible.
     def door_run(y0,y1,double=False):
-        rows=(.12,.68,.84) if double else (.12,.84)
+        # The two sink fronts finish below the stainless apron.
+        head=.677 if 14.74<=y0<17.14 else .84
+        rows=(.12,.68,head) if double else (.12,head)
         for z0,z1 in zip(rows,rows[1:]):
             bx(framework,38.53,38.62,y0+.025,y1-.025,z0,z1,paint)
             bx(framework,38.50,38.53,y0+.10,y1-.10,z0+.046,z1-.045,inset)
@@ -28,11 +30,12 @@ def fit_kitchen():
             else:
                 yy=y0+.15
                 line(framework,(38.44,yy,z1-.085),(38.44,yy,z1-.19),.007,silver)
-    for a,b in [(12.58,14.73),(17.13,17.93),(20.43,23.14)]:
+    for a,b in [(12.58,14.734),(17.148,17.925),(20.435,23.14)]:
         bx(framework,38.62,40.76,a,b,.092,.855,paint)
     for a,b in [(12.58,14.74),(14.74,15.94),(15.94,17.14),(17.14,17.93),(20.43,21.79),(21.79,23.14)]:
         door_run(a,b,a>=17.14)
-    bx(framework,38.71,40.76,12.59,23.16,.025,.107,dark)
+    for a,b in ((12.59,17.923),(20.437,23.14)):
+        bx(framework,38.71,40.76,a,b,.025,.107,dark)
     # Return runs from the sink corner toward dining along the solid bedroom wall.
     bx(framework,34.12,38.64,12.60,14.52,.091,.859,paint)
     bx(framework,34.17,38.57,12.61,14.39,.026,.108,dark)
@@ -79,20 +82,20 @@ def fit_kitchen():
     cyl(sink,39.48,drainy,.755,.757,.024,dark,16)
     # Commercial pull-down faucet. A helix wraps the arched hose all the way over
     # its bend; the small metal sprayer hangs above the bowl as in L1040596.
-    cyl(sink,40.40,drainy,.910,.943,.043,silver)
-    cyl(sink,40.40,drainy,.934,1.158,.020,silver)
-    line(sink,(40.40,drainy,1.003),(40.40,drainy-.27,1.003),.012,silver)
-    line(sink,(40.40,drainy-.27,1.003),(40.40,drainy-.27,1.129),.008,silver)
+    cyl(sink,40.31,drainy,.910,.943,.043,silver)
+    cyl(sink,40.31,drainy,.934,1.158,.020,silver)
+    line(sink,(40.31,drainy,1.003),(40.31,drainy-.27,1.003),.012,silver)
+    line(sink,(40.31,drainy-.27,1.003),(40.31,drainy-.27,1.129),.008,silver)
     arc=[];spring=[]
     for j in range(151):
-        t=j/150;ang=pi*t;x=39.93+.47*cos(ang);z=1.153+.151*sin(ang)
+        t=j/150;ang=pi*t;x=39.84+.47*cos(ang);z=1.153+.151*sin(ang)
         arc.append((x,drainy,z))
         phase=tau*15*t
         spring.append((x+.049*cos(ang)*cos(phase),drainy+.047*sin(phase),z+.014*sin(ang)*cos(phase)))
     for k in range(0,150,6):line(sink,arc[k],arc[k+6],.0075,rail,8)
     for a,b in zip(spring,spring[1:]):line(sink,a,b,.0036,silver,6)
-    line(sink,(39.46,drainy,1.157),(39.46,drainy,1.072),.010,silver)
-    cyl(sink,39.46,drainy,1.045,1.098,.025,silver,16,.016)
+    line(sink,(39.37,drainy,1.157),(39.37,drainy,1.072),.010,silver)
+    cyl(sink,39.37,drainy,1.045,1.098,.025,silver,16,.016)
     finish(sink)
     appliances=group('Kitchen | stainless range, vent hood and tall refrigerator')
     y0,y1=17.93,20.43;cy=(y0+y1)/2
@@ -139,7 +142,7 @@ def fit_kitchen():
         line(appliances,(x-.044,yy,z+.006),(x-.111,yy,z+.015),.019,silver,20)
         line(appliances,(x-.113,yy,z+.018),(x-.102,yy,z+.030),.0029,rail)
     # Low hood and centered rectangular flue, between both windows.
-    bx(appliances,38.74,40.85,y0-.06,y1+.06,1.687,1.76,silver)
+    bx(appliances,38.74,40.831,y0-.06,y1+.06,1.687,1.76,silver)
     bx(appliances,38.735,38.743,cy-.47,cy+.47,1.705,1.746,blackglass)
     for yy in (cy-.30,cy-.15,cy,cy+.15,cy+.30):
         line(appliances,(38.734,yy,1.724),(38.731,yy,1.724),.004,silver,8)
@@ -150,7 +153,7 @@ def fit_kitchen():
     for yy in (y0+.15,y1-.15):
         cyl(appliances,38.98,yy,1.672,1.684,.024,creamware,18)
     # The steel chimney ends below the gable peak and its back is flush against the wood.
-    bx(appliances,40.04,40.85,cy-.53,cy+.53,1.759,min(2.85,topz(40.4,cy)-.035),steel)
+    bx(appliances,40.04,40.831,cy-.53,cy+.53,1.759,min(2.85,topz(40.4,cy)-.035),steel)
     bx(appliances,40.035,40.042,cy-.529,cy+.529,2.398,2.402,silver)
     # L1040614 shows a charcoal side, the pull on the patio edge, a separate
     # lower freezer and an exposed side grille inside the compressor cover.
@@ -308,20 +311,20 @@ def fit_kitchen():
         bx(hang,40.54,40.79,ya-.14,yb+.14,1.00,1.055,shelves)
         bx(hang,40.56,40.79,ya-.14,yb+.14,1.951,2.025,shelves)
         rod=2.059
-        line(hang,(40.37,ya-.18,rod),(40.37,yb+.18,rod),.006,rail,10)
-        for ed in (ya-.17,yb+.17):line(hang,(40.37,ed-.034,rod),(40.37,ed+.034,rod),.011,rail,12)
+        line(hang,(40.47,ya-.18,rod),(40.47,yb+.18,rod),.006,rail,10)
+        for ed in (ya-.17,yb+.17):line(hang,(40.47,ed-.034,rod),(40.47,ed+.034,rod),.011,rail,12)
         mid=(ya+yb)/2
         for first,(low,high) in enumerate(((ya-.032,mid-.023),(mid+.023,yb+.032))):
             for n in range(4):
                 yy=low+(high-low)*(n+.25)/4
-                line(hang,(40.37,yy,rod),(40.36,yy,2.024),.0028,silver,8)
+                line(hang,(40.47,yy,rod),(40.46,yy,2.024),.0028,silver,8)
             width=high-low
             for n in range(19):
                 t0=n/19;t1=(n+1)/19
                 def panel_point(t,z):
                     r=(z-1.073)/.954
                     yy=low+t*width+.018*(1-r)*sin(t*2*pi)
-                    x=40.35+.066*cos(t*6*pi+.3)+.027*(1-r)*sin(t*4*pi)
+                    x=40.47+.044*cos(t*6*pi+.3)+.016*(1-r)*sin(t*4*pi)
                     return hang.vert((x*ft,yy*ft,z))
                 verts=[panel_point(t0,2.025),panel_point(t1,2.025),panel_point(t1,1.073),panel_point(t0,1.073)]
                 u0=1-(first+t0)*.5;u1=1-(first+t1)*.5
@@ -395,7 +398,7 @@ def fit_kitchen():
     # flanked by espresso cabinets. Its offset within the island is estimated.
     cooler_a,cooler_b=19.14,21.14
     bx(island,31.55,32.19,17.49,22.82,.039,.875,walnut)
-    for ya,yb in ((17.49,cooler_a),(cooler_b,22.82)):
+    for ya,yb in ((17.49,cooler_a-.008),(cooler_b+.008,22.82)):
         bx(island,32.19,33.72,ya,yb,.039,.873,paint)
         for za,zb in ((.109,.64),(.655,.852)):
             bx(island,33.72,33.78,ya+.026,yb-.026,za,zb,inset)
