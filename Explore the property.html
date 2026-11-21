@@ -57,7 +57,6 @@
 #welcome [hidden]{display:none}
 #welcome-form{margin:0}
 #welcome-note{font-size:.875rem;line-height:1.4;color:#505a52;margin:7px 0 2px}
-#welcome-intro{font-weight:550}
 #welcome-title:focus{outline:none}
 #welcome-identity{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end}
 #welcome-identity label{display:grid;gap:4px;font-weight:650;font-size:.9rem}
@@ -179,7 +178,7 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
 @media(max-width:680px){#status{padding:24px max(22px,env(safe-area-inset-right)) max(7vh,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left))}#load-photo{object-position:58% 58%}#welcome-loading{margin:0 0 12px;padding:8px 0}}
 @media(max-width:680px) and (max-height:720px){
   .welcome-copy{display:flex;flex-direction:column}
-  .welcome-copy .welcome-story{order:1;margin:14px 0 0}
+  .welcome-copy .welcome-route{order:1;margin:14px 0 0}
 }
 @media(max-width:375px) and (max-height:650px){.welcome-photo{height:clamp(76px,16dvh,100px)}.welcome-copy{padding:13px 17px 16px}#welcome-title{font-size:2rem;margin-bottom:10px}}
 @media(min-width:681px) and (max-height:490px){.welcome-layout{grid-template-columns:minmax(0,68%) 1fr}.welcome-photo{width:32%}.welcome-copy{padding:12px 22px}#welcome-title{font-size:2.5rem;margin-bottom:8px}#welcome-loading{margin:0 0 10px;padding:5px 0}.welcome-copy p{margin-bottom:8px}}
@@ -414,14 +413,14 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
     <div class="welcome-copy">
       <p class="welcome-location">The Reindeer Trail · Smallwood, NY</p>
       <h2 id="welcome-title" tabindex="-1">3D cabin walkthrough</h2>
-      <p id="welcome-intro">Start on the driveway at golden hour. Walk through the front door, explore the rooms, or head around back to the fire pit.</p>
+      <p id="welcome-intro">The Reindeer Trail is our quiet place in the mountains. Take your coffee to the deck and watch the morning light move through the trees. In the evening, linger over dinner with friends, then step outside to see the stars.</p>
       <div id="welcome-loading" class="load-progress">
       <div class="load-line"><span data-load-stage role="status">Loading the 3D walkthrough…</span><span data-load-percent aria-hidden="true"></span></div>
       <div class="load-track"><progress data-load-bar max="100" aria-label="Walkthrough loading progress"></progress></div>
       <div class="load-info"><span data-load-detail></span><span data-load-eta></span></div>
       <button type="button" data-load-retry hidden>Try again</button>
     </div>
-      <p class="welcome-story">We come for the best parts of camping. Supper under the trees, crickets by the fire, and stars worth staying up for. Inside, there’s a warm kitchen and a bed for the night.</p>
+      <p class="welcome-route">Your walk begins on the driveway at golden hour. Explore the rooms at your own pace, or follow the path around back to the swings.</p>
       <form id="welcome-form">
         <div id="welcome-identity" hidden>
           <label>Your hiker’s name<input id="welcome-name" required maxlength="28" autocomplete="nickname" placeholder="Name or nickname" aria-describedby="welcome-note"></label>
