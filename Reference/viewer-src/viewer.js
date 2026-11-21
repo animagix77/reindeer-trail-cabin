@@ -24,7 +24,7 @@ import {installSceneControls} from './scene-controls.js';
 import {batchStatic} from './batch.js';
 import {installWoodlandSound,outdoorsFloor} from './woodland-sound.js';
 import {installTourLighting} from './tour-lighting.js';
-import { WalkSpace } from './walking.js';
+import {WalkSpace,walkIntent} from './walking.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -84,7 +84,6 @@ function paceRenderer(time){
   }
 }
 const walkKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
-const turnSpeed=THREE.MathUtils.degToRad(100);
 const walking=()=>body!==null;
 function stopWalking() {
   camera.position.y-=bob;bob=0;gait.reset();velocity.set(0,0);
@@ -104,28 +103,21 @@ function nextFrame(t) {
   const elapsed=lastTime?t-lastTime:16;
   const dt=Math.min(.085,Math.max(0,elapsed/1000));
   lastTime=t;
-  const on=(a,b)=>Number(held.has(a)||held.has(b));
-  const turn=on('KeyA','ArrowLeft')-on('KeyD','ArrowRight');
-  if(turn){
-    yaw+=turn*turnSpeed*dt;
+  const input=walkIntent(held,axes,yaw,dt);
+  if(input.turn){
+    yaw=input.yaw;
     camera.rotation.set(pitch,yaw,0,'YXZ');
   }
   if(worldActions?.seated){
     render();
-    if(turn)schedule();else lastTime=0;
+    if(input.turn)schedule();else lastTime=0;
     return;
   }
-  let sideways=axes.x;
-  let forward=on('KeyW','ArrowUp')-on('KeyS','ArrowDown')-axes.y;
-  const norm=Math.max(1,Math.hypot(sideways,forward));
   const speed=/loft/i.test(body.label)?1.02:1.71;
-  sideways*=speed/norm;forward*=speed/norm;
-  const accelerating=Boolean(sideways||forward);
+  const accelerating=Boolean(input.x||input.z);
   const response=1-Math.exp(-(accelerating?13:23)*dt);
-  const desiredX=Math.cos(yaw)*sideways-Math.sin(yaw)*forward;
-  const desiredZ=-Math.sin(yaw)*sideways-Math.cos(yaw)*forward;
-  velocity.x+=(desiredX-velocity.x)*response;
-  velocity.y+=(desiredZ-velocity.y)*response;
+  velocity.x+=(input.x*speed-velocity.x)*response;
+  velocity.y+=(input.z*speed-velocity.y)*response;
   if(!accelerating && velocity.lengthSq()<.00025)velocity.set(0,0);
   const oldX=body.x,oldZ=body.z,eyeHeight=camera.position.y-bob;
   body=walkSpace.move(body,velocity.x*dt,velocity.y*dt);
@@ -137,7 +129,7 @@ function nextFrame(t) {
   if(!travel && Math.abs(bob)<.0003)bob=0;
   camera.position.y=THREE.MathUtils.lerp(eyeHeight,wanted,1-Math.exp(-15*dt))+bob;
   render();
-  if(held.size || sideways || forward || velocity.lengthSq() || bob || Math.abs(camera.position.y-wanted)>.002) schedule();
+  if(held.size || accelerating || velocity.lengthSq() || bob || Math.abs(camera.position.y-wanted)>.002) schedule();
   else lastTime=0;
 }
 function schedule(){if(!frame) frame=requestAnimationFrame(nextFrame);}
@@ -147,7 +139,7 @@ function usableTarget(target) {
 window.addEventListener('keydown',e=>{
   if(sceneControls.contains(e.target) || party.open || propertyMap.open || welcome.open || waterNotes.open || tourInterface.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
   e.preventDefault();
-  if(worldActions?.seated && /^(Key[WS]|Arrow(Up|Down))$/.test(e.code))return;
+  if(worldActions?.seated && e.code!=='ArrowLeft' && e.code!=='ArrowRight')return;
   held.add(e.code);
   if(!frame) nextFrame(performance.now());
 });
@@ -189,7 +181,7 @@ function updateLookControls(){
   element('stick').hidden=!walking() || worldActions?.seated || !matchMedia('(any-pointer: coarse)').matches;
   let label='Cabin view. Drag or use the arrow keys to look around.';
   if(walking()) label=touchControls.matches?'Walk with the movement pad and drag to look around.':
-    'Walk forward with W and back with S. Turn left with A and right with D. The arrow keys also walk and turn. Drag to look around.';
+    'Walk forward with W and back with S. Sidestep left with A and right with D. The up and down arrows also walk. Turn with the left and right arrows, or drag to look around.';
   if(worldActions?.seated)label='Seated by the fire. Drag to look around. Use Stand up to walk again.';
   canvas.setAttribute('aria-label',label);
 }
@@ -560,9 +552,9 @@ async function show() {
   fires=installTourFires(world,gltf.scene);
   firewood=installFirewood(world,gltf.scene,walkSpace,camera,fires,undefined,kind=>party.fuel(kind));
   woodSplit=installWoodSplitting(world,gltf.scene,walkSpace,{
-    camera,schedule,takeSplitLog:()=>firewood.takeSplitLog(),
+    camera,schedule,takeSplitLog:firewood.takeSplitLog,
     handsBusy(){const wood=firewood.snapshot();return wood.held || wood.inFlight || activities.offeringFood;},
-    onSwing:duration=>woodland.swing(duration),onStrike:(strength,kind)=>woodland.strike(strength,kind),
+    onSwing:duration=>woodland.swing(duration),onStrike:woodland.strike,
     onContact:speed=>woodland.woodImpact(speed)
   });
   walkSpace.dynamicBlocker=woodSplit.blocksStep;

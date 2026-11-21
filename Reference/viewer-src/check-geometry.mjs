@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {WalkSpace} from './walking.js';
+import {WalkSpace,walkIntent} from './walking.js';
 import {checkFirewood} from './check-firewood.mjs';
 import {checkWorldActions} from './check-world-actions.mjs';
 
@@ -168,6 +168,31 @@ scene.traverse(mesh=>{
   if(/^Front hall [|] shoe bench/.test(part))shoeRack.push(mesh);
 });
 const axisX=at(1,0,0).sub(at(0,0,0)).normalize(),againstX=axisX.clone().negate();
+// Hold each strafe key in the actual entry hallway with the camera facing
+// along it. The visitor can step toward both walls without changing aim.
+{
+  const eye=at(31,8.8,1.59),body=walks.spawn(eye.x,eye.z,eye.y);
+  const yaw=Math.atan2(-axisX.z,axisX.x),pad={x:0,y:0};
+  function intent(...keys){return walkIntent(new Set(keys),pad,yaw,1/60);}
+  const forward=intent('KeyW');
+  for(const [key,sign] of [['KeyA',-1],['KeyD',1]]){
+    const step=intent(key),end=walks.move(body,step.x,step.z);
+    const side=(end.x-body.x)*axisX.x+(end.z-body.z)*axisX.z;
+    assert.equal(step.yaw,yaw);
+    assert(Math.abs(step.x*forward.x+step.z*forward.z)<1e-9);
+    assert(sign*side>.20 && sign*side<.48,'Sideways walking should stop at the hall wall');
+    const diagonal=intent('KeyW',key);
+    assert(Math.abs(Math.hypot(diagonal.x,diagonal.z)-1)<1e-9,'Diagonals cannot travel faster');
+    assert.equal(diagonal.yaw,yaw);
+  }
+  assert.deepEqual(intent('ArrowUp','KeyW'),forward);
+  assert.deepEqual(intent('ArrowDown'),intent('KeyS'));
+  assert.deepEqual(intent('KeyA','KeyD'),intent());
+  const left=intent('ArrowLeft'),right=intent('ArrowRight');
+  assert(left.yaw>yaw && right.yaw<yaw && !left.x && !left.z && !right.x && !right.z,'Arrow keys rotate in place');
+  const analog=walkIntent(new Set(),{x:.4,y:0},yaw,1/60);
+  assert(Math.abs(Math.hypot(analog.x,analog.z)-.4)<1e-9 && analog.yaw===yaw,'The touch pad retains its analog range');
+}
 for(const y of [1.0,2.5,6.5,8.0,8.8,9.8,10.5,11.8,12.4]){
   for(const h of [.30,1.63]){
     const from=at(31,y,h);

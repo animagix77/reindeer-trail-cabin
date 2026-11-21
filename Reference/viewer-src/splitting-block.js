@@ -111,62 +111,86 @@ export function makeSplittingBlock(model){
     flakes.instanceMatrix.needsUpdate=true;
   }
 
-  const stock=new Map();
+  // Fractures retain their original tree coordinates even when a billet tips
+  // onto its side. Physics reports which of those meshes the stump supports.
+  const supported=new Set([round]),timber=new WeakMap();
   const wholeCenter={x:0,z:0};
-  stock.set(round,{wood,center:wholeCenter,centerY:0});
-  let opening=[];
-  function openCheck(u){
-    const ease=1-(1-clamp01(u))**3;
-    for(const {mesh,center,shiftX,shiftZ} of opening){
-      mesh.position.x=center.x+ease*shiftX;
-      mesh.position.z=center.z+ease*shiftZ;
+  timber.set(round,{wood,center:wholeCenter,centerY:0});
+  const local=new T.Vector3(),inverse=new T.Quaternion(),normal=new T.Vector3();
+  function sourcePoint(target,point){
+    const item=timber.get(target);
+    local.copy(point).sub(target.position).applyQuaternion(inverse.copy(target.quaternion).invert());
+    return {x:local.x+item.center.x,y:local.y+item.centerY,z:local.z+item.center.z};
+  }
+  function sideEntry(point,wood){
+    // The visible bark wanders a few millimetres along a billet. Match the
+    // contact on it to the same lip of the undeformed grain cross-section.
+    let closest=Infinity,x=point.x,z=point.z;
+    for(let i=0;i<wood.ring.length;i++){
+      const a=wood.ring[i],b=wood.ring[(i+1)%wood.ring.length],dx=b.x-a.x,dz=b.z-a.z;
+      const u=clamp01(((point.x-a.x)*dx+(point.z-a.z)*dz)/(dx*dx+dz*dz));
+      const px=a.x+u*dx,pz=a.z+u*dz,dist=(px-point.x)**2+(pz-point.z)**2;
+      if(dist<closest){closest=dist;x=px;z=pz;}
     }
-    if(u>=1)opening=[];
+    point.x=x+.002*(wood.center.x-x);point.z=z+.002*(wood.center.z-z);
+  }
+  function onMesh(target,x,y,z){
+    const item=timber.get(target);
+    return new T.Vector3(x-item.center.x,y-item.centerY,z-item.center.z).applyQuaternion(target.quaternion).add(target.position);
   }
   return {...tool,root,round,top,
     get height(){return wood.height;},get radius(){return wood.radius;},get progress(){return wood.progress;},
-    get targets(){return Array.from(stock.keys());},
-    grainCenter(target=stock.keys().next().value){
-      const item=stock.get(target);
-      return item && {x:target.position.x+item.wood.center.x-item.center.x,z:target.position.z+item.wood.center.z-item.center.z};
+    get targets(){return Array.from(supported);},
+    setSupported(mesh,standing){
+      if(!timber.has(mesh))return;
+      if(standing)supported.add(mesh);else supported.delete(mesh);
     },
-    aimDirection(target,nx,nz){
-      const seam=stock.get(target)?.wood.faces[0];
-      if(!seam)return {nx,nz};
-      // Turn the bit across the first cleavage to quarter the half. The actual
-      // bearing and chosen spot still influence where the second cut opens.
-      const side=nx*seam.nz-nz*seam.nx<0?-1:1;
-      const x=.76*side*seam.nz+.24*nx,z=-.76*side*seam.nx+.24*nz,length=Math.hypot(x,z);
-      return {nx:x/length,nz:z/length};
+    grainCenter(target=supported.values().next().value){
+      const item=timber.get(target);if(!item)return null;
+      return onMesh(target,item.wood.center.x,item.wood.height*.5,item.wood.center.z);
+    },
+    aimDirection(target,nx,nz,face){
+      const item=timber.get(target);
+      normal.set(nx,0,nz).applyQuaternion(inverse.copy(target.quaternion).invert());
+      // On a fallen billet the blade enters the side and opens a seam along
+      // its length. The cross-sectional normal lies tangent to that side.
+      const side=Math.abs(face.y)<.55;
+      const cut=side
+        ?{nx:face.z/Math.hypot(face.x,face.z),nz:-face.x/Math.hypot(face.x,face.z)}
+        :item.wood.grainDirection(normal.x,normal.z);
+      normal.set(cut.nx,0,cut.nz).applyQuaternion(target.quaternion);
+      const horizontal=Math.hypot(normal.x,normal.z);
+      return {nx:horizontal>.001?normal.x/horizontal:nx,nz:horizontal>.001?normal.z/horizontal:nz,grainNX:cut.nx,grainNZ:cut.nz,sideFace:side};
     },
     begin(){
-      if(stock.size)return false;
+      if(supported.size)return false;
       clearChips();wood=createOakRound(++index);
       round.geometry.dispose();round.geometry=oakGeometry(wood);round.visible=true;
-      stock.set(round,{wood,center:wholeCenter,centerY:0});return true;
+      timber.set(round,{wood,center:wholeCenter,centerY:0});supported.add(round);return true;
     },
-    rest(){clearChips();openCheck(1);tool.rest();},
+    rest(){clearChips();tool.rest();},
     stroke(t,good,reduced,camera,aim){
       tool.stroke(t,good,reduced,camera,aim);
-      const duration=aim?.duration??tool.swingDuration;
-      if(opening.length)openCheck(reduced?1:(t-tool.impactFraction)*duration/.13);
-      if(chipHit){
-        if(reduced)clearChips();else flyChips(t,duration);
-      }
+      if(chipHit){if(reduced)clearChips();else flyChips(t,aim?.duration??tool.swingDuration);}
     },
     impact(hit){
-      const target=hit.target??round,item=stock.get(target);
-      if(!item)return {split:false,bite:false,pieces:[]};
+      const target=hit.target??round,item=timber.get(target);
+      if(!item || !supported.has(target))return {split:false,bite:false,pieces:[]};
       const billet=item.wood,before=billet.revision;
-      const offsetX=target.position.x-item.center.x,offsetZ=target.position.z-item.center.z;
-      const result=billet.strike({...hit,x:hit.x-offsetX,z:hit.z-offsetZ});
-      result.bite=billet.revision!==before;
+      const at=sourcePoint(target,hit);
+      if(hit.sideFace)sideEntry(at,billet);
+      const result=billet.strike({...at,nx:hit.grainNX??hit.nx,nz:hit.grainNZ??hit.nz,energy:hit.energy});
+      result.bite=billet.revision!==before;result.area=billet.area;
       if(result.bite){
-        chipHit={x:hit.x,y:hit.y??top+wood.height,z:hit.z,angle:Math.atan2(hit.nz,hit.nx)};
+        chipHit={x:hit.x,y:hit.y,z:hit.z,angle:Math.atan2(hit.nz,hit.nx)};
         flakes.count=result.split?8:4;
       }
       const cut=result.cut;
-      if(cut)result.cut={...cut,x:cut.x+offsetX,z:cut.z+offsetZ};
+      if(cut){
+        const point=onMesh(target,cut.x,at.y,cut.z);
+        normal.set(cut.nx,0,cut.nz).applyQuaternion(target.quaternion);
+        result.cut={...cut,x:point.x,y:point.y,z:point.z,nx:normal.x,ny:normal.y,nz:normal.z};
+      }
       if(!result.split){
         if(result.bite){
           target.geometry.dispose();
@@ -174,21 +198,17 @@ export function makeSplittingBlock(model){
         }
         return result;
       }
-      stock.delete(target);
+      result.pieces=result.pieces.map(({polygon,center,billet:child,...body})=>{
+        const geometry=oakGeometry(billet,polygon,cut,center,billet.height/2);
+        const mesh=marker(new T.Mesh(geometry,materials),'Split oak firewood');
+        mesh.position.copy(onMesh(target,center.x,billet.height/2,center.z));
+        mesh.quaternion.copy(target.quaternion);
+        if(child)timber.set(mesh,{wood:child,center,centerY:billet.height/2});
+        return {mesh,...body,choppable:!!child};
+      });
+      supported.delete(target);
       if(target===round)round.visible=false;
       else {target.removeFromParent();target.geometry.dispose();}
-      const airborne=[];
-      for(const {polygon,center,half,...body} of result.pieces){
-        const geometry=oakGeometry(billet,polygon,cut,center,billet.height/2);
-        const mesh=marker(new T.Mesh(geometry,materials),half?'Oak half on block':'Split oak firewood');
-        mesh.position.set(center.x+offsetX,top+billet.height/2,center.z+offsetZ);
-        if(half){
-          root.add(mesh);stock.set(mesh,{wood:half,center,centerY:billet.height/2});
-          mesh.userData.choppingHull={hull:body.hull,height:body.height};
-          opening.push({mesh,center,shiftX:body.side*cut.nx*.028,shiftZ:body.side*cut.nz*.028});
-        }else airborne.push({mesh,...body});
-      }
-      result.pieces=airborne;
       return result;
     }
   };

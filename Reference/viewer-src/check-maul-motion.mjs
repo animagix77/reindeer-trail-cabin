@@ -40,12 +40,44 @@ test('resistant oak arrests the face, returns a small bounce and damps it; a gla
       const low=fromContact(.025),high=fromContact(.09),settled=fromContact(.14);
       assert(low.y<target.y && low.y>target.y-.025);
       assert(high.y>target.y+.035 && high.y<target.y+.08);
-      assert(settled.y<high.y-.012 && settled.y>target.y);
+      assert(settled.y<high.y-.012);
+      if(outcome==='bite')assert(Math.abs(settled.y-target.y)<.009,'The head falls back into its shallow kerf');
+      else assert(settled.y>target.y,'A glancing bit skips free');
       const skid=Math.hypot(high.x-target.x,high.z-target.z);
       if(outcome==='glance')assert(skid>.045);
       else assert(skid<.025);
     }
   }
+});
+
+test('the hands load the handle before the head lifts, then change leverage to recover it from a split',()=>{
+  const {tool,aim,edge,stroke,fromContact}=equipped('split');
+  const opening=edge(),buttY=tool.maul.position.y;
+  const loaded=stroke(.065/aim.duration);
+  assert(tool.maul.position.y>buttY+.045 && loaded.y<opening.y-.018,'The hands must lead the heavy head');
+  const splitDepth=fromContact(.103).y;
+  const grip=tool.maul.getObjectByName('Right work glove'),atImpact=grip.position.z;
+  const lifting=fromContact(.165);
+  assert(Math.abs(lifting.y-splitDepth)<.012,'The heavy head stays low while the hands lever the handle');
+  assert(grip.position.z<atImpact-.065,'The guide hand chokes up to recover the maul');
+  assert(fromContact(.25).y>lifting.y+.09,'Extraction must carry the head back up');
+});
+
+test('the steel edge stops above the stump when it splits a low piece of kindling',()=>{
+  const {aim,tool,target,stroke}=equipped('split');
+  aim.blockTop=target.y-.033;
+  const steel=tool.maul.getObjectByName('Forged wedge head').geometry.attributes.position;
+  assert(stroke(tool.impactFraction).distanceTo(target)<1e-6);
+  const vertex=new T.Vector3();
+  let minimum=Infinity;
+  for(let i=1;i<=50;i++){
+    stroke(tool.impactFraction+(1-tool.impactFraction)*i/50);
+    for(let j=0;j<steel.count;j++){
+      vertex.fromBufferAttribute(steel,j).applyQuaternion(tool.maul.quaternion).add(tool.maul.position);
+      minimum=Math.min(minimum,vertex.y);
+    }
+  }
+  assert(minimum>=aim.blockTop-.0001 && minimum<aim.blockTop+.005);
 });
 
 test('reduced motion preserves exact impact without playing the windup or bouncing the viewmodel',()=>{

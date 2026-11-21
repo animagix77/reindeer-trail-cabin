@@ -239,7 +239,7 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     obj.rotation.set(k==='logs'?.36:0,-.54,-.20);obj.position.set(-.005,k==='logs'?.051:.012,-.026);
     carry[k]=obj;obj.visible=false;palm.add(obj);
   }
-  let held=null,inFlight=null,body=null,currentView='property',message='Gather loose wood at the foot of the woodpile.';
+  let held=null,heldSplit=null,inFlight=null,body=null,currentView='property',message='Gather loose wood at the foot of the woodpile.';
   let lastDrop=null,reportedState,clock=performance.now()*.001;
   let offeringFood=false;
   let nearPit=false,nearStockpile=false,canToss=false,nearby=[],lastReport='';
@@ -260,7 +260,7 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     return true;
   }
   const token=()=>[...kinds.map(k=>counts[k]),held||'',!!inFlight,nearPit,nearStockpile,canToss,nearby.join(),message].join('|');
-  function snapshot(){return {counts:{...counts},held,nearby:[...nearby],canToss,inFlight:!!inFlight,nearPit,nearStockpile,message};}
+  function snapshot(){return {counts:{...counts},held,heldName:heldSplit && held!=='logs'?'kindling':null,nearby:[...nearby],canToss,inFlight:!!inFlight,nearPit,nearStockpile,message};}
   function notify(text){
     if(text!==undefined)message=text;
     const changed=token();if(changed===lastReport)return;
@@ -272,7 +272,7 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     nearPit=Boolean(yard&&Math.abs(body.y-ring.y)<.92&&distance(ring)<=5.5);
     nearStockpile=Boolean(yard&&distance(anchors.sticks)<3.4&&Math.abs(body.y-anchors.sticks.y)<.70);
     nearby=nearStockpile?kinds.filter(k=>distance(anchors[k])<=1.65):[];
-    for(const k of kinds)carry[k].visible=k===held;
+    for(const k of kinds)carry[k].visible=k===held && !heldSplit;
     palm.visible=!!held&&!!body&&currentView!=='property'&&!offeringFood;
     if(palm.visible){
       const rightEdge=Math.tan(T.MathUtils.degToRad(camera.fov)*.5)*Math.min(camera.aspect,1.5);
@@ -303,16 +303,31 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     held=k;stock[k].count=--counts[k];
     return result(true,'Carrying a '+names[k]+'. Take it to the fire pit.');
   }
-  function takeSplitLog(){
+  function takeSplitLog(massKg=2,mesh){
     if(held||inFlight)return result(false,'Finish with the wood in your hand first.');
-    held='logs';return result(true,'Carrying your freshly split log. Take it to the fire pit.');
+    held=massKg<.22?'twigs':massKg<1?'sticks':'logs';
+    if(mesh){
+      // The pile can dispose its geometry as soon as it is picked up. Keep the
+      // exact cut faces and bark and turn the upright billet across the palm.
+      const cut=mesh.geometry.clone().center().rotateZ(-Math.PI/2);
+      heldSplit=new T.Mesh(cut,mesh.material);
+      heldSplit.name='Freshly split oak';
+      heldSplit.position.copy(carry[held].position);
+      heldSplit.rotation.copy(carry[held].rotation);
+      palm.add(heldSplit);
+    }
+    return result(true,held==='logs'?'Carrying your freshly split log.':'Carrying your split kindling.');
+  }
+  function discardSplit(mesh){
+    if(mesh){mesh.removeFromParent();mesh.geometry.dispose();}
   }
   function putBack(){
     if(!held||inFlight)return false;
     const k=held;
     if(!nearby.includes(k))return result(false,'Return to the woodpile to put this wood back.');
     if(counts[k]>=stock[k].instanceMatrix.count)return result(false,'The woodpile is full.');
-    stock[k].count=++counts[k];held=null;return result(true,'The '+names[k]+' is back on the pile.');
+    stock[k].count=++counts[k];held=null;discardSplit(heldSplit);heldSplit=null;
+    return result(true,'The wood is back on the pile.');
   }
   function stackedPose(kind,i){
     const a=i*2.39996+kinds.indexOf(kind)*2.03,r=.08+.047*(i%3);
@@ -326,9 +341,9 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     if(offeringFood)return result(false,'Put the deer food away before tossing firewood.');
     measure();
     if(!canToss)return result(false,'Stand near the fire pit and turn toward the ring.');
-    const kind=held,mesh=carry[kind].clone();
+    const kind=held,source=heldSplit||carry[kind],mesh=source.clone();
     mesh.visible=true;scene.add(mesh);
-    carry[kind].getWorldPosition(mesh.position);carry[kind].getWorldQuaternion(mesh.quaternion);
+    source.getWorldPosition(mesh.position);source.getWorldQuaternion(mesh.quaternion);
     const stockAtPit=fires.fuelSnapshot()[kind];
     const index=Math.min(7,Math.ceil(stockAtPit/fuelDuration[kind]));
     const destination=stackedPose(kind,index);
@@ -340,8 +355,10 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     const clearance=ringRadius-(kind==='twigs'?.16:.23);
     const motion=createTossMotion({kind,start:mesh.position,contact,duration,orientation:mesh.quaternion,
       groundAt:(x,z)=>Math.hypot(x-ring.x,z-ring.z)<=clearance?contact.y:null});
-    inFlight={kind,mesh,motion,start:clock};
-    held=null;return result(true,'Tossing the '+names[kind]+'.');
+    const label=heldSplit && kind!=='logs'?'kindling':names[kind];
+    inFlight={kind,mesh,motion,start:clock,fromBlock:!!heldSplit,label};
+    heldSplit?.removeFromParent();heldSplit=null;
+    held=null;return result(true,'Tossing the '+label+'.');
   }
   function settleFuel(){
     const banks=fires.fuelSnapshot();
@@ -351,13 +368,18 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
       lastFuel[kind]=bank;
       const total=bank/fuelDuration[kind],count=Math.ceil(total);
       const mesh=laid[kind];mesh.count=count;
+      for(const old of restPoses[kind].splice(count))discardSplit(old?.mesh);
       restPoses[kind].length=count;
       for(let i=0;i<count;i++){
         const pose=stackedPose(kind,i);
         const resting=restPoses[kind][i];
         if(resting){pose.position.copy(resting.position);pose.quaternion.copy(resting.quaternion);}
         const intact=clamp(total-i,0,1);
-        pose.scale.setScalar(.42+.58*Math.sqrt(intact));
+        const scale=.42+.58*Math.sqrt(intact);
+        if(resting?.mesh){
+          resting.mesh.scale.setScalar(scale);
+          pose.scale.setScalar(0);
+        }else pose.scale.setScalar(scale);
         pose.updateMatrix();mesh.setMatrixAt(i,pose.matrix);
         const char=.84*(1.-intact);
         mesh.setColorAt(i,tintValue.copy(white).lerp(charcoal,char));
@@ -370,19 +392,21 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     if(inFlight){
       const f=inFlight;
       if(f.motion.sample(time-f.start,f.mesh)){
-        scene.remove(f.mesh);inFlight=null;
+        if(!f.fromBlock)scene.remove(f.mesh);
+        inFlight=null;
         fires.addFuel(f.kind);
         const slot=Math.ceil(fires.fuelSnapshot()[f.kind]/fuelDuration[f.kind])-1;
-        restPoses[f.kind][slot]={position:f.mesh.position.clone(),quaternion:f.mesh.quaternion.clone()};
+        discardSplit(restPoses[f.kind][slot]?.mesh);
+        restPoses[f.kind][slot]={position:f.mesh.position.clone(),quaternion:f.mesh.quaternion.clone(),mesh:f.fromBlock?f.mesh:null};
         lastFuel[f.kind]=-1;
         onFuelAdded(f.kind);
-        lastDrop=f.kind;
+        lastDrop=f.label;
         measure();
       }
     }
     if(lastDrop){
       if(fires.fuelLevel<=.001){message='Gather more wood at the woodpile.';lastDrop=null;}
-      else message=fires.lit?'The fire is lit. Add more wood to build it up.':'The '+names[lastDrop]+' is in the ring. Light the fire when you’re ready.';
+      else message=fires.lit?'The fire is lit. Add more wood to build it up.':'The '+lastDrop+' is in the ring. Light the fire when you’re ready.';
     }
     settleFuel();
     notify();

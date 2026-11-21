@@ -75,22 +75,29 @@ function channel(ctx,kind,channelIndex){
 }
 // Strike, tearing fibers and landing wood use separate envelopes. A half
 // knocking the stump can sound before its later impact on the ground.
-function splittingSound(ctx,outcome,variant){
+function splittingSound(ctx,outcome,variant,woodSize){
   const rate=22050,buf=ctx.createBuffer(1,Math.ceil(rate*.34),rate),samples=buf.getChannelData(0);
   const rng=random(5941+variant*3351+outcome.length*113);
   const split=outcome==='split',landing=outcome==='landing',glance=outcome==='glance';
-  const pitch=(landing?82:glance?183:111)*(.92+.16*rng()),decay=landing?39:27;
+  const pitch=(landing?82:glance?183:181-87*woodSize)*(.92+.16*rng());
+  const decay=landing?39:45-18*woodSize;
   const tearAt=.012+.009*rng();
+  // The maul and stump give contact a short low knock, even on a light billet.
+  // The wood above it has its own pitch and opens over a longer time on a full round.
+  const stumpHz=74+5*rng(),tearDecay=100-58*woodSize;
   let previous=0,low=0;
   for(let i=0;i<samples.length;i++){
     const t=i/rate,white=rng()*2-1,fiberTime=t-tearAt;
     low+=.14*(white-low);
     const impulse=(landing?low:.48*(white-previous))*Math.exp(-t*(glance?72:164));
     const block=(.64*Math.sin(tau*pitch*t)+.31*Math.sin(tau*pitch*2.27*t)*Math.exp(-t*19))*Math.exp(-t*decay);
-    const fibers=split && fiberTime>0?(white-.7*low)*Math.exp(-fiberTime*66)*(.55+.45*Math.cos(810*fiberTime)**2):0;
+    const stumpTime=t-.004;
+    const stump=!landing && !glance && stumpTime>0
+      ?.5*Math.sin(tau*stumpHz*stumpTime)*Math.exp(-stumpTime*23):0;
+    const fibers=split && fiberTime>0?(white-.7*low)*Math.exp(-fiberTime*tearDecay)*(.55+.45*Math.cos(810*fiberTime)**2):0;
     const ring=glance?.20*Math.sin(tau*691*t)*Math.exp(-t*47):0;
     previous=white;
-    samples[i]=Math.tanh(impulse+block+1.24*fibers+ring)*Math.min(1,i/8);
+    samples[i]=Math.tanh(impulse+stump+block+1.24*fibers+ring)*Math.min(1,i/8);
   }
   return buf;
 }
@@ -139,10 +146,11 @@ export function installWoodlandSound() {
     last[key]=value;param.setTargetAtTime(value,audio.currentTime,lag);
   }
   const hidden=()=>document.hidden;
-  function woodSound(outcome,volume){
+  function woodSound(outcome,volume,sectionArea=.035){
     if(!enabled || audio?.state!=='running' || hidden())return;
-    const variant=impactNumber++%3,key=outcome+variant;
-    if(!impacts.has(key))impacts.set(key,splittingSound(audio,outcome,variant));
+    const band=Math.round(4*THREE.MathUtils.clamp(Math.sqrt(Math.max(0,sectionArea)/.06),0,1));
+    const variant=impactNumber++%3,key=outcome+variant+'-'+band;
+    if(!impacts.has(key))impacts.set(key,splittingSound(audio,outcome,variant,band/4));
     const source=audio.createBufferSource(),gain=audio.createGain();
     source.buffer=impacts.get(key);source.playbackRate.value=.97+.06*Math.random();
     gain.gain.value=volume;source.connect(gain);gain.connect(bus);
@@ -192,8 +200,8 @@ export function installWoodlandSound() {
       source.buffer=swingBuffer;source.playbackRate.value=swingBuffer.duration/seconds;
       source.connect(bus);source.onended=()=>source.disconnect();source.start();
     },
-    strike(strength,outcome=strength>.6?'split':'glance'){
-      woodSound(outcome,.32+.57*THREE.MathUtils.clamp(strength,0,1));
+    strike(strength,outcome=strength>.6?'split':'glance',sectionArea){
+      woodSound(outcome,.32+.57*THREE.MathUtils.clamp(strength,0,1),sectionArea);
     },
     woodImpact(speed){
       woodSound('landing',THREE.MathUtils.clamp((speed-.28)*.13,0,.46));

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import {installWoodSplitting} from './wood-splitting.js';
 import {WalkSpace} from './walking.js';
+import {makeSplittingBlock} from './splitting-block.js';
 import './check-maul-motion.mjs';
 
 // The HUD and texture canvas are stand-ins. The maul, raycasts, fracture,
@@ -40,13 +41,13 @@ function setup(t,{touch=false,reduced=false}={}){
   globalThis.matchMedia=query=>({matches:query.includes('coarse')?touch:reduced});
   t.after(()=>{delete globalThis.document;delete globalThis.window;delete globalThis.matchMedia;});
   let seconds=100,busy=false;
-  const strikes=[],landings=[];
+  const strikes=[],areas=[],landings=[],carried=[];
   t.mock.method(performance,'now',()=>seconds*1000);
   const camera=new T.PerspectiveCamera(62,1000/700,.035,200),scene=new T.Scene();
   const ground={heights:()=>[{label:'WalkSurface_ParcelGround',y:0}],add(){}};
   const game=installWoodSplitting(scene,new T.Group(),ground,{
-    camera,schedule(){},takeSplitLog(){busy=true;return true;},handsBusy:()=>busy,
-    onSwing(){},onStrike:(energy,result)=>strikes.push(result),onContact:speed=>landings.push(speed)
+    camera,schedule(){},takeSplitLog(mass,mesh){busy=true;carried.push({mass,mesh});return true;},handsBusy:()=>busy,
+    onSwing(){},onStrike:(energy,result,area)=>{strikes.push(result);areas.push(area)},onContact:speed=>landings.push(speed)
   });
   const station=scene.getObjectByName('Driveway wood splitting'),axe=station.getObjectByName('Splitting maul');
   const round=station.getObjectByName('Unsplit round');
@@ -74,17 +75,17 @@ function setup(t,{touch=false,reduced=false}={}){
   function tap(point){pointer('pointerdown',point);pointer('pointerup',point);}
   const shaft=()=>screen(axe,0,0,-.27);
   const grain=(x,z)=>screen(round,x,.29,z);
-  const halves=()=>station.children.filter(o=>o.name==='Oak half on block');
+  const clear=()=>el('split-clear').dispatchEvent(new Event('click'));
   const halfGrain=(mesh,x=0,z=0)=>screen(mesh,x,.145,z);
   const guided=()=>el('split-action').dispatchEvent(new Event('click'));
   const collect=()=>el('split-collect').dispatchEvent(new Event('click'));
   const pieces=()=>station.children.filter(obj=>obj.name==='Split oak firewood');
   stand(.04,.96);
-  return {el,axe,round,station,halves,halfGrain,guided,time,tick,until,stand,stage,pointer,tap,shaft,grain,collect,pieces,strikes,landings};
+  return {el,axe,round,station,clear,carried,areas,halfGrain,guided,time,tick,until,stand,stage,pointer,tap,shaft,grain,collect,pieces,strikes,landings};
 }
 
-test('clicking the maul and a round leaves two aimable halves; quartering both builds a physical pile',t=>{
-  const {el,stage,stand,pointer,tap,shaft,grain,round,axe,station,tick,until,collect,pieces,strikes,landings,halves,halfGrain,guided}=setup(t);
+test('clicking a supported piece repeatedly splits that same piece past quarters; clearing frees the block and preserves the pile',t=>{
+  const {el,stage,stand,pointer,tap,shaft,grain,round,axe,station,tick,until,collect,pieces,strikes,areas,landings,carried,clear,halfGrain,guided}=setup(t);
   const reticle=el('split-reticle'),strength=el('split-strength');
   assert.equal(stage(),'parked');assert(!reticle.hidden);
   tap([30,30]);assert.equal(stage(),'parked');
@@ -106,46 +107,57 @@ test('clicking the maul and a round leaves two aimable halves; quartering both b
   const edge=head.geometry.boundingBox.getCenter(new T.Vector3());edge.y=head.geometry.boundingBox.min.y;
   station.worldToLocal(head.localToWorld(edge));
   assert(Math.hypot(edge.x-x,edge.z-z)<.004,'The cutting edge landed on the first selected spot');
-  assert(!round.visible);assert.equal(halves().length,2);assert.equal(pieces().length,0);
-  collect();assert.equal(pieces().length,0,'Upright halves are still on the block');
-  until(()=>stage()==='ready','The next cut should be available well before full stamina');
-  assert(strength.value<82);assert.equal(reticle.dataset.ready,'true');
-  const [left,right]=halves();
-  tap(halfGrain(right));until(()=>stage()==='ready','Finish cutting the selected half');
-  assert.deepEqual(halves(),[left]);assert.equal(pieces().length,2);assert(!round.visible);
-  const firstPair=pieces();
-  guided();
-  until(()=>strikes.length===3,'The guided action should also target the remaining half');
-  assert.deepEqual(strikes,['split','split','split']);assert.equal(pieces().length,4);
-  assert(firstPair.every(p=>pieces().includes(p)));
-  until(()=>stage()==='ready','Clearing the block should allow the next round to load');
-  assert(round.visible);assert(landings.length>0,'Falling wood reached a collider');
-  assert(pieces().some(p=>p.position.y<.30),'The quarters fell off the chopping face');
+  assert(!round.visible);assert.equal(pieces().length,2);
+  collect();assert.equal(pieces().length,2,'Wood cannot be collected during the stroke');
+  const ready=()=>until(()=>stage()==='ready','Waiting for a supported piece');
+  ready();assert(strength.value<82);assert.equal(reticle.dataset.ready,'true');
+  let parent=pieces()[0];const otherHalf=pieces()[1];
+  for(let i=0;i<3;i++){
+    const before=pieces(),hitCount=strikes.length;
+    // The selected piece has its own rigid-body pose and its own end grain.
+    // Let the piece settle before aiming at the real surface.
+    for(let n=0;n<65;n++)tick(1/60);
+    tap(halfGrain(parent));until(()=>strikes.length>hitCount,'Tap the retained descendant');
+    assert.equal(strikes.at(-1),'split');assert(!pieces().includes(parent));
+    const children=pieces().filter(p=>!before.includes(p));
+    assert.equal(children.length,2);assert(pieces().includes(otherHalf),'Aiming at a child cannot fracture the other half');
+    assert(areas.at(-1)<areas.at(-2),'Impact feedback uses the struck cross-section');
+    parent=children.reduce((best,p)=>p.geometry.boundingSphere.radius>best.geometry.boundingSphere.radius?p:best);
+    ready();
+  }
+  assert.equal(pieces().length,5);assert(!round.visible,'There is no four-piece reload');
+  for(let n=0;n<600;n++)tick(1/60);
+  assert(!round.visible,'A settled supported billet is never automatically cleared');
+  assert(!el('split-clear').hidden);clear();
+  until(()=>round.visible && stage()==='ready','Clearing the block should allow the next round to load');
+  assert.equal(pieces().length,5);assert(landings.length>0,'Falling wood reached a collider');
+  assert(pieces().some(p=>p.position.y<.30),'The split pieces fell off the chopping face');
+  guided();until(()=>stage()!=='swinging','Spend stamina');
   const previousStrength=strength.value;
   for(let i=0;i<90;i++)tick(1/60,true);
   assert.equal(strength.value,previousStrength,'Walking pauses recovery');
   tick(.5);assert(strength.value>previousStrength && strength.value<100);
-  collect();assert.equal(stage(),'parked');assert.equal(pieces().length,3);
-  collect();tap(grip);assert.equal(pieces().length,3);assert.equal(stage(),'parked','Carrying a log occupies both hands');
+  const previous=pieces();collect();assert.equal(stage(),'parked');assert.equal(pieces().length,previous.length-1);
+  assert(carried[0].mass>0 && previous.includes(carried[0].mesh) && !pieces().includes(carried[0].mesh));
+  collect();tap(grip);assert.equal(pieces().length,previous.length-1);assert.equal(stage(),'parked','Carrying a log occupies both hands');
 });
 
 test('tougher oak keeps its cut between strikes from different spots and a different stance',t=>{
-  const {el,tap,shaft,grain,stand,stage,round,strikes,pieces,until,tick,guided}=setup(t);
+  const {el,tap,shaft,grain,stand,stage,round,strikes,pieces,until,tick,clear}=setup(t);
   const ready=()=>until(()=>stage()==='ready','Next swing should become available');
   tap(shaft());ready();tap(grain(0,0));tick(2);
   assert.deepEqual(strikes,['split'],'A low frame rate still sweeps the edge across the round');
-  ready();guided();ready();guided();ready();
+  ready();clear();until(()=>round.visible && stage()==='ready','Load a fresh round after clearing the supported halves');
   until(()=>el('split-strength').value===100,'Recover fully before the next round');
   const pristine=round.geometry;
-  tap(grain(0,0));until(()=>strikes.length===4,'Expected contact with the second round');
-  assert.deepEqual(strikes,['split','split','split','bite']);assert.equal(pieces().length,4);
+  tap(grain(0,0));until(()=>strikes.length===2,'Expected contact with the second round');
+  assert.deepEqual(strikes,['split','bite']);assert.equal(pieces().length,2);
   assert(round.visible);assert.notEqual(round.geometry,pristine);assert.match(el('split-message').textContent,/crack/i);
   ready();
   // Shift around the stump and aim at the far end of the first cut.
   stand(.22,.90);tap(grain(.006,.09));
-  until(()=>strikes.length===5,'A second strike from a new stance should land');
-  assert.equal(strikes.at(-1),'split');assert.equal(pieces().length,4);
-  ready();assert.equal(pieces().length,4,'The existing pile stays in place as the next billet cleaves');
+  until(()=>strikes.length===3,'A second strike from a new stance should land');
+  assert.equal(strikes.at(-1),'split');assert.equal(pieces().length,4);ready();
 });
 
 test('touch, reduced motion, reach limits and a walk-away never create ghost strikes',t=>{
@@ -168,8 +180,9 @@ test('touch, reduced motion, reach limits and a walk-away never create ghost str
   assert(el('split-strength').value<100,'Returning to the block cannot refill strength');
   tap(grain(0,0));tick(1);
   assert.deepEqual(strikes,['split'],'The reduced-motion strike still hits real wood');
-  assert.equal(pieces().length,0);el('split-action').dispatchEvent(new Event('click'));tick(1);
-  assert.equal(pieces().length,2);stand(0,1.65);collect();assert.equal(pieces().length,2);
+  assert.equal(pieces().length,2);until(()=>stage()==='ready','Wait for the splitting face to settle');
+  el('split-action').dispatchEvent(new Event('click'));until(()=>strikes.length===2,'Guided touch strike');
+  assert.equal(pieces().length,3);stand(0,1.65);collect();assert.equal(pieces().length,3);
   assert(el('split-collect').disabled,'Wood cannot be collected out of reach');
 });
 
@@ -199,4 +212,23 @@ test('chopping immediately spends reserve and lengthens successive swings; resti
   until(()=>meter.value===100,'Full rest should restore the initial cadence');
   const start=time();guided();until(()=>stage()!=='swinging','Complete the fresh stroke');
   assert(Math.abs(time()-start-lengths[0])<.025);
+});
+
+test('a side-lying billet cleaves along its own grain and children inherit its pose',()=>{
+  const station=makeSplittingBlock(new T.Group()),round=station.round;
+  const first=station.impact({target:round,x:0,y:.76,z:0,nx:1,nz:0,energy:1});
+  assert.equal(first.pieces.length,2);
+  const half=first.pieces[0].mesh;
+  half.rotation.z=Math.PI/2;half.position.set(.03,.55,-.02);
+  station.root.add(half);station.setSupported(half,true);station.root.updateMatrixWorld(true);
+  const ray=new T.Raycaster(new T.Vector3(half.position.x,1,half.position.z),new T.Vector3(0,-1,0));
+  const contact=ray.intersectObject(half)[0];assert(contact);
+  const aim=station.aimDirection(half,1,0,contact.face.normal);
+  const next=station.impact({target:half,...contact.point,...aim,energy:1});
+  assert(next.split);
+  for(const {mesh} of next.pieces){
+    assert(mesh.quaternion.angleTo(half.quaternion)<1e-6,'Child stays aligned to the side-lying parent');
+    assert(mesh.position.distanceTo(half.position)<.16,'Child originates at the fallen billet');
+  }
+  assert(Math.abs(next.cut.nz)>.5,'The cut stays along the physical length of the fallen wood');
 });

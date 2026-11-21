@@ -100,4 +100,24 @@ export function checkFirewood(model,space){
   fires.setFirePitOn(true);now+=11;fires.update(camera,'yard',now);
   assert.equal(fires.fuelSnapshot().twigs,0);
   assert.equal(fires.fuelSnapshot().logs,217);assert.equal(deliveries,4);
+  // The original pile mesh is released on collection. The billet keeps its
+  // cut shape from palm to coals, including pieces that only burn as kindling.
+  fires.setFirePitOn(false);
+  for(const [mass,kind] of [[.12,'twigs'],[.63,'sticks'],[2.1,'logs']]){
+    fires.applyFuel({twigs:0,sticks:0,logs:0});wood.update(body,'yard',now);
+    const source=new T.Mesh(new T.BoxGeometry(.035,.29,.045),new T.MeshStandardMaterial());
+    assert(wood.takeSplitLog(mass,source));assert.equal(wood.state.held,kind);
+    const hand=world.getObjectByName('Freshly split oak');
+    assert.notEqual(hand.geometry,source.geometry);assert.equal(hand.material,source.material);
+    const size=new T.Vector3();hand.geometry.computeBoundingBox();hand.geometry.boundingBox.getSize(size);
+    assert(Math.abs(size.x-.29)<1e-5,'The cut face and full billet length survived pickup');
+    source.geometry.dispose();assert(wood.toss());
+    now+=3;wood.update(body,'yard',now);
+    const landed=world.getObjectByName('Freshly split oak');
+    assert.equal(landed.geometry,hand.geometry);assert.equal(landed.parent,world);
+    assert.equal(fires.fuelSnapshot()[kind],fuelDuration[kind]);
+    let disposed=false;landed.geometry.addEventListener('dispose',()=>{disposed=true;});
+    fires.applyFuel({twigs:0,sticks:0,logs:0});wood.update(body,'yard',now);
+    assert(!landed.parent && disposed);source.material.dispose();
+  }
 }

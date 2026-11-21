@@ -1,8 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createOakRound,oakGeometry} from './wood-fracture.js';
-import {makeSplittingBlock} from './splitting-block.js';
-import {Group} from 'three';
 
 const blow=(x=0,z=0,nx=1,nz=0,energy=.85)=>({x,z,nx,nz,energy});
 function area(ring){
@@ -64,38 +62,60 @@ test('fresh split oak pieces have complementary cut surfaces, centered collision
   }
 });
 
-test('a full round and its two upright halves give exactly four pieces and preserve both cleavage faces',t=>{
-  globalThis.document={createElement:()=>({getContext:()=>({fillRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){}})})};
-  t.after(()=>{delete globalThis.document;});
-  const station=makeSplittingBlock(new Group());
-  const first=station.impact(blow());
-  assert(first.split);assert.equal(station.round.visible,false);
-  assert.equal(first.pieces.length,0,'Both halves remain on the stump');
-  const halves=station.targets;assert.equal(halves.length,2);
-  assert.equal(station.begin(),false,'The next round cannot overwrite remaining halves');
-  station.rest();
-  let sum=0;
-  for(const half of halves){
-    const center=station.grainCenter(half),direction=station.aimDirection(half,1,0);
-    assert(Math.abs(direction.nz)>.7,'Aim across the first seam to produce quarters');
-    const second=station.impact({...blow(center.x,center.z,direction.nx,direction.nz,1),target:half});
-    assert(second.split);assert.equal(second.pieces.length,2);
-    for(const p of second.pieces){
-      assert(p.mesh.isMesh && p.hull.length>=3 && p.density>600);
-      assert.equal(p.mesh.position.y,station.top+p.height/2);
-      assert.deepEqual(p.mesh.geometry.groups.map(g=>g.materialIndex),[0,1,2]);
-      const geom=p.mesh.geometry,face=geom.groups[2],normals=geom.attributes.normal;
-      const normal0=[normals.getX(face.start),normals.getZ(face.start)];
-      assert(Array.from({length:face.count},(_,i)=>face.start+i).some(i=>Math.abs(normal0[0]*normals.getX(i)+normal0[1]*normals.getZ(i))<.65),'Quarter retains the two distinct internal split faces');
-      assert(volume(geom)>area(p.hull)*p.height*.98);
-      sum+=area(p.hull);
+test('repeated cuts preserve each piece of the original round down to kindling size',()=>{
+  const whole=createOakRound(0);
+  const pending=[{wood:whole,level:0}];
+  const terminal=[];
+  let deepest=0,splitQuarter=false,observedHeartwood=false;
+  while(pending.length){
+    const {wood,level}=pending.pop();
+    const {nx,nz}=wood.grainDirection(1,0);
+    const {x,z}=wood.center,hit=blow(x,z,nx,nz,1);
+    let result;
+    for(let i=0;i<5&&!result?.split;i++)result=wood.strike(hit);
+    assert(result.split,'Fresh strength should split a centered billet in a few blows');
+    assert(!wood.strike(hit).split,'A spent billet must not create duplicate fragments');
+    if(level===2)splitQuarter=true;
+    const total=result.pieces.reduce((sum,p)=>sum+area(p.hull),0);
+    assert(Math.abs(total-area(wood.ring))<1e-9);
+    for(const p of result.pieces){
+      assert(p.hull.length>=3 && area(p.hull)>0);
+      const geometry=oakGeometry(wood,p.polygon,result.cut,p.center,p.height/2);
+      const groups=geometry.groups.map(g=>g.materialIndex);
+      assert(groups.includes(1) && groups.includes(2),'All pieces have end grain and split grain');
+      if(!groups.includes(0))observedHeartwood=true;
+      const nominal=area(p.hull)*p.height,v=volume(geometry);
+      // The facets follow wandering fibres and cuts remove a little end grain.
+      assert(v>nominal*.89 && v<nominal*1.07,'A fragment must remain a solid billet');
+      if(p.billet){
+        assert(Math.abs(p.billet.area-area(p.hull))<1e-10);
+        assert(p.billet.faces.some(f=>f===result.cut));
+        for(const f of wood.faces){
+          const on=p=>Math.abs((p.x-f.x)*f.nx+(p.z-f.z)*f.nz)<1e-9;
+          const retained=p.polygon.some((a,i)=>on(a)&&on(p.polygon[(i+1)%p.polygon.length]));
+          assert.equal(p.billet.faces.includes(f),retained,'Each edge keeps its original cleavage face');
+        }
+        pending.push({wood:p.billet,level:level+1});
+      }else{
+        terminal.push(p);deepest=Math.max(deepest,level+1);
+      }
+      geometry.dispose();
     }
-    assert(!station.impact({...blow(),target:half}).split,'A spent half cannot be struck twice');
   }
-  assert(Math.abs(sum-area(createOakRound(0).ring))<1e-8);
-  assert.equal(station.targets.length,0);assert(station.begin());
-  assert(station.round.visible);assert.equal(station.progress,0);
-  const pristine=station.round.geometry;
-  const dent=station.impact(blow());assert(!dent.split);assert(dent.bite);
-  assert.notEqual(station.round.geometry,pristine);
+  assert(splitQuarter && deepest>=5 && deepest<13);
+  assert(terminal.length>16);
+  assert(observedHeartwood,'Pieces from the middle must not grow bark on inherited cut faces');
+  assert(Math.abs(terminal.reduce((sum,p)=>sum+area(p.hull),0)-area(whole.ring))<1e-9);
+});
+
+test('guidance favors a billet’s broad dimension while still respecting the strike bearing',()=>{
+  const first=createOakRound(0).strike(blow(0,0,1,0,1));
+  const half=first.pieces[0].billet;
+  const left=half.grainDirection(-1,.2),right=half.grainDirection(1,.2);
+  assert(left.nz>.8 && right.nz>.8 && left.nx<right.nx);
+  const center=half.center;
+  const offset=blow(center.x*.6,center.z+.046,0,1,1);
+  const quarter=half.strike(offset);
+  assert(quarter.split);assert(quarter.pieces.every(p=>p.billet));
+  assert(area(quarter.pieces[0].hull)<area(quarter.pieces[1].hull)*.7,'Off-center split leaves an unequal pair');
 });

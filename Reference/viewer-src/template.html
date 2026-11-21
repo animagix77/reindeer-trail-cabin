@@ -116,6 +116,7 @@
 
 #woodwork{position:absolute;z-index:4;bottom:max(82px,env(safe-area-inset-bottom));left:clamp(12px,3vw,55px);width:min(265px,calc(100vw - 20px));padding:10px 12px;border:1px solid #d6dec44d;border-radius:10px;background:linear-gradient(125deg,#29372ff2,#17231ff2);color:#faf6e9;box-shadow:0 4px 18px #0d171d40}
 .wood-heading,.split-power,.wood-actions{display:flex;align-items:center;gap:7px}
+.wood-actions{flex-wrap:wrap}
 .wood-heading{justify-content:space-between}
 #woodwork h2{font:500 1.15rem/1.1 "Baskervville","Iowan Old Style",Georgia,serif;margin:0}
 #split-score{font-size:.71rem;color:#e0d8bc;font-variant-numeric:tabular-nums}
@@ -343,7 +344,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
   <div class="wood-heading"><h2 id="split-title">Splitting block</h2><span id="split-score" hidden></span></div>
   <div class="split-power"><label for="split-strength">Strength</label><meter id="split-strength" min="0" max="100" value="100"></meter><span id="split-strength-value" aria-hidden="true">100%</span></div>
   <p id="split-message" role="status"></p>
-  <div class="wood-actions"><button type="button" id="split-action">Pick up axe</button><button type="button" id="split-collect" hidden>Carry a piece</button></div>
+  <div class="wood-actions"><button type="button" id="split-action">Pick up axe</button><button type="button" id="split-clear" hidden>Clear block</button><button type="button" id="split-collect" hidden>Carry a piece</button></div>
 </section>
 <div id="stick" role="group" aria-label="Movement pad" hidden><span id="nub"></span></div><section id="activity" hidden aria-labelledby="activity-title">
   <div class="activity-title"><h2 id="activity-title"></h2><button id="activity-close" aria-label="Close activity">×</button></div>
@@ -358,7 +359,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
     </fieldset>
     <div class="activity-actions"><button class="primary" id="hold-food">Hold out</button><button id="toss-food">Toss</button><button id="refill-basket">Refill</button></div><p id="deer-message" role="status"></p></div></section>
 <div class="dock" id="tools" hidden>
-  <div><p class="hint" id="hint"><span id="walk-keys" hidden><span><kbd>W</kbd><kbd>S</kbd> Walk</span><span><kbd>A</kbd><kbd>D</kbd> Turn</span></span><span id="look-gesture">Drag to look</span></p></div>
+  <div><p class="hint" id="hint"><span id="walk-keys" hidden><span><kbd>W</kbd><kbd>S</kbd> Walk</span><span><kbd>A</kbd><kbd>D</kbd> Sidestep</span><span><kbd>←</kbd><kbd>→</kbd> Turn</span></span><span id="look-gesture">Drag to look</span></p></div>
   <nav aria-label="Walking tools">
     <button id="flashlight" type="button" aria-pressed="false" aria-keyshortcuts="L" title="Flashlight (L)" hidden>Flashlight</button>
     <button id="scene-stars" type="button" title="Set a clear night sky and look for stars">Stargaze</button>
@@ -368,7 +369,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 <dialog id="tour-guide" aria-labelledby="guide-title">
   <div class="guide-heading"><h2 id="guide-title">Cabin guide</h2><button type="button" id="guide-close" aria-label="Close cabin guide">×</button></div>
   <h3>Getting around</h3>
-  <p class="guide-keys">W and S walk forward and back. A and D turn. Page Up and Page Down look up and down. You can also drag to look around. Click what you want to use, or press E when an action appears.</p>
+  <p class="guide-keys">W and S walk forward and back. A and D sidestep. Drag to look around, or turn with the left and right arrows. Page Up and Page Down look up and down. Click what you want to use, or press E when an action appears.</p>
   <p class="guide-touch">Move with the left pad and drag the scene to look around. Tap an object or its action when you get close.</p>
   <div class="guide-row">
     <button id="lock" type="button" hidden>Mouse look</button>

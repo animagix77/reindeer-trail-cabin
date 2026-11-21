@@ -64,11 +64,11 @@ export function installWorldActions({model,canvas,camera,firewood,activities,sce
       case 'chair':return seatOccupied(t.number)?'':'Sit by the fire';
       case 'pit':
         if(wood?.inFlight)return '';
-        if(wood?.held)return wood.canToss?'Toss '+woodNames[wood.held]+' into fire':'';
+        if(wood?.held)return wood.canToss?'Toss '+(wood.heldName||woodNames[wood.held])+' into fire':'';
         return sceneControls.isFireLit()?'Put out fire':'Light fire';
       default:
         if(!wood || wood.inFlight || activities.offeringFood || !wood.nearby.includes(t.id))return '';
-        if(wood.held)return wood.held===t.id?'Put back '+woodNames[t.id]:'';
+        if(wood.held)return wood.held===t.id?'Put back '+(wood.heldName||woodNames[t.id]):'';
         return wood.counts[t.id]>0?'Pick up '+woodNames[t.id]:'';
     }
   }

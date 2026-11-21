@@ -4,13 +4,13 @@ import * as T from 'three';
 import {createSplitPhysics} from './split-physics.js';
 
 const material=new T.MeshStandardMaterial();
-function station(groundAt=()=>0,onContact){
+function station(groundAt=()=>0,onContact,onSupport){
   const root=new T.Group();
   const stump=new T.Mesh(new T.CylinderGeometry(.305,.305,.47,20),material);
   stump.name='Scored chopping stump';stump.position.y=.235;root.add(stump);
   const round=new T.Mesh(new T.CylinderGeometry(.135,.135,.29,20),material);
   round.name='Unsplit round';round.visible=false;root.add(round);
-  return {root,round,physics:createSplitPhysics({root,groundAt,onContact})};
+  return {root,round,physics:createSplitPhysics({root,groundAt,onContact,onSupport})};
 }
 function halves(angle,r=.135){
   const height=.29;
@@ -95,4 +95,22 @@ test('a loading round wakes and pushes settled wood in its path',()=>{
   assert.equal(physics.count,2);
   while(physics.take()){}
   assert(!physics.blocksStep(0,0,0));
+});
+
+test('a loose billet can land sideways on the stump and remain available until the visitor clears it',()=>{
+  const changes=[],{physics}=station(()=>0,null,(mesh,supported)=>changes.push(supported));
+  const {result,cut}=halves(0,.08),piece=result[0];
+  piece.mesh.position.set(0,.83,0);piece.mesh.rotation.z=Math.PI/2;piece.choppable=true;
+  // An already loose billet falls without another wedging impulse.
+  physics.release([piece],{...cut,nx:0,nz:0});
+  assert(Number.isFinite(settle(physics)));
+  assert.deepEqual(changes,[true],'Actual support promotes a returned sideways piece');
+  assert(!physics.canLoad());assert.equal(physics.clearBlock(),0,'Automatic reloading cannot nudge usable timber');
+  assert(Math.abs(piece.mesh.quaternion.z)>.5,'The solver preserved the landed orientation');
+  assert(physics.clearBlock(true)>0);assert(Number.isFinite(settle(physics)));
+  assert.equal(changes.at(-1),false);assert(physics.canLoad());
+  let carried;
+  assert(!physics.take(()=>false),'With occupied hands nothing is removed');
+  assert(physics.take((mass,mesh)=>{carried={mass,mesh};return true;}));
+  assert.equal(carried.mesh,piece.mesh);assert(carried.mass>0);assert.equal(physics.count,0);
 });

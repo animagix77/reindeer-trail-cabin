@@ -34,7 +34,7 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     box.updateMatrixWorld();space.add(box,'WalkBlock_Splitting'+name);box.geometry.dispose();box.material.dispose();
   }
   blocker('Block',0,0,.51,.51,.60);blocker('Rounds',-.92,-.16,.94,.40,.59);
-  const physics=createSplitPhysics({root,groundAt,getWorkpieces:()=>station.targets,onContact:speed=>{
+  const physics=createSplitPhysics({root,groundAt,onSupport:station.setSupported,onContact:speed=>{
     const range=Math.hypot(camera.position.x-x,camera.position.z-z);
     if(range<10)onContact?.(speed*Math.min(1,2/Math.max(1,range)));
   }});
@@ -42,22 +42,23 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
   const view={eye:eye.toArray(),target:worldPoint(0,.72,0).toArray(),fov:62};
   const el=id=>document.getElementById(id);
   const panel=el('woodwork'),action=el('split-action'),collect=el('split-collect');
+  const clear=el('split-clear');
   const power=el('split-strength'),readout=el('split-strength-value'),reticle=el('split-reticle');
   const pile=el('split-score'),message=el('split-message'),canvas=el('view');
   const reduced=matchMedia('(prefers-reduced-motion: reduce)'),touch=matchMedia('(pointer: coarse)');
   let near=false,distance=Infinity,equipped=false,drawnAt=0,strength=1,exhausted=false,recoverAt=0,lastTick=now();
-  let swing=null,queuedHit=null,reloadAfter=null,loading=null,lastClear=0,lastShadow=0,hint='',hover=null;
+  let swing=null,queuedHit=null,reloadAfter=null,loading=null,clearing=false,lastClear=0,lastShadow=0,hint='',hover=null;
   const stump=root.getObjectByName('Scored chopping stump');
   const ray=new T.Raycaster(),ndc=new T.Vector2(),point=new T.Vector3(),viewer=new T.Vector3();
   const oldEdge=new T.Vector3(),newEdge=new T.Vector3(),projected=new T.Vector3();
-  const suggested=new T.Vector2();
+  let preferred=null,notch=null;
   function dirty(){model.userData.lightRevision=(model.userData.lightRevision||0)+1;}
   function canInput(){return near && !document.querySelector('dialog[open]');}
   function phase(t){
     if(!equipped)return 'parked';
     if(swing)return 'swinging';
     if(t<drawnAt+(reduced.matches?0:drawSeconds))return 'drawing';
-    if(loading || reloadAfter!==null)return 'loading';
+    if(loading || clearing || reloadAfter!==null || !station.targets.length)return 'loading';
     return exhausted?'recovering':'ready';
   }
   function canReach(){return distance<=(equipped?swingReach:pickupReach);}
@@ -71,6 +72,7 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     const quantity=n+' split '+(n===1?'piece':'pieces');
     if(pile.textContent!==quantity)pile.textContent=quantity;
     pile.hidden=!n;collect.hidden=!n;collect.disabled=!!swing||distance>pickupReach;
+    clear.hidden=station.round.visible || !n || loading!==null || !equipped;clear.disabled=clearing || !!swing || distance>swingReach;
     const text=equipped?'Swing':'Pick up axe';
     if(action.textContent!==text)action.textContent=text;
     action.disabled=!canReach() || !['ready','parked'].includes(stage);
@@ -78,16 +80,17 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     if(!guide && !canReach())guide='Step closer to the block.';
     if(!guide && stage==='parked')guide=touch.matches?'Tap the axe to pick it up.':'Click the axe to pick it up.';
     if(!guide && stage==='ready'){
-      const wood=station.round.visible?'the round':'a half';
-      guide=(touch.matches?'Tap':'Click')+' a spot on '+wood+'.';
+      const gesture=touch.matches?'Tap':'Click';
+      guide=gesture+(station.round.visible?' where you want to split the round.':' a piece on the stump to split it again.');
     }
-    if(!guide && stage==='loading')guide='Setting the next round on the block.';
+    if(!guide && stage==='loading')guide=loading?'Setting the next round on the block.':clearing?'Clearing the stump.':'Let the wood settle.';
     if(message.textContent!==guide)message.textContent=guide;
   }
 
   function aimAt(x,z,target){
-    // Recast onto the end grain. A strike on the side aims at the rim above it.
-    ray.set(worldPoint(x,station.top+station.height+.10,z),new T.Vector3(0,-1,0));
+    // Sweep down onto the actual visible cutting surface, even if a billet
+    // lies on its side. Its transform also fixes the orientation of the grain.
+    ray.set(worldPoint(x,station.top+1,z),new T.Vector3(0,-1,0));
     ray.far=Infinity;
     const candidates=target?[target]:station.targets;
     for(const mesh of candidates)mesh.updateWorldMatrix(true,false);
@@ -97,14 +100,26 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     const bearing=Math.atan2(viewer.x-point.x,viewer.z-point.z);
     const lateral=(point.x*Math.cos(bearing)-point.z*Math.sin(bearing))/station.radius;
     const angle=bearing+.36*clamp(lateral,-1,1);
-    return {kind:'round',target:top.object,x:point.x,y:point.y,z:point.z,...station.aimDirection(top.object,Math.cos(angle),-Math.sin(angle))};
+    const anchor=top.object.worldToLocal(top.point.clone());
+    return {kind:'round',target:top.object,anchor,x:point.x,y:point.y,z:point.z,...station.aimDirection(top.object,Math.cos(angle),-Math.sin(angle),top.face.normal)};
+  }
+  function guidedAim(){
+    const stock=station.targets;
+    const target=stock.includes(preferred)?preferred:stock[0];
+    if(!target)return null;
+    if(target===preferred && notch){
+      const p=notch.clone().applyQuaternion(target.quaternion).add(target.position);
+      const aim=aimAt(p.x,p.z,target);if(aim)return aim;
+    }
+    const center=station.grainCenter(target);
+    return aimAt(center.x,center.z,target);
   }
   function hitTest(clientX,clientY,slop=0){
     const rect=canvas.getBoundingClientRect();
     const nx=clientX==null?0:2*(clientX-rect.left)/rect.width-1;
     const ny=clientY==null?0:1-2*(clientY-rect.top)/rect.height;
     camera.updateWorldMatrix(true,false);root.updateWorldMatrix(true,true);
-    const stock=station.targets,targets=[stump,cache,...stock];
+    const stock=station.targets,targets=[stump,cache,...new Set([...stock,...physics.surface])];
     if(!equipped)targets.push(station.maul);
     const offsets=slop?[[0,0],[slop,0],[-slop,0],[0,slop],[0,-slop]]:[[0,0]];
     for(const [dx,dy] of offsets){
@@ -126,15 +141,15 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
   }
   function showTarget(t){
     reticle.hidden=true;
-    if(!near||!canReach()||!canInput()||swing||loading||reloadAfter!==null)return;
+    if(!near||!canReach()||!canInput()||swing||loading||clearing||reloadAfter!==null)return;
     const locked=document.pointerLockElement===canvas;
     const hit=locked?hitTest(null,null):hover;
     if(locked&&!hit)return;
     if(equipped){
       if(!station.targets.length)return;
-      if(hit?.kind==='round')projected.set(hit.x,hit.y+.003,hit.z);
-      else projected.set(suggested.x,station.top+station.height+.003,suggested.y);
-      root.localToWorld(projected);
+      const aim=hit?.kind==='round' && station.targets.includes(hit.target)?hit:guidedAim();
+      if(!aim)return;
+      aim.target.localToWorld(projected.copy(aim.anchor));projected.y+=.003;
     }else station.maul.localToWorld(projected.set(0,0,-.27));
     camera.updateWorldMatrix(true,false);projected.project(camera);
     if(Math.abs(projected.x)>.995||Math.abs(projected.y)>.995||Math.abs(projected.z)>1)return;
@@ -155,7 +170,7 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
   }
   function strike(aim){
     const t=now();
-    if(!aim || !equipped || distance>swingReach || exhausted || reloadAfter!==null || loading || !station.targets.includes(aim.target))return false;
+    if(!aim || !equipped || distance>swingReach || exhausted || clearing || reloadAfter!==null || loading || !station.targets.includes(aim.target))return false;
     if(swing){
       if(t-swing.start>=swing.duration-.14)queuedHit??=aim;
       return false;
@@ -164,7 +179,7 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     const stamina=strength;
     const duration=(reduced.matches?.48:station.swingDuration)*(1+.95*(1-stamina)**1.35);
     strength=Math.max(0,strength-effort);exhausted=strength<minimumStrength;
-    swing={start:t,duration,aim:{...aim,stamina,endStamina:strength,duration},contact:false,whoosh:false};
+    swing={start:t,duration,aim:{...aim,blockTop:station.top,stamina,endStamina:strength,duration},contact:false,whoosh:false};
     recoverAt=t+duration+.86;hint='';hover=null;canvas.style.cursor='';
     refresh();return true;
   }
@@ -174,26 +189,20 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
       swing.aim.outcome='glance';onStrike(.28,'glance');hint='Glancing blow. Aim inside the rim.';return;
     }
     const contact=root.worldToLocal(hit.point.clone());
-    const result=station.impact({...swing.aim,x:contact.x,z:contact.z,energy:.68+.32*swing.aim.stamina});
+    const result=station.impact({...swing.aim,x:contact.x,y:contact.y,z:contact.z,energy:.68+.32*swing.aim.stamina});
     swing.aim.outcome=result.split?'split':result.bite?'bite':'glance';
-    onStrike((result.split?1:result.bite?.7:.28)*(.76+.24*swing.aim.stamina),swing.aim.outcome);
+    onStrike((result.split?1:result.bite?.7:.28)*(.76+.24*swing.aim.stamina),swing.aim.outcome,result.area);
     if(result.split){
-      if(result.pieces.length)physics.release(result.pieces,result.cut);
-      const next=station.grainCenter();
-      if(next){
-        suggested.set(next.x,next.z);
-        hint=result.pieces.length?'Split the remaining half.':'Aim across either half to quarter it.';
-      }else{
-        reloadAfter=t+.15;lastClear=t;hint='';
-      }
+      physics.release(result.pieces,result.cut,swing.aim.target);
+      preferred=result.pieces.find(piece=>piece.choppable)?.mesh;notch=null;
+      hint='';
     }else if(result.bite){
-      // Mark a spot along the opened check, leaving its mouth visible.
-      const {x,z,nx,nz}=result.cut;
+      physics.lodge(swing.aim.target,contact,.68+.32*swing.aim.stamina);
+      const {x,y,z,nx,nz}=result.cut;
       const direction=z*nx-x*nz>0?-1:1;
-      suggested.set(x-direction*.045*nz,z+direction*.045*nx);
-      if(!aimAt(suggested.x,suggested.y,swing.aim.target)){
-        const center=station.grainCenter(swing.aim.target);suggested.set(center.x,center.z);
-      }
+      preferred=swing.aim.target;
+      notch=new T.Vector3(x-direction*.027*nz,y,z+direction*.027*nx)
+        .sub(preferred.position).applyQuaternion(preferred.quaternion.clone().invert());
       hint='Follow the crack toward either end.';
     }else hint='Glancing blow. Aim inside the rim.';
     dirty();
@@ -217,8 +226,8 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
         const length=oldEdge.distanceTo(newEdge);
         if(length>1e-7){
           ray.set(oldEdge,point.subVectors(newEdge,oldEdge).normalize());
-          ray.far=length+.0015;
-          hit=ray.intersectObjects([...station.targets,stump],false)[0];
+          ray.far=length+.003;
+          hit=ray.intersectObjects([stump,...new Set([...station.targets,...physics.surface])],false)[0];
         }
         oldEdge.copy(newEdge);
       }
@@ -226,20 +235,20 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
       resolveImpact(hit,t);
     }
     station.stroke(end,true,reduced.matches,camera,s.aim);
-    if(end===1){
-      swing=null;
-      // The halves have finished separating, so the guided action can strike
-      // the middle of the remaining timber even after a low-frame-rate hit.
-      if(s.aim.outcome==='split'){
-        const next=station.grainCenter();if(next)suggested.set(next.x,next.z);
-      }
-    }
+    if(end===1)swing=null;
   }
   function reload(t){
+    if(clearing){
+      if(physics.canLoad())clearing=false;
+      else if(t-lastClear>.72){physics.clearBlock(true);lastClear=t;}
+    }
+    if(!loading && !clearing && !station.round.visible && !swing){
+      if(station.targets.length)reloadAfter=null;
+      else reloadAfter??=t+.28;
+    }
     if(reloadAfter!==null && t>=reloadAfter && !swing){
       if(physics.canLoad()){
-        station.begin();suggested.set(0,0);loading={start:t};reloadAfter=null;
-        hint='';dirty();
+        station.begin();preferred=notch=null;loading={start:t};reloadAfter=null;hint='';dirty();
       }else if(t-lastClear>1.5){physics.clearBlock();lastClear=t;}
     }
     if(!loading)return;
@@ -279,13 +288,18 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
   action.addEventListener('click',()=>{
     if(!canInput()||!canReach())return;
     if(!equipped)pickup();
-    else if(!reticle.hidden)strike(document.pointerLockElement===canvas?hitTest(null,null):aimAt(suggested.x,suggested.y));
+    else if(!reticle.hidden)strike(document.pointerLockElement===canvas?hitTest(null,null):guidedAim());
     canvas.focus({preventScroll:true});
+  });
+  clear.addEventListener('click',()=>{
+    if(!canInput() || !equipped || swing || loading || station.round.visible || distance>swingReach)return;
+    physics.clearBlock(true);clearing=true;preferred=notch=null;hint='';lastClear=now();
+    canvas.focus({preventScroll:true});refresh();
   });
   collect.addEventListener('click',()=>{
     if(!canInput()||distance>pickupReach||swing||!physics.count)return;
-    if(!handsBusy() && takeSplitLog()){
-      physics.take();returnAxe();hint='Take your split log to the fire pit.';
+    if(!handsBusy() && physics.take(takeSplitLog)){
+      returnAxe();hint='Take your wood to the fire pit.';
     }else hint='Your hands are full.';
     canvas.focus({preventScroll:true});refresh();
   });
@@ -328,7 +342,7 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
       }
       if(distance<9 && (activePhysics || loading || swing) && seconds-lastShadow>=.12){dirty();lastShadow=seconds;}
       hud(seconds);showTarget(seconds);
-      return activePhysics || !!loading || reloadAfter!==null || !!swing || (strength<1&&!moving) || phase(seconds)==='drawing';
+      return activePhysics || clearing || !!loading || reloadAfter!==null || !!swing || (strength<1&&!moving) || phase(seconds)==='drawing';
     }
   };
 }

@@ -40,6 +40,18 @@ function nearPolygon(x,z,polygon) {
   return (polygon.length>=3 && inside)||minDistance<RADIUS*RADIUS;
 }
 
+// Movement is relative to the visitor’s horizontal look direction. Keep
+// turning separate so sidestepping never changes the aim of a held tool.
+export function walkIntent(keys,pad,yaw,dt){
+  const turn=Number(keys.has('ArrowLeft'))-Number(keys.has('ArrowRight'));
+  yaw+=turn*THREE.MathUtils.degToRad(100)*dt;
+  const side=Number(keys.has('KeyD'))-Number(keys.has('KeyA'))+pad.x;
+  const forward=Number(keys.has('KeyW')||keys.has('ArrowUp'))-Number(keys.has('KeyS')||keys.has('ArrowDown'))-pad.y;
+  const scale=Math.max(1,Math.hypot(side,forward));
+  const cos=Math.cos(yaw),sin=Math.sin(yaw);
+  return {yaw,turn,x:(cos*side-sin*forward)/scale,z:(-sin*side-cos*forward)/scale};
+}
+
 export class WalkSpace {
   floors=new Map();
   blocks=new Map();
