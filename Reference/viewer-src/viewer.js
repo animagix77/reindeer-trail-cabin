@@ -31,7 +31,6 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const element = id => document.getElementById(id);
 const canvas = element('view');
 const controlsPanel = element('tools');
-const loading=installLoadingScreen();
 let sceneCanRender=false;
 const camera = new THREE.PerspectiveCamera(39,1,0.03,4000);
 const world = new THREE.Scene();
@@ -424,6 +423,7 @@ const welcome=installWelcome({
     canvas.focus({preventScroll:true});
   }
 });
+const loading=installLoadingScreen(welcome.setLoadState);
 const tourInterface=installTourInterface({
   stopMovement(){stopWalking();pointers.clear();},
   resume(){if(sceneCanRender)schedule();},

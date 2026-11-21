@@ -18,7 +18,7 @@ function transferTime(seconds){
   return 'About '+minutes+(minutes===1?' minute':' minutes')+' left';
 }
 
-export function installLoadingScreen(){
+export function installLoadingScreen(setWelcomeState){
   const full=document.getElementById('status'),compact=document.getElementById('welcome-loading');
   const dialog=document.getElementById('welcome'),canvas=document.getElementById('view');
   const views=[full,compact].map(host=>{
@@ -81,6 +81,7 @@ export function installLoadingScreen(){
       finished=true;canvas.inert=false;canvas.setAttribute('aria-busy','false');
       display('ready','Ready to explore','','',100);
       full.hidden=true;compact.hidden=!dialog.open;
+      setWelcomeState('ready');
       if(!dialog.open && document.activeElement===document.body)canvas.focus({preventScroll:true});
     },
     failed(message){
@@ -88,7 +89,7 @@ export function installLoadingScreen(){
       failed=true;canvas.setAttribute('aria-busy','false');
       full.hidden=false;compact.hidden=false;
       display('error','The cabin couldn’t open',message);
-      document.getElementById('welcome-start').disabled=true;
+      setWelcomeState('error');
       views[dialog.open?1:0].retry.focus({preventScroll:true});
     }
   };

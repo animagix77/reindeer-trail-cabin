@@ -49,8 +49,9 @@
 .welcome-copy .welcome-location{color:#536347;font-size:.78rem;letter-spacing:.1em;margin:0 0 16px}
 #welcome-title{font:400 clamp(3.25rem,5.5vw,5.4rem)/.94 "Baskervville","Iowan Old Style",Georgia,serif;letter-spacing:-.053em;color:#213926;margin:0 0 24px;text-wrap:balance}
 .welcome-copy p{margin:0 0 14px}.welcome-photo{display:block;min-height:100%;height:100%;object-fit:cover;object-position:55% 60%;min-width:0;position:absolute;inset:0 0 0 auto;width:55%}
-#welcome-start{margin-top:10px;background:#29472f;color:#fffdf3;padding:12px 19px;border-radius:7px;display:inline-flex;gap:20px;align-items:center;min-height:45px}
-#welcome-start:hover{background:#173621}#welcome-start span+span{font-size:1.15rem;line-height:1}
+#welcome-start{margin-top:10px;background:#29472f;color:#fffdf3;padding:12px 19px;border-radius:7px;display:inline-flex;gap:20px;align-items:center;justify-content:center;min-width:10rem;min-height:45px}
+#welcome-start:enabled:hover{background:#173621}#welcome-start span+span{font-size:1.15rem;line-height:1}
+#welcome-start:disabled{background:#d6d6d3;color:#484846;cursor:default}#welcome-start:disabled span+span{display:none}
 #welcome-close{position:absolute;right:12px;top:12px;width:35px;height:35px;min-width:35px;min-height:35px;display:grid;place-content:center;line-height:1;padding:0;border-radius:50%;background:#f6f3e8ee;color:#293e2d;font-size:1.4rem}
 #welcome button:focus-visible{outline:3px solid #9a672d;outline-offset:3px}
 
@@ -392,7 +393,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
   <div class="welcome-layout">
     <div class="welcome-copy">
       <p class="welcome-location">Smallwood, New York</p>
-      <h2 id="welcome-title">The Reindeer Trail</h2>
+      <h2 id="welcome-title" tabindex="-1">The Reindeer Trail</h2>
       <div id="welcome-loading" class="load-progress">
       <div class="load-line"><span data-load-stage role="status">Opening the cabin…</span><span data-load-percent aria-hidden="true"></span></div>
       <div class="load-track"><progress data-load-bar max="100" aria-label="Cabin loading progress"></progress></div>
@@ -401,7 +402,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
     </div>
       <p>We come here for the things we love about camping. Fresh air. Supper outdoors. A circle of chairs where there’s always room to pull up one more.</p>
       <p>Inside, there’s a warm kitchen and a bed for the night. Out by the fire, you can hear the crickets as the embers settle. On a clear night, give your eyes a minute. The stars are worth staying up for.</p>
-      <button type="button" id="welcome-start"><span>Start exploring</span><span aria-hidden="true">→</span></button>
+      <button type="button" id="welcome-start" disabled><span>Loading…</span><span aria-hidden="true">→</span></button>
     </div>
     <div class="welcome-photo">
       <img class="welcome-image" src="data:image/webp;base64,%%WELCOME_PHOTO%%" alt="Snow covers the backyard chairs and fire ring beneath string lights stretching from the pergola to the cabin deck.">
