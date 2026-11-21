@@ -4,8 +4,10 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {WalkSpace,walkIntent} from './walking.js';
+import {walkingGait} from './footsteps.js';
 import {checkFirewood} from './check-firewood.mjs';
 import {checkWorldActions} from './check-world-actions.mjs';
+import {installEggSwings} from './egg-swings.js';
 
 const bytes=await fs.readFile(process.argv[2]);
 assert.equal(bytes.readUInt32LE(8),bytes.length,'GLB is incomplete');
@@ -97,6 +99,39 @@ for(const {id,ring} of neighborhood.homes){
     return sum+x*v-y*u;
   },0))*.5;
   assert(Math.abs(roofArea-planArea)<.02,'Roof differs from mapped footprint on '+id);
+}
+// Step-height rocks need support at their actual exposed faces. The surrounding
+// packed gravel should stay close to the visitor's feet through its shallow ridges.
+{
+  const byPart=name=>{
+    const matches=[];scene.traverse(o=>{if(o.isMesh && o.userData.part===name)matches.push(o);});
+    return matches;
+  };
+  const banks=byPart('Garden · bank fieldstone and scattered cobbles');
+  const chips=byPart('Garden · loose chips on graded paths');
+  const supports=byPart('WalkSurface_WoodlandFieldstone');
+  assert.equal(banks.length,1,'Woodland rocks should be batched');
+  assert.equal(chips.length,1,'Gravel chips should be batched');
+  assert.equal(supports.length,1,'Missing fieldstone walking surface');
+  for(const mesh of [banks[0],chips[0]])assert(mesh.geometry.hasAttribute('color'),'Missing natural stone tints');
+  const support=supports[0],geo=support.geometry,indices=geo.index;
+  for(let i=0;i<indices.count;i+=3*Math.max(1,Math.floor(indices.count/48))){
+    const point=new T.Vector3();
+    for(let j=0;j<3;j++)point.add(new T.Vector3().fromBufferAttribute(geo.attributes.position,indices.getX(i+j)));
+    point.multiplyScalar(1/3).applyMatrix4(support.matrixWorld);
+    const from=point.clone();from.y+=1;
+    const top=hits(banks,from,down)[0]?.point.y;
+    const foot=walks.heights(point.x,point.z).find(h=>h.label===support.userData.part && Math.abs(h.y-top)<.001);
+    assert(foot,'Feet and visible fieldstone disagree');
+  }
+  const pad=byPart('Rear gravel fire circle');
+  for(let j=0;j<24;j++){
+    const a=2*Math.PI*j/24,r=.82;
+    const from=at(24.85+9.65*r*Math.cos(a),55.4+13*r*Math.sin(a),25);
+    const top=hits(pad,from,down)[0].point.y;
+    const foot=walks.heights(from.x,from.z).find(h=>h.label==='WalkSurface_FireCircleGravel');
+    assert(foot && Math.abs(foot.y-top)<.005,'Fire-circle gravel and walking height disagree');
+  }
 }
 // Both faces of the pergola carry bulbs, with a direct run to the deck and a
 // longer return by the picnic table. Check the rendered filaments in plan.
@@ -214,6 +249,14 @@ scene.traverse(mesh=>{
   if(/^Front hall [|] shoe bench/.test(part))shoeRack.push(mesh);
 });
 const axisX=at(1,0,0).sub(at(0,0,0)).normalize(),againstX=axisX.clone().negate();
+// A keydown can be timestamped just after the next animation frame's own timestamp.
+{
+  const gait=walkingGait();
+  const height=gait.update(.02,1/60,false,()=>{},false);
+  assert.equal(gait.update(0,0,false,()=>{},false),height,'A zero-time frame preserves the current head height');
+  assert.ok(Number.isFinite(gait.update(.02,1/60,false,()=>{},false)),'Head motion resumes on the next walking frame');
+}
+
 // Hold each strafe key in the actual entry hallway with the camera facing
 // along it. The visitor can step toward both walls without changing aim.
 {
@@ -633,6 +676,34 @@ const paved=hardFinishes.reduce((sum,key)=>sum+counts[key],0)/sampleCount;
 assert(paved>.63,'Paving should cover roughly two-thirds of the developed frontage');
 for(const [x,y,expected] of [[21.38,-20.7,hardFinishes[1]],[21.38,-17,hardFinishes[1]],[28,-15.9,hardFinishes[2]]]){
   assert.equal(hits(land,at(x,y,10),down)[0]?.object.material.name,expected,'Frontage finish at '+[x,y]);
+}
+// Verify the moving pieces on the same combined meshes used by the viewer.
+{
+  const preferences={matches:false},update=installEggSwings(scene,preferences);
+  const camera=new T.PerspectiveCamera(68,1,.035,200);
+  camera.position.copy(scene.getObjectByName('TourEye_yard').getWorldPosition(new T.Vector3()));
+  camera.lookAt(scene.getObjectByName('TourLook_yard').getWorldPosition(new T.Vector3()));
+  const poses=[1,2].map(id=>{
+    const pivot=scene.getObjectByName('EggSwingPivot'+id);
+    assert.equal(pivot.children.length,3,'The chain, wicker and cushion must stay together');
+    const [links,,pad]=pivot.children;
+    const anchor=pivot.getWorldPosition(new T.Vector3());
+    assert(Math.abs(anchor.y-new T.Box3().setFromObject(links).max.y)<.001);
+    const local=pad.geometry.boundingBox.getCenter(new T.Vector3());
+    return {pivot,pad,local,start:pad.localToWorld(local.clone()),anchor};
+  });
+  assert(update(camera,.5,true),'The chairs should animate in the backyard view');
+  for(const {pivot,pad,local,start,anchor} of poses){
+    const current=pad.localToWorld(local.clone());
+    assert(current.distanceTo(start)>.001 && current.distanceTo(start)<.035);
+    assert(pivot.getWorldPosition(new T.Vector3()).distanceTo(anchor)<1e-6);
+    assert(Math.abs(current.distanceTo(anchor)-start.distanceTo(anchor))<1e-6);
+  }
+  preferences.matches=true;
+  assert.equal(update(camera,1,true),false);
+  assert(poses.every(({pad,local,start})=>pad.localToWorld(local.clone()).distanceTo(start)<1e-6));
+  preferences.matches=false;camera.position.y+=50;
+  assert.equal(update(camera,2,true),false,'Distant swings should not request animation frames');
 }
 console.log(`Checked ${primitives} mesh primitives, ${triangles.toLocaleString()} triangles and ${spawns} authored walk starts. Straight front hall, kitchen counter backing, side doorways, entry, front ground, well casing and stair access, pergola lighting, covered-deck window and firewood rack, tree nook closure, primary passage, loft stairs, the two straight basement steps and basement round trips passed.`);
 console.log('Developed frontage paving',Math.round(paved*1000)/10+'%',counts);

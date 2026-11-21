@@ -28,7 +28,7 @@ test('walking respects a heap and still lets a visitor escape if wood topples in
   assert(space.move(around,1,0).x>.9);
 });
 
-function setup(t,{touch=false,reduced=false}={}){
+function setup(t,{touch=false,reduced=false,stocking=false}={}){
   const elements=new Map();
   function el(id){
     if(!elements.has(id))elements.set(id,new Element());
@@ -42,11 +42,12 @@ function setup(t,{touch=false,reduced=false}={}){
   t.after(()=>{delete globalThis.document;delete globalThis.window;delete globalThis.matchMedia;});
   let seconds=100,busy=false;
   const strikes=[],areas=[],landings=[],carried=[];
+  let stocked=0;
   t.mock.method(performance,'now',()=>seconds*1000);
   const camera=new T.PerspectiveCamera(62,1000/700,.035,200),scene=new T.Scene();
   const ground={heights:()=>[{label:'WalkSurface_ParcelGround',y:0}],add(){}};
   const game=installWoodSplitting(scene,new T.Group(),ground,{
-    camera,schedule(){},takeSplitLog(mass,mesh){busy=true;carried.push({mass,mesh});return true;},handsBusy:()=>busy,
+    camera,schedule(){},stockTotal:()=>stocked,onStockWood:stocking?n=>{stocked+=n;}:undefined,takeSplitLog(mass,mesh){busy=true;carried.push({mass,mesh});return true;},handsBusy:()=>busy,
     onSwing(){},onStrike:(energy,result,area)=>{strikes.push(result);areas.push(area)},onContact:speed=>landings.push(speed)
   });
   const station=scene.getObjectByName('Driveway wood splitting'),axe=station.getObjectByName('Splitting maul');
@@ -81,7 +82,7 @@ function setup(t,{touch=false,reduced=false}={}){
   const collect=()=>el('split-collect').dispatchEvent(new Event('click'));
   const pieces=()=>station.children.filter(obj=>obj.name==='Split oak firewood');
   stand(.04,.96);
-  return {el,axe,round,station,clear,carried,areas,halfGrain,guided,time,tick,until,stand,stage,pointer,tap,shaft,grain,collect,pieces,strikes,landings};
+  return {el,axe,round,station,clear,stocked:()=>stocked,carried,areas,halfGrain,guided,time,tick,until,stand,stage,pointer,tap,shaft,grain,collect,pieces,strikes,landings};
 }
 
 test('clicking a supported piece repeatedly splits that same piece past quarters; clearing frees the block and preserves the pile',t=>{
@@ -99,7 +100,7 @@ test('clicking a supported piece repeatedly splits that same piece past quarters
   tap(grain(x,z));tap(grain(-.07,-.04));
   assert.equal(stage(),'drawing');
   until(()=>stage()==='swinging','Queued swing never started');
-  assert(strength.value>=78 && strength.value<=80);assert(reticle.hidden);
+  assert(strength.value>=86 && strength.value<=87);assert(reticle.hidden);
   for(let i=0;i<500 && !strikes.length;i++)tick(.0025);
   assert.deepEqual(strikes,['split']);
   const head=axe.getObjectByName('Forged wedge head');
@@ -110,7 +111,7 @@ test('clicking a supported piece repeatedly splits that same piece past quarters
   assert(!round.visible);assert.equal(pieces().length,2);
   collect();assert.equal(pieces().length,2,'Wood cannot be collected during the stroke');
   const ready=()=>until(()=>stage()==='ready','Waiting for a supported piece');
-  ready();assert(strength.value<82);assert.equal(reticle.dataset.ready,'true');
+  ready();assert(strength.value<89);assert.equal(reticle.dataset.ready,'true');
   let parent=pieces()[0];const otherHalf=pieces()[1];
   for(let i=0;i<3;i++){
     const before=pieces(),hitCount=strikes.length;
@@ -187,7 +188,7 @@ test('touch, reduced motion, reach limits and a walk-away never create ghost str
 });
 
 
-test('chopping immediately spends reserve and lengthens successive swings; resting restores fresh cadence',t=>{
+test('the first three heavy swings stay quick; repeated work tires the visitor and rest restores full cadence',t=>{
   const {el,tap,shaft,stage,guided,time,tick,until,strikes}=setup(t);
   const meter=el('split-strength');
   const ready=()=>until(()=>stage()==='ready','Waiting for an available round or rested arms');
@@ -203,7 +204,9 @@ test('chopping immediately spends reserve and lengthens successive swings; resti
     until(()=>stage()==='ready'||stage()==='recovering','Finish loading');
     if(stage()==='recovering')break;
   }
-  assert(lengths.length>=4 && lengths[1]>lengths[0] && Math.max(...lengths)>lengths[0]*1.45,'Last tired swing visibly slows');
+  assert(lengths.length>=7 && lengths.length<=10,'At least seven full strokes before stopping to rest');
+  assert(lengths.slice(0,3).every(n=>Math.abs(n-lengths[0])<.025),'First three strokes have fresh cadence');
+  assert(Math.max(...lengths)>lengths[0]*1.45,'Last tired swing visibly slows');
   assert(meter.value<16);assert.equal(stage(),'recovering');
   const stoppedAt=strikes.length,spent=meter.value;
   guided();for(let i=0;i<120;i++)tick(1/60,true);
@@ -212,6 +215,29 @@ test('chopping immediately spends reserve and lengthens successive swings; resti
   until(()=>meter.value===100,'Full rest should restore the initial cadence');
   const start=time();guided();until(()=>stage()!=='swinging','Complete the fresh stroke');
   assert(Math.abs(time()-start-lengths[0])<.025);
+});
+
+test('only donated pieces count, once, after they settle away from the chopping face',t=>{
+  const {stage,shaft,tap,guided,tick,until,stocked,carried,collect,pieces}=setup(t,{stocking:true});
+  const ready=()=>until(()=>stage()==='ready','Waiting for the wood to settle');
+  tap(shaft());ready();guided();ready();
+  assert.equal(pieces().length,2);assert.equal(stocked(),0);
+  // Both halves remain on the stump long enough to be split again.
+  for(let i=0;i<240;i++)tick(1/60);
+  guided();ready();assert.equal(pieces().length,3);assert.equal(stocked(),0);
+  collect();assert.equal(carried.length,1);assert.equal(stocked(),0);
+  assert.equal(stage(),'parked');
+  assert.equal(pieces().length,2);
+});
+
+test('clearing the block restocks each resulting billet once and cannot score empty swings',t=>{
+  const {el,stage,shaft,tap,guided,round,clear,tick,until,stocked,pieces}=setup(t,{stocking:true});
+  const ready=()=>until(()=>stage()==='ready','Waiting for the next swing');
+  tap(shaft());ready();guided();ready();guided();ready();assert.equal(pieces().length,3);
+  clear();until(()=>stocked()===3 && round.visible,'Every finished piece should reach the woodpile');
+  assert.equal(pieces().length,0);assert.equal(el('split-score').textContent,'3 stacked');
+  clear();for(let i=0;i<240;i++)tick(1/60);
+  assert.equal(stocked(),3);assert(el('split-clear').hidden);
 });
 
 test('a side-lying billet cleaves along its own grain and children inherit its pose',()=>{

@@ -184,6 +184,66 @@ function addRelief(m,type,substitute){
   m.needsUpdate=true;
 }
 
+// The owner’s entrance masonry photo contains the same grey, weathered stone
+// and lichen as the woodland bank. Project it in metres across the loose rocks
+// so a split face, its worn top and a little chip share the same grain size.
+function finishLooseStone(model,material,photo){
+  coatOutdoorMaterial(model,material);
+  if(!photo)return;
+  const previous=material.onBeforeCompile,key=material.customProgramCacheKey();
+  material.onBeforeCompile=(shader,renderer)=>{
+    previous.call(material,shader,renderer);
+    shader.uniforms.stonePhoto={value:photo};
+    const varyings='\nvarying vec3 stonePoint,stoneNormal;\n';
+    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>'+varyings)
+      .replace('#include <begin_vertex>',`#include <begin_vertex>
+        stonePoint=(modelMatrix*vec4(position,1.)).xyz;
+        stoneNormal=normalize(mat3(modelMatrix)*normal);`);
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>',
+      '#include <common>'+varyings+'uniform sampler2D stonePhoto;')
+      .replace('#include <color_fragment>',`#include <color_fragment>
+        vec3 rockN=normalize(stoneNormal);
+        vec3 w=abs(rockN);w*=w;w*=w;w/=max(.001,w.x+w.y+w.z);
+        vec2 scale=vec2(2.7,5.4);
+        vec3 mineral=w.x*texture2D(stonePhoto,stonePoint.zy*scale).rgb
+                    +w.y*texture2D(stonePhoto,stonePoint.xz*scale+.31).rgb
+                    +w.z*texture2D(stonePhoto,stonePoint.xy*scale+.67).rgb;
+        float grain=dot(mineral,vec3(.23,.59,.18));
+        vec2 bed=vec2(stonePoint.x*.69+stonePoint.z*.84,stonePoint.y+.24*stonePoint.z);
+        float layer=texture2D(stonePhoto,bed*vec2(1.23,2.4)).r;
+        float bedding=dot(stonePoint,vec3(.68,3.0,-1.23))+.59*layer;
+        float seamDistance=abs(fract(bedding)-.5);
+        float seamWidth=max(.015,fwidth(bedding));
+        float seam=(1.-smoothstep(0.,seamWidth,seamDistance))*
+          (1.-smoothstep(.018,.068,seamWidth))*smoothstep(.07,.21,layer);
+        float weathering=clamp(log2(max(.022,grain)/.205),-1.6,1.35);
+        float flecks=smoothstep(.29,.53,grain);
+        float moss=smoothstep(.016,.085,mineral.g-mineral.b)*smoothstep(-.16,.82,rockN.y);
+        vec3 patina=mix(vec3(.97,.97,.96),vec3(.73,.83,.55),.48*moss);
+        // Clay and damp leaf mould darken the buried toe. The existing vertex
+        // tints also darken down the stone, so keep its crown relatively dry.
+        float exposed=smoothstep(-.32,.73,rockN.y);
+        diffuseColor.rgb*=patina*mix(vec3(.65,.62,.58),vec3(1.),exposed)
+          *(.85+.26*weathering+.30*(layer-.19)+.14*flecks-.22*seam);
+        float flakeHeight=.0022*weathering-.0018*seam;
+      `)
+      .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
+        roughnessFactor=clamp(roughnessFactor-.14*flecks-.04*exposed,.71,.99);`)
+      .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+        vec3 px=dFdx(-vViewPosition),py=dFdy(-vViewPosition);
+        vec3 face=normalize(cross(px,py));
+        normal=normalize(mix(normal,face*sign(dot(face,normal)),.28));
+        vec3 r1=cross(py,normal),r2=cross(normal,px);
+        float determinant=dot(px,r1);
+        vec3 slope=(dFdx(flakeHeight)*r1+dFdy(flakeHeight)*r2)
+                   *sign(determinant)/max(1.e-9,abs(determinant));
+        normal=normalize(normal-slope*min(1.,.43/max(.001,length(slope))));
+      `);
+  };
+  material.customProgramCacheKey=()=>key+'|woodland-stone';
+  material.needsUpdate=true;
+}
+
 // The exported sprays and distant crown atlases both have authored UV tangents.
 // Use that direction to shade across the branch rather than across the carrier quad.
 const canopyVertex=`
@@ -359,6 +419,10 @@ export function installCabinSurfaces(model,renderer){
     if(!mesh.isMesh)return;
     const source=materials(mesh),changed=source.map(m=>{
       if(!m.isMeshStandardMaterial)return m;
+      if(/^Garden · (bank fieldstone and scattered cobbles|loose chips on graded paths|loose river gravel and margin stones)$/.test(m.name)){
+        if(!done.has(m)){finishLooseStone(model,m,rock);done.set(m,m);}
+        return m;
+      }
       if(m.name.startsWith('Water well ·')){
         if(!done.has(m))done.set(m,wellFinish(model,m));
         return done.get(m);

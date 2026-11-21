@@ -4,6 +4,44 @@ import random
 from mathutils import Vector
 
 
+# Small, soft banks between the photographed gathering areas. Centres and radii
+# use local plan feet; amplitudes are metres added to the surveyed elevation.
+# The long bank behind the swings and scallops along the downhill side are
+# outside the stocked wood, paths, parking pads and fire-circle footprint.
+woodland_banks=(
+    (-34,10,5,18,.19),(-30,43,9,11,.15),(-9,55,13,9,.22),
+    (6,69,10,9,.16),(29,76,19,7,.21),(53,60,7.6,12,.24),
+    (55,17,5.6,14,.17),(48,-4,4.5,7,.12))
+
+
+def woodland_relief(x,y):
+    from mathutils.noise import noise
+    height=0.
+    for index,(cx,cy,rx,ry,amplitude) in enumerate(woodland_banks):
+        u=(x-cx)/rx;v=(y-cy)/ry
+        edge=1-u*u-v*v
+        if edge<=0:continue
+        # A rounded shoulder and adjacent shallow wash fade to zero slope at
+        # the rim. Two scales of coherent noise give each bank its own crest.
+        phase=index*1.7
+        along=u+.28*v+.18*math.sin(3*v+phase)
+        ridge=math.exp(-5*(along+.16)**2)
+        hollow=math.exp(-16*(along-.48)**2)
+        undulation=noise(Vector((x*.13,y*.13,3.17)))
+        fine=noise(Vector((x*.48,y*.48,9.54)))
+        height+=amplitude*edge**2*(ridge-.85*hollow+.65*undulation+.20*fine)
+    return height
+
+
+def gravel_ripple(rad,angle):
+    # Several low ridges where aggregate collects inside the steel edging.
+    # The furniture bed and the edging stay at their established grades.
+    if not .70<rad<1:return 0.
+    along=.50+.50*math.cos(3*angle+.76*math.sin(2*angle+.41))
+    across=math.sin(math.pi*(rad-.70)/.30)**2
+    return across*(.004+.019*along**2)*(.78+.22*math.sin(7*angle+15*rad))
+
+
 def garden_gravel(group, gravel, pad, height, drain_x, center, surrounds):
     """Give the two gravel beds one continuous metric projection and contact tones."""
     cx,cy,rx,ry=pad
@@ -67,7 +105,7 @@ def garden_gravel(group, gravel, pad, height, drain_x, center, surrounds):
             # Intermediate points lie on the actual edging chord.
             rad=row/rings*(math.cos(math.pi/66) if col%2 else 1)
             x=cx+rx*rad*math.cos(a);y=cy+ry*rad*math.sin(a)
-            points.append(pos(x,y,height(x)))
+            points.append(pos(x,y,height(x)+gravel_ripple(rad,a)))
             i=first+col;j=first+(col+1)%sectors
             faces.append((0,i,j) if row==1 else (i-sectors,i,j,j-sectors))
     make('Rear gravel fire circle',points,faces)
@@ -86,7 +124,7 @@ def garden_gravel(group, gravel, pad, height, drain_x, center, surrounds):
     make('Pergola · gravel shoulder beside the fire circle',points,faces)
 
 
-def dress_garden_ground(group,pad,height,drain_x,terrain,local):
+def dress_garden_ground(group,pad,height,drain_x,terrain,local,land,helper,garden_offset):
     """A shallow gravel spill and curled hardwood leaves, especially at the edging."""
     rng=random.Random(1060579)
     cx,cy,rx,ry=pad
@@ -94,8 +132,9 @@ def dress_garden_ground(group,pad,height,drain_x,terrain,local):
     # L1060579/583 and IMG_3337/3341 resolve the loose stone and leaves.
     def surface(e,n):
         x,y=local(e+OX,n+OY)
-        on_circle=((x-cx)/rx)**2+((y-cy)/ry)**2<=1
-        if on_circle:return height(x)-OZ
+        u,v=(x-cx)/rx,(y-cy)/ry
+        rad=math.hypot(u,v)
+        if rad<=1:return height(x)-OZ+gravel_ripple(rad,math.atan2(v,u))
         if 45.35<=y<=63.65:
             edge=cx+rx*math.sqrt(1-((y-cy)/ry)**2)-.035
             if edge<=x<=drain_x:return height(x)-OZ-.008
@@ -174,3 +213,115 @@ def dress_garden_ground(group,pad,height,drain_x,terrain,local):
             leaf_colors.append(tuple(k*value for k in color))
         for j in range(12):leaf_faces.append((start,start+1+j,start+1+(j+1)%12))
     colored('Garden · fallen oak and maple leaves',leaf_verts,leaf_faces,leaf_colors)
+
+    # Loose crushed chips are sparse on the front treads and gather in small
+    # pockets on the gravel paths. Sample their actual rendered triangles so
+    # the stone follows each grade change, including the timber stair checks.
+    stone_verts=[];stone_faces=[];stone_colors=[]
+    # Larger chips concentrate where raking and foot traffic push gravel
+    # outwards. Keep the centre, seats and slotted pergola drain clear.
+    for _ in range(36):
+        angle=rng.uniform(0,math.tau)
+        rad=rng.uniform(.81,.975)
+        for _ in range(rng.randint(4,13)):
+            a=angle+rng.gauss(0,.036);r=rad+rng.gauss(0,.015)
+            e,n,_=pos(cx+rx*r*math.cos(a),cy+ry*r*math.sin(a),height(cx))
+            z=surface(e,n)
+            if z is not None:pebble(e,n,z-.002,rng.uniform(.012,.035))
+    for path in list(group.objects):
+        if not path.name.startswith(('Front walk · gravel terraces','Rear garden path','Driveway steps · crushed stone infill')):continue
+        geo=path.data;geo.calc_loop_triangles()
+        for tri in geo.loop_triangles:
+            a,b,c=(geo.vertices[i].co for i in tri.vertices)
+            normal=(b-a).cross(c-a)
+            if abs(normal.z)<.86*normal.length:continue
+            mean=(a+b+c)/3
+            fan=.5+.5*math.sin(mean.x*2.2+math.sin(mean.y*3.7))*math.cos(mean.y*2.8)
+            count=int(.5*abs(normal.z)*(5+30*fan**2)+rng.random())
+            for j in range(count):
+                u,v=rng.random(),rng.random()
+                if u+v>1:u=1-u;v=1-v
+                p=a+(b-a)*u+(c-a)*v
+                pebble(p.x,p.y,p.z-.002,rng.uniform(.008,.025))
+    colored('Garden · loose chips on graded paths',stone_verts,stone_faces,stone_colors)
+
+    # Fieldstone bounds come from the dry woodland banks, not the level area
+    # made for the chairs. Sink angular cobbles in irregular groups, with a
+    # tail of finer fragments spilling away from each partly buried slab.
+    from mathutils.bvhtree import BVHTree
+    parcel=group.objects['WalkSurface_ParcelGround'].data
+    walkable=BVHTree.FromPolygons([v.co for v in parcel.vertices],[p.vertices[:] for p in parcel.polygons])
+    rock_verts=[];rock_faces=[];rock_colors=[];support_verts=[];support_faces=[]
+    occupied=[]
+    palettes=((.40,.41,.40),(.49,.48,.44),(.43,.39,.35),(.56,.54,.48),(.38,.40,.43))
+    patches=[(-33.4,-3,4,6),(-35,18,4,9),(-24,41,7,6),(-8,53,8,6),
+             (8,65,5,7),(23,72,8,4),(38,74,7,5),(51,60,5,8),
+             (54,28,4,7),(48,0,4,6),(45.5,-10,2.4,3.3),(7,-1.0,2.8,1.7),
+             (15.2,46.1,2,3.4),(31.9,40.6,3.3,1.6)]
+
+    def fieldstone(x,y,rad,bearing):
+        if math.hypot((x-cx)/rx,(y-cy)/ry)<1.08 or (29<x<44 and 44<y<65):return
+        if 33<x<58 and 32<y<50 and garden_offset(x,y)[0]<1.84+rad/ft:return
+        e,n=eastnorth(x,y)
+        center,normal,face_index,_=terrain.ray_cast((e-OX,n-OY,65),(0,0,-1),110)
+        if center is None or normal.z<.59 or land.data.polygons[face_index].material_index!=0:return
+        if any((center.x-px)**2+(center.y-py)**2 < (.84*(rad+radius))**2 for px,py,radius in occupied):return
+        occupied.append((center.x,center.y,rad))
+        # Each rounded slab has bedding faces, a chipped shoulder and a crown.
+        # Slip the upper bed a little sideways and tint exposed facets.
+        size=8 if rad>.15 else 6
+        width=rad*rng.uniform(.50,.83)
+        cap=rad*rng.uniform(.43,.69)
+        anisotropy=rng.uniform(.74,1.05)
+        ct,st=math.cos(bearing),math.sin(bearing)
+        outline=[]
+        for j in range(size):
+            t=(j+rng.uniform(-.14,.14))*math.tau/size
+            jitter=rng.uniform(.80,1.12)
+            # Soft square cross-sections give broken stones some flatter faces.
+            a=math.cos(t);b=math.sin(t)
+            a=math.copysign(abs(a)**anisotropy,a)*rad*jitter
+            b=math.copysign(abs(b)**anisotropy,b)*width*jitter
+            outline.append((ct*a-st*b,st*a+ct*b))
+        base_color=rng.choice(palettes);lichen=rng.uniform(0,.55)
+        slope_x=-normal.x/normal.z;slope_y=-normal.y/normal.z
+        rings=[];pts=[];tones=[]
+        for band,(extent,elevation) in enumerate(((.83,-.48),(1.,.12),(.77,.80),(.48,.94))):
+            ring=[]
+            for j,(dx,dy) in enumerate(outline):
+                drift=.09*band/3
+                xx=extent*dx+drift*rad*ct;yy=extent*dy+drift*rad*st
+                z=center.z+slope_x*xx+slope_y*yy+cap*(elevation+rng.uniform(-.07,.07))
+                ring.append(len(pts));pts.append((center.x+xx,center.y+yy,z))
+                shade=(.66,.84,1.,1.06)[band]*rng.uniform(.92,1.08)
+                moss=lichen*max(0,math.cos(j*math.tau/size+.6)) if band>=2 else 0.
+                tones.append(tuple(shade*(v*(1-moss)+m*moss) for v,m in zip(base_color,(.43,.46,.32))))
+            rings.append(ring)
+        crown=len(pts);pts.append((center.x,center.y,center.z+cap*1.06));tones.append(base_color)
+        faces=[]
+        for lower,upper in zip(rings,rings[1:]):
+            for j in range(size):
+                k=(j+1)%size;faces.append((lower[j],lower[k],upper[k],upper[j]))
+        faces.extend((rings[-1][j],rings[-1][(j+1)%size],crown) for j in range(size))
+        first=len(rock_verts);rock_verts.extend(pts);rock_colors.extend(tones)
+        rock_faces.extend(tuple(first+i for i in f) for f in faces)
+        # Feet can step onto the crown of the larger embedded rocks. Only add
+        # supports on the parcel; background geometry cannot extend walkability.
+        if cap>.075 and all(walkable.ray_cast((pts[i][0],pts[i][1],65),(0,0,-1),110)[0] is not None for i in rings[1]):
+            first=len(support_verts);support_verts.extend(pts)
+            support_faces.extend(tuple(first+i for i in f) for f in faces[size:])
+
+    for px,py,rx,ry in patches:
+        bearing=rng.uniform(0,math.tau)
+        for cluster in range(7):
+            angle=rng.uniform(0,math.tau);offset=math.sqrt(rng.random())
+            x=px+rx*offset*math.cos(angle);y=py+ry*offset*math.sin(angle)
+            radius=rng.uniform(.17,.37) if cluster<3 else rng.uniform(.07,.16)
+            fieldstone(x,y,radius,bearing+rng.uniform(-.38,.38))
+            for j in range(13):
+                # Fines sort into the hollows between larger stones.
+                t=rng.uniform(0,math.tau);d=rng.uniform(1.1,3.7)*radius/ft
+                fieldstone(x+math.cos(t)*d,y+math.sin(t)*d,rng.uniform(.018,.095),bearing+rng.uniform(-1.2,1.2))
+    colored('Garden · bank fieldstone and scattered cobbles',rock_verts,rock_faces,rock_colors)
+    if support_faces:
+        helper('WalkSurface_WoodlandFieldstone',support_verts,support_faces)

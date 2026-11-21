@@ -7,7 +7,7 @@ export function walkingGait() {
       const progress=phase+distance/(shortStride?.54:.74);
       if(progress>=1){left=!left;onStep(left);}
       phase=progress%1;
-      const pace=Math.min(1,distance/(dt*1.45));
+      const pace=dt>0?Math.min(1,distance/(dt*1.45)):0;
       strength+=(pace-strength)*(1-Math.exp(-12*dt));
       return reducedMotion?0:-.017*strength*Math.cos(phase*2*Math.PI);
     }

@@ -42,6 +42,30 @@ export function checkFirewood(model,space){
   const fires=installTourFires(world,model);
   let deliveries=0,now=performance.now()*.001;
   const wood=installFirewood(world,model,space,camera,fires,()=>{},()=>++deliveries);
+  const fresh=world.getObjectByName('Fresh split wood behind the swings');
+  const stackBounds=new T.Box3().setFromObject(model.getObjectByName('WalkBlock_StackedGardenFirewood'));
+  const oldRinds=[];
+  model.traverse(o=>{if(o.isMesh && o.material.name==='Weathered timber ties')oldRinds.push(o);});
+  const pos=new T.Vector3(),matrix=new T.Matrix4(),ray=new T.Raycaster(),down=new T.Vector3(0,-1,0);
+  assert.equal(fresh.count,0);assert(!fresh.visible);
+  wood.setRestocked(1);assert(fresh.visible && fresh.count===1);
+  fresh.getMatrixAt(0,matrix);pos.setFromMatrixPosition(matrix);
+  let top=-Infinity;
+  for(const d of [-.13,0,.13]){
+    const offset=.3048*d,angle=5.4*Math.PI/180;
+    ray.set(new T.Vector3(pos.x-Math.sin(angle)*offset,pos.y+1,pos.z+Math.cos(angle)*offset),down);
+    const hit=ray.intersectObjects(oldRinds,false)[0];if(hit)top=Math.max(top,hit.point.y);
+  }
+  assert(Math.abs(pos.y-top-.031)<.035,'The first fresh billet rests on the existing stack');
+  wood.setRestocked(2000);assert.equal(fresh.count,150);
+  for(let i=0;i<fresh.count;i++){
+    fresh.getMatrixAt(i,matrix);pos.setFromMatrixPosition(matrix);
+    assert(pos.x>=stackBounds.min.x-.03 && pos.x<=stackBounds.max.x+.03 &&
+      pos.z>=stackBounds.min.z-.03 && pos.z<=stackBounds.max.z+.03,
+      'The refilled pile stays behind the swings');
+  }
+  wood.setRestocked(3);assert.equal(fresh.count,3,'Joining a new house replaces the displayed count');
+  wood.setRestocked(0);assert.equal(fresh.count,0);assert(!fresh.visible);
   const marker=name=>model.getObjectByName(name).getWorldPosition(new T.Vector3()).toArray();
   const yard={eye:marker('TourEye_yard'),target:marker('TourLook_yard')};
   function visit(view){

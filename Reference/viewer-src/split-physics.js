@@ -63,7 +63,7 @@ function batchResting(records,root){
   for(const item of records){item.mesh.visible=false;item.unpack=unpack;}
 }
 
-export function createSplitPhysics({root,groundAt,onContact,onSupport}){
+export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWood}){
   const world=new World({gravity:new Vec3(0,-9.81,0),allowSleep:true});
   world.broadphase=new SAPBroadphase(world);
   world.broadphase.useBoundingBoxes=true;
@@ -71,7 +71,7 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport}){
   world.narrowphase.enableFrictionReduction=true;
   Object.assign(world.defaultContactMaterial,{friction:.61,restitution:.075,contactEquationStiffness:3e6});
   const tiles=new Map(),pieces=[],matrix=new T.Matrix4(),center=new T.Vector3(),size=new T.Vector3();
-  let accumulator=0,active=false,regroup=false,collisionSpeed=0,nextSound=0;
+  let accumulator=0,clock=0,active=false,regroup=false,collisionSpeed=0,nextSound=0;
   function addTile(ix,iz){
     const key=ix+','+iz;if(tiles.has(key))return;
     const left=ix*terrainSize-terrainSize/2,far=iz*terrainSize+terrainSize/2,spacing=terrainSize/terrainCells;
@@ -255,6 +255,31 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport}){
       return dx*dx+dz*dz<.18*.18;
     });
   }
+  function removePiece(index){
+    const item=pieces[index];
+    item.unpack?.();if(item.choppable)onSupport?.(item.mesh,false);
+    pieces.splice(index,1);world.removeBody(item.body);item.mesh.removeFromParent();item.mesh.geometry.dispose();
+    const at=item.body.position;
+    for(const {body} of pieces)if(body.position.distanceSquared(at)<.48*.48)body.wakeUp();
+    regroup=true;active=pieces.length>0;
+  }
+  function stackFinished(){
+    if(!onStockWood)return false;
+    let pending=false,count=0;
+    // Briefly leave fallen wood available to pick up. Only pieces that have
+    // stopped off the face transfer; their children can never earn twice.
+    for(let i=pieces.length-1;i>=0;i--){
+      const item=pieces[i];
+      if(item.body.sleepState!==Body.SLEEPING || item.supported || overFace(item) || blocksReload(item)){
+        item.stackAt=null;continue;
+      }
+      item.stackAt??=clock+2.5;
+      if(clock<item.stackAt){pending=true;continue;}
+      removePiece(i);count++;
+    }
+    if(count)onStockWood(count);
+    return pending;
+  }
   function take(accept){
     if(!pieces.length)return false;
     // Clear a piece resting across the chopping face first. Otherwise lift the
@@ -262,11 +287,7 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport}){
     let chosen=pieces.findIndex(blocksReload);
     if(chosen<0)for(let i=0;i<pieces.length;i++)if(chosen<0 || pieces[i].body.position.y>=pieces[chosen].body.position.y)chosen=i;
     const item=pieces[chosen];if(accept && !accept(item.body.mass,item.mesh))return false;
-    item.unpack?.();if(item.choppable)onSupport?.(item.mesh,false);
-    pieces.splice(chosen,1);world.removeBody(item.body);item.mesh.removeFromParent();item.mesh.geometry.dispose();
-    const at=item.body.position;
-    for(const {body} of pieces)if(body.position.distanceSquared(at)<.48*.48)body.wakeUp();
-    regroup=true;active=pieces.length>0;return true;
+    removePiece(chosen);return true;
   }
   function settle(item){
     const b=item.body;if(b.sleepState===Body.SLEEPING)return;
@@ -293,9 +314,10 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport}){
   function step(seconds){
     if(!pieces.length)return false;
     // A suspended browser resumes from the last pose, without a giant integration step.
-    accumulator+=Math.min(.15,Math.max(0,Number.isFinite(seconds)?seconds:0));
+    const dt=Math.min(.15,Math.max(0,Number.isFinite(seconds)?seconds:0));
+    clock+=dt;accumulator+=dt;
     syncBlank(Math.floor(accumulator/stepSize)*stepSize);
-    if(!active){accumulator=0;return false;}
+    if(!active){accumulator=0;const pending=stackFinished();return active||pending;}
     for(const {body} of pieces)if(body.sleepState!==Body.SLEEPING)cover(body.position.x,body.position.z);
     while(accumulator>=stepSize){world.step(stepSize);accumulator-=stepSize;}
     active=false;
@@ -315,7 +337,8 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport}){
       onContact(collisionSpeed);nextSound=world.time+.075;
     }
     collisionSpeed=0;
-    return active;
+    const pending=stackFinished();
+    return active||pending;
   }
   return {release,lodge,step,canLoad,clearBlock,blocksStep,take,get surface(){return pieces.filter(i=>i.supported||overFace(i)).map(i=>i.mesh);},get count(){return pieces.length;}};
 }

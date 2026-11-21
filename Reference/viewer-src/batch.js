@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // pieces in the viewer, preserving the original transforms and textured materials.
 export function batchStatic(model) {
   const buckets=new Map();
-  const conditional=/^(Front(?:Door|Screen)Hinge|GrillLidHinge|roof|terrain|wooded[ _]terrain|canopy|backdrop|walk(?:surface|block|spawn)|tax[ _]parcel|site[ _]section|vault[ _])|ceiling/i;
+  const conditional=/^(Front(?:Door|Screen)Hinge|GrillLidHinge|EggSwingPivot|roof|terrain|wooded[ _]terrain|canopy|backdrop|walk(?:surface|block|spawn)|tax[ _]parcel|site[ _]section|vault[ _])|ceiling/i;
   model.traverseVisible(mesh=>{
     if(!mesh.isMesh || mesh.children.length || Array.isArray(mesh.material) || mesh.material.transparent || mesh.isSkinnedMesh || mesh.isInstancedMesh || mesh.morphTargetInfluences?.length) return;
     for(let ancestor=mesh;ancestor;ancestor=ancestor.parent) if(conditional.test(ancestor.name)) return;

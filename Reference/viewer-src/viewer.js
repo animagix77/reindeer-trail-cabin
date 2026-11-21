@@ -1,3 +1,4 @@
+import {installEggSwings} from './egg-swings.js';
 import {installCabinSurfaces} from './cabin-surfaces.js';
 import {installWoodlandGrass} from './woodland-grass.js';
 import {cabinFilm} from './cabin-film.js';
@@ -33,6 +34,7 @@ const element = id => document.getElementById(id);
 const canvas = element('view');
 const controlsPanel = element('tools');
 let sceneCanRender=false;
+let updateEggSwings;
 const camera = new THREE.PerspectiveCamera(39,1,0.03,4000);
 const world = new THREE.Scene();
 const woodland=installWoodlandSound();
@@ -406,6 +408,7 @@ const party=installParty({
     window.addEventListener('hashchange',()=>{if(activeView===region)place();},{once:true});
     chooseView(region);
   },
+  showStock(count){firewood?.setRestocked(count);schedule();},
   snapshotFuel:()=>fires?.fuelSnapshot(),
   applyFuel:state=>{fires?.applyFuel(state);render();},
   addRemoteFuel:kind=>{fires?.addFuel(kind);render();},
@@ -439,6 +442,7 @@ function render(firstFrame=false){
   const animateFire=fires?.update(camera,activeView,seconds);
   woodland.update(camera,outside,walking(),ringCenter,fires?.energy??0);
   const animateLeaves=surfaces?.update(camera,activeView,seconds,outside);
+  const animateSwings=updateEggSwings?.(camera,seconds,walking());
   const animateGrass=updateGrass?.(camera,seconds,outside);
   const animateTree=treeLights?.update(camera,activeView,seconds,canvas.height);
   const animateGuests=party.update(seconds);
@@ -450,7 +454,7 @@ function render(firstFrame=false){
   const cinematic=film && walking();
   const adapting=cinematic?film.render(world,camera,lighting,outside,seconds):false;
   if(!cinematic)renderer.render(world,camera);
-  if(!document.hidden && (adapting || animateFlood || animateSplitting || animateWood || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
+  if(!document.hidden && (adapting || animateSwings || animateFlood || animateSplitting || animateWood || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
 }
 function updateState(button,enabled) {button.setAttribute('aria-pressed',String(enabled));}
 element('reset').addEventListener('click',reset);
@@ -550,8 +554,10 @@ async function show() {
   wildlife=installWildlife(world,walkSpace,camera,{onChange:activities.setDeer});
   fires=installTourFires(world,gltf.scene);
   firewood=installFirewood(world,gltf.scene,walkSpace,camera,fires,undefined,kind=>party.fuel(kind));
+  firewood.setRestocked(party.stockTotal);
   woodSplit=installWoodSplitting(world,gltf.scene,walkSpace,{
     camera,schedule,takeSplitLog:firewood.takeSplitLog,
+    onStockWood:count=>party.restock(count),stockTotal:()=>party.stockTotal,
     handsBusy(){const wood=firewood.snapshot();return wood.held || wood.inFlight || activities.offeringFood;},
     onSwing:duration=>woodland.swing(duration),onStrike:woodland.strike,
     onContact:speed=>woodland.woodImpact(speed)
@@ -586,6 +592,7 @@ async function show() {
   surfaces=installCabinSurfaces(gltf.scene,renderer);
   await loading.preparing(3,'Lighting and drawing your first view');
   floodlights=installMotionFloodlights(world,gltf.scene,schedule);
+  updateEggSwings=installEggSwings(gltf.scene,reducedMotion);
   batchStatic(gltf.scene);
   lighting.captureExterior();
   flashlight=installWalkingFlashlight(world);

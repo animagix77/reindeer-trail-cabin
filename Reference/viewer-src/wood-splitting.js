@@ -5,10 +5,10 @@ import {createSplitPhysics} from './split-physics.js';
 const now=()=>performance.now()/1000;
 const clamp=T.MathUtils.clamp;
 const drawSeconds=.34,loadSeconds=.66;
-const effort=.205,minimumStrength=.16,restedEnough=.51,fullRestSeconds=5.4;
+const effort=.13,freshReserve=.72,minimumStrength=.16,restedEnough=.51,fullRestSeconds=5.4;
 const swingReach=1.2,pickupReach=1.45,returnDistance=1.8;
 
-export function installWoodSplitting(scene,model,space,{camera,schedule,takeSplitLog,handsBusy,onSwing,onStrike,onContact}){
+export function installWoodSplitting(scene,model,space,{camera,schedule,takeSplitLog,handsBusy,onSwing,onStrike,onContact,onStockWood,stockTotal=()=>0}){
   const station=makeSplittingBlock(model),root=station.root;
   const ground=(x,z)=>space.heights(x,z).find(h=>h.label==='WalkSurface_ParcelGround')?.y;
   // Gravel shoulder beside the garage motor court, clear of the driveway stairs.
@@ -34,7 +34,7 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     box.updateMatrixWorld();space.add(box,'WalkBlock_Splitting'+name);box.geometry.dispose();box.material.dispose();
   }
   blocker('Block',0,0,.51,.51,.60);blocker('Rounds',-.92,-.16,.94,.40,.59);
-  const physics=createSplitPhysics({root,groundAt,onSupport:station.setSupported,onContact:speed=>{
+  const physics=createSplitPhysics({root,groundAt,onSupport:station.setSupported,onStockWood,onContact:speed=>{
     const range=Math.hypot(camera.position.x-x,camera.position.z-z);
     if(range<10)onContact?.(speed*Math.min(1,2/Math.max(1,range)));
   }});
@@ -69,9 +69,9 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     const percent=Math.floor(strength*100);
     if(power.value!==percent){power.value=percent;readout.textContent=percent+'%';}
     const n=physics.count;
-    const quantity=n+' split '+(n===1?'piece':'pieces');
+    const quantity=stockTotal()+' stacked';
     if(pile.textContent!==quantity)pile.textContent=quantity;
-    pile.hidden=!n;collect.hidden=!n;collect.disabled=!!swing||distance>pickupReach;
+    collect.hidden=!n;collect.disabled=!!swing||distance>pickupReach;
     clear.hidden=station.round.visible || !n || loading!==null || !equipped;clear.disabled=clearing || !!swing || distance>swingReach;
     const text=equipped?'Swing':'Pick up axe';
     if(action.textContent!==text)action.textContent=text;
@@ -176,7 +176,9 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
       return false;
     }
     if(phase(t)==='drawing'){queuedHit??=aim;return true;}
-    const stamina=strength;
+    // The reserve drains with every stroke. Fresh arms can sustain the first
+    // few full-speed swings before fatigue begins to affect the heavy maul.
+    const stamina=Math.min(1,strength/freshReserve);
     const duration=(reduced.matches?.48:station.swingDuration)*(1+.95*(1-stamina)**1.35);
     strength=Math.max(0,strength-effort);exhausted=strength<minimumStrength;
     swing={start:t,duration,aim:{...aim,blockTop:station.top,stamina,endStamina:strength,duration},contact:false,whoosh:false};

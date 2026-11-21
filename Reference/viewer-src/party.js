@@ -1,12 +1,27 @@
 import {guestMarker} from './guest-marker.js';
 import {openTourRoom,readRoom} from './tour-room.js';
+import {validCount} from './room-stock.js';
 
-export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snapshotFuel,applyFuel,addRemoteFuel,stop,schedule}){
+export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snapshotFuel,applyFuel,addRemoteFuel,showStock,stop,schedule}){
   const get=id=>document.getElementById(id);
   const dialog=get('party'),button=get('party-toggle'),notice=get('party-status'),rejoin=get('party-rejoin');
   const details=get('party-details'),share=get('party-link'),log=get('party-log'),input=get('party-input');
   const markers=new Map(),speakerLabels=new Map();
   const invite=readRoom(),publicRoom=!invite,offline=location.protocol==='file:';
+  // Only an aggregate checkpoint is saved on the device. No visitor or room IDs.
+  const stockKey='reindeer-trail-woodpile-v1';
+  function savedStock(){
+    if(invite)return 0;
+    try{const n=Number(localStorage.getItem(stockKey));return validCount(n)?n:0;}catch{return 0;}
+  }
+  let stockTotal=savedStock();
+  function displayStock(total){
+    if(!validCount(total))return;
+    stockTotal=total;showStock(total);
+    if(!invite&&total>savedStock()){
+      try{localStorage.setItem(stockKey,String(total));}catch{}
+    }
+  }
   let profile=null,room=null,own='',slot=0,pulse,lastTick=null,unread=0,ready=false,applying=false,isHost=false;
   let pendingEntry=null,departing=false,hasEntered=false;
   const neighbors=()=>Array.from(markers.values(),m=>m.target).filter(Boolean);
@@ -103,6 +118,7 @@ export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snap
       try{
         const handle=openTourRoom({...profile,invite,publicRoom,snapshot,onEnd:end,onRoster:members,onPose:pose,onMessage:message,
           snapshotFuel,onFuelState:applyFuel,onAddFuel:addRemoteFuel,
+          startingStock:Math.max(stockTotal,savedStock()),onStockTotal:displayStock,
           onPlace(p){if(dialog.open)dialog.close();meetAt(p);},
           onScene(s){applying=true;try{apply(s,!isHost);}finally{applying=false;}},
           onReconnecting(reason){
@@ -156,6 +172,11 @@ export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snap
     },
     get open(){return dialog.open;},
     get suffix(){return invite?'?room='+invite:'';},
+    get stockTotal(){return stockTotal;},
+    restock(count){
+      if(!validCount(count)||!count||room?.stock(count))return;
+      displayStock(Math.max(stockTotal,savedStock())+count);
+    },
     fuel(kind){if(ready)room.fuel(kind);},
     conditions(){if(ready&&!applying)room.conditions(snapshot());},
     update(seconds){

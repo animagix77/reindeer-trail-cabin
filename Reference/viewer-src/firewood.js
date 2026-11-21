@@ -49,7 +49,7 @@ function branches(bundle) {
   parts.forEach(p=>p.dispose());
   return g;
 }
-function splitLog(){
+function splitLog(stacked=false){
   // Half a round, with ridged bark, a pale split face, and end-grain
   // following the arc of the original trunk.
   const positions=[],colors=[],surfaces=[];
@@ -61,7 +61,8 @@ function splitLog(){
     for(const p of [a,b,c]){positions.push(p.x,p.y,p.z);colors.push(m.r,m.g,m.b);surfaces.push(surface);}
   }
   function quad(a,b,c,d,color,surface=0){triangle(a,b,c,color,surface);triangle(a,c,d,color,surface);}
-  const stations=[-.203,-.127,-.034,.057,.142,.205],sides=13;
+  const stations=stacked?[-.203,.012,.205]:[-.203,-.127,-.034,.057,.142,.205];
+  const sides=stacked?7:13;
   for(let j=0;j<stations.length-1;j++){
     const a=stations[j],b=stations[j+1];
     for(let i=0;i<sides;i++){
@@ -77,7 +78,7 @@ function splitLog(){
   for(const end of [stations[0],stations.at(-1)]){
     for(let i=0;i<sides;i++){
       const t=i*Math.PI/sides,n=(i+1)*Math.PI/sides;
-      const bands=[0,.25,.32,.55,.60,.81,.86,1];
+      const bands=stacked?[0,.55,.60,1]:[0,.25,.32,.55,.60,.81,.86,1];
       for(let j=0;j<bands.length-1;j++){
         const a=ring(end,t,bands[j]),b=ring(end,n,bands[j]),c=ring(end,n,bands[j+1]),d=ring(end,t,bands[j+1]);
         quad(a,b,c,d,[0xae8760,0x98714e,0xb8926b,0xa37e59,0xbe9b74,0xab855c,0xc1a07a][j],2);
@@ -149,10 +150,12 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
   const ringRadius=.5*Math.min(bounds.max.x-bounds.min.x,bounds.max.z-bounds.min.z);
   const looseGravel=[],obstacles=[],floorRay=new T.Raycaster(),down=v(0,-1,0);
   let barkPhoto,stackEnds;
+  const stackedBark=[];
   model.traverse(o=>{
     if(!o.isMesh)return;
     if(o.material.name==='Hardwood bark')barkPhoto=o.material.map;
     if(o.material.name==='Firewood · weathered split face')stackEnds=o;
+    if(o.material.name==='Weathered timber ties')stackedBark.push(o);
     for(let p=o;p;p=p.parent){
       if(/^Rear[ _]garden[ _]path/i.test(p.name)){looseGravel.push(o);break;}
       if(/^WalkBlock_/.test(p.name)){
@@ -231,6 +234,57 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     stock[k].computeBoundingSphere();
     laid[k].boundingSphere=new T.Sphere(ring.clone().addScaledVector(up,.19),.65);
     stock[k].count=counts[k];laid[k].count=0;
+  }
+  // The photographed stack is two ranks deep, with sloping ends. Fresh wood
+  // builds in short tapered bays on its crown, inside its existing walk blocker.
+  const freshWood=new T.InstancedMesh(splitLog(true),wood,150);
+  freshWood.name='Fresh split wood behind the swings';
+  freshWood.count=0;freshWood.visible=false;freshWood.castShadow=freshWood.receiveShadow=true;
+  pieces.add(freshWood);
+  let stackBuilt=false;
+  function buildStack(){
+    const ray=new T.Raycaster(),pose=new T.Object3D();
+    let index=0;
+    for(let rank=0;rank<2;rank++)for(let bay=0;bay<3;bay++){
+      const x=40.5+rank*1.48,start=49.10+bay*3.62,spacing=.51;
+      let below=[];
+      for(let row=0;row<5;row++){
+        const heights=[];
+        for(let col=0;col<7-row;col++){
+          const y=start+(col+row*.5)*spacing;
+          const at=plan(x,y);
+          if(row===0){
+            // Sample both sides of a valley between two existing logs so a
+            // fresh billet bridges the bark even where the hill slopes.
+            let height=-Infinity;
+            for(const offset of [-.13,0,.13]){
+              const point=plan(x,y+offset);point.y=ring.y+3;
+              ray.set(point,down);
+              const hit=ray.intersectObjects(stackedBark,false)[0];
+              if(hit)height=Math.max(height,hit.point.y);
+            }
+            at.y=Number.isFinite(height)?height:floorAt(at).y+.89;
+          }else at.y=Math.max(below[col],below[col+1])-.012;
+          const variation=Math.sin((index+1)*19.2),scale=.97+.045*variation;
+          pose.position.set(at.x+.012*variation,at.y+.031*scale,at.z);
+          pose.rotation.set(.025*Math.cos(index),-angle+.038*variation,.018*Math.sin(index*3.7),'YXZ');
+          pose.scale.set(.93+.12*Math.cos(index*1.7),scale,scale);
+          pose.updateMatrix();freshWood.setMatrixAt(index++,pose.matrix);
+          heights.push(at.y+.079*scale);
+        }
+        below=heights;
+      }
+    }
+    freshWood.count=index;freshWood.computeBoundingSphere();freshWood.instanceMatrix.needsUpdate=true;
+    stackBuilt=true;
+  }
+  function setRestocked(total){
+    if(!Number.isSafeInteger(total)||total<0)return;
+    const count=Math.min(total,freshWood.instanceMatrix.count);
+    if(count===freshWood.count)return;
+    if(count&&!stackBuilt)buildStack();
+    freshWood.count=count;freshWood.visible=count>0;
+    model.userData.lightRevision=(model.userData.lightRevision||0)+1;
   }
   const palm=new T.Group();palm.name='Carrying firewood';palm.add(makeOfferingHand());scene.add(palm);palm.visible=false;
   const carry={};
@@ -412,5 +466,5 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     notify();
     return Boolean(inFlight);
   }
-  return {view,update,snapshot,pickUp,takeSplitLog,putBack,toss,targets:anchors,get state(){return reportedState;}};
+  return {view,update,snapshot,pickUp,takeSplitLog,putBack,toss,setRestocked,targets:anchors,get state(){return reportedState;}};
 }

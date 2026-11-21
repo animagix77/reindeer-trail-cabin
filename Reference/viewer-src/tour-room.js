@@ -1,4 +1,5 @@
 import Peer from 'peerjs';
+import {roomStock,validCount} from './room-stock.js';
 
 // PeerJS introduces browsers. The host assigns each visitor a driveway slot.
 const newKey=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join('');
@@ -61,10 +62,13 @@ const createPeer=id=>id?new Peer(id,{secure:true,debug:0}):new Peer({secure:true
 
 export function openTourRoom(options,makePeer=createPeer){
   if(!validName(options.name)||!validAvatar(options.avatar))throw Error('A name and avatar are required');
+  const stock=roomStock(options.startingStock,options.onStockTotal);
+  options={...options,stock};
   if(!options.publicRoom)return connectTourRoom(options,makePeer);
 
   // Exactly one browser can register the public address. The others join it.
   // When that browser leaves, the remaining visitors elect another the same way.
+  const stockSession={key:newKey()};
   const address=publicRoomId(),visitor='visitor-'+newKey();
   let current=null,retry=null,closed=false,entered=false,waiting=false,attempts=0;
   const connectionExpired=()=>end('The open house could not connect. Check your connection and try again.');
@@ -100,11 +104,16 @@ export function openTourRoom(options,makePeer=createPeer){
             retry=setTimeout(()=>connect(true),backoff+Math.random()*350);
           }
         }
-      },makePeer,{address,visitor,asHost});
+      },makePeer,{address,visitor,asHost,stockSession});
     }catch{end('This browser could not open a multiplayer connection.');}
   }
   connect(true);
   return {
+    stock(amount){
+      if(!entered||closed||!validCount(amount)||!amount)return false;
+      if(stock.merge(visitor,stock.count(visitor)+amount))current?.publishStock();
+      return true;
+    },
     send(text){current?.send(text);},move(p){current?.move(p);},
     fuel(kind){current?.fuel(kind);},conditions(scene){current?.conditions(scene);},
     place(){return false;},
@@ -112,10 +121,11 @@ export function openTourRoom(options,makePeer=createPeer){
   };
 }
 
-function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage,onScene,onPose,onPlace,snapshot,snapshotFuel,onFuelState,onAddFuel},makePeer,publicSession){
+function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage,onScene,onPose,onPlace,snapshot,snapshotFuel,onFuelState,onAddFuel,stock,onStockTotal},makePeer,publicSession){
   const isHost=publicSession?publicSession.asHost:!invite;
   const hostId=publicSession?.address||invite.split('.')[0];
   const key=publicSession?'':isHost?newKey():invite.split('.')[1];
+  const stockSession=publicSession?.stockSession||{key:newKey()};
   const peer=makePeer(publicSession?(isHost?hostId:publicSession.visitor):undefined);
   let hostMember=hostId;
   const members=new Map(),links=new Map(),pending=new Set(),messages=[],timers=new Set();
@@ -127,6 +137,14 @@ function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage
     peer.destroy();onEnd(reason,code);
   }
   function broadcast(m){for(const c of links.values())safeSend(c,m);}
+  function publishStock(){
+    if(!ready||ended)return;
+    const count=stock.count(id);
+    if(count>0){
+      if(isHost)broadcast({t:'stock',id,count});
+      else safeSend(uplink,{t:'stock',count});
+    }
+  }
   function publishFuel(){
     const state=snapshotFuel?.();
     if(validFuel(state))broadcast({t:'fuelState',fuel:state});
@@ -194,7 +212,9 @@ function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage
         let slot=1;while(used.has(slot))slot++;
         admitted=true;pending.delete(c);links.set(c.peer,c);
         members.set(c.peer,{id:c.peer,name:m.name.trim(),avatar:m.avatar,slot,pose:null});
-        safeSend(c,{t:'welcome',hostMember:id,list:Array.from(members.values()),messages,scene:snapshot(),fuel:snapshotFuel?.()});
+        safeSend(c,{t:'welcome',stockKey:stockSession.key,stockBase:stock.base,hostMember:id,list:Array.from(members.values()),messages,scene:snapshot(),fuel:snapshotFuel?.()});
+        const stockEntries=stock.snapshot();
+        for(let i=0;i<stockEntries.length;i+=64)safeSend(c,{t:'stockSnapshot',entries:stockEntries.slice(i,i+64)});
         publishRoster();return;
       }
       if(links.get(c.peer)!==c)return;
@@ -204,6 +224,9 @@ function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage
         if(chatTokens>=1){chatTokens--;chat(c.peer,m.text);}
       }
       if(m.t==='move' && validPose(m.p) && now-lastMove>=70){lastMove=now;recordPose(c.peer,m.p);}
+      if(m.t==='stock'&&validCount(m.count)&&m.count-stock.count(c.peer)<=256&&stock.merge(c.peer,m.count)){
+        broadcast({t:'stock',id:c.peer,count:m.count});
+      }
       if(m.t==='addWood' && validWood(m.kind) && onAddFuel){
         if(now-lastWood>=300){lastWood=now;onAddFuel(m.kind);publishFuel();}
         else safeSend(c,{t:'fuelState',fuel:snapshotFuel?.()});
@@ -220,7 +243,7 @@ function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage
     id=publicSession?.visitor||own;
     if(isHost){
       members.set(id,{id,name:name.trim(),avatar,slot:0,pose:null});
-      publishRoster();joined(publicSession?'':id+'.'+key);if(snapshotFuel)later(alignBurn,15000);return;
+      onStockTotal?.(stock.total);publishRoster();joined(publicSession?'':id+'.'+key);if(snapshotFuel)later(alignBurn,15000);return;
     }
     uplink=peer.connect(hostId,{label:'cabin-tour',serialization:'raw',reliable:true});
     watchConnection(uplink);
@@ -238,13 +261,21 @@ function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage
           hostMember=m.hostMember;
         }
         if(!replaceRoster(m.list))return;
+        if(validCount(m.stockBase)&&typeof m.stockKey==='string'&&/^[a-f0-9]{32}$/.test(m.stockKey)){
+          if(stockSession.key!==m.stockKey)stock.start(m.stockBase);
+          stockSession.key=m.stockKey;
+        }
         if(validScene(m.scene))onScene(m.scene);
         if(validFuel(m.fuel))onFuelState?.(m.fuel);
-        joined(invite);
+        joined(invite);publishStock();
         for(const item of (Array.isArray(m.messages)?m.messages:[]).slice(-45))if(validItem(item))onMessage(item,true);
         return;
       }
       if(!ready)return;
+      if(m.t==='stockSnapshot'&&Array.isArray(m.entries)&&m.entries.length<=64){
+        for(const entry of m.entries)if(Array.isArray(entry)&&entry.length===2)stock.merge(entry[0],entry[1]);
+      }
+      if(m.t==='stock')stock.merge(m.id,m.count);
       if(m.t==='roster')replaceRoster(m.list);
       if(m.t==='chat'&&validItem(m.item)&&members.get(m.item.fromId)?.name===m.item.from)onMessage(m.item,false);
       if(m.t==='pose'&&members.has(m.id)&&validPose(m.p)){members.get(m.id).pose=m.p;onPose(m.id,m.p);}
@@ -262,6 +293,12 @@ function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage
   });
   peer.on('disconnected',()=>{if(!ended&&!peer.destroyed)later(()=>{if(peer.disconnected&&!peer.destroyed)peer.reconnect();},1500);});
   return {
+    publishStock,
+    stock(amount){
+      if(!ready||ended||!validCount(amount)||!amount)return false;
+      if(stock.merge(id,stock.count(id)+amount))publishStock();
+      return true;
+    },
     send(text){if(!ready||ended||!validChat(text))return;isHost?chat(id,text):safeSend(uplink,{t:'say',text});},
     move(p){if(!ready||ended||!validPose(p))return;const next=JSON.stringify(p);if(next===lastPose)return;lastPose=next;
       isHost?recordPose(id,p):safeSend(uplink,{t:'move',p});},

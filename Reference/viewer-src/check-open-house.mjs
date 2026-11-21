@@ -137,3 +137,27 @@ test('private invites still open the original private group with its chat histor
   assert.equal(invited.chat[0].text,'Private hello');assert.equal(invited.chat[0].history,true);
   assert.equal(open.roster.length,1);assert.equal(open.chat.length,0);
 });
+
+test('restocked wood combines across visitors, late joins and public host replacement',async t=>{
+  const net=signaling(), scores=new Map();
+  function arrive(name,startingStock){
+    return visitor(t,net,name,{startingStock,onStockTotal:n=>scores.set(name,n)});
+  }
+  const first=arrive('Fern',8);
+  await waitFor(()=>first.arrivals.length===1);
+  const second=arrive('Oak',64);
+  await waitFor(()=>second.roster.length===2&&scores.get('Oak')===8);
+  first.room.stock(2);second.room.stock(3);
+  await waitFor(()=>scores.get('Fern')===13&&scores.get('Oak')===13);
+  const third=arrive('Ash',0);
+  await waitFor(()=>scores.get('Ash')===13);
+  first.room.leave();
+  // A piece can finish falling while a guest's connection is being replaced.
+  second.room.stock(1);
+  await waitFor(()=>second.arrivals.length===2&&third.arrivals.length===2
+    &&scores.get('Ash')===14&&scores.get('Oak')===14);
+  third.room.stock(2);
+  await waitFor(()=>scores.get('Oak')===16);
+  const later=arrive('Pine',0);
+  await waitFor(()=>later.roster.length===3&&scores.get('Pine')===16);
+});

@@ -153,7 +153,7 @@ def build_exterior_site():
         width=4.2 if x<3 else 3.4
         return mix(z,center,inner*fade(max(0,south-y),width))
     def zone(x,y):
-        base=terrainZ(*eastnorth(x,y)); z=base
+        base=terrainZ(*eastnorth(x,y)); z=base+woodland_relief(x,y)
         # Graded access at the two daylight-basement garage thresholds.
         west_edge=0.1 if y>=1 else max(-2.35,min(.1,(y-1)*.76))
         driveDist=extents(x,y,-30.85,west_edge,-25,32)
@@ -664,13 +664,21 @@ def build_exterior_site():
     pad_rx,pad_ry=9.65,13.0
     pad=(pad_x,pad_y,pad_rx,pad_ry)
     def gravel_height(x):return zpat+OZ+.0015*(x-25.3)
-    v=[pos(pad_x,pad_y,gravel_height(pad_x))];fs=[]
+    v=[pos(pad_x,pad_y,gravel_height(pad_x))]
     for i in range(67):
         ang=math.tau*i/66
         x=pad_x+pad_rx*math.cos(ang)
         v.append(pos(x,pad_y+pad_ry*math.sin(ang),gravel_height(x)))
-        if i:fs.append((0,i,i+1))
-    helper('WalkSurface_FireCircleGravel',v,fs)
+    ground_rings=[v[0]];ground_faces=[]
+    for row,r in enumerate((.70,.775,.85,.925,1.)):
+        start=len(ground_rings)
+        for j in range(66):
+            ang=math.tau*j/66
+            x=pad_x+r*pad_rx*math.cos(ang);y=pad_y+r*pad_ry*math.sin(ang)
+            ground_rings.append(pos(x,y,gravel_height(x)+gravel_ripple(r,ang)))
+            i=start+j;k=start+(j+1)%66
+            ground_faces.append((0,i,k) if row==0 else (i-66,i,k,k-66))
+    helper('WalkSurface_FireCircleGravel',ground_rings,ground_faces)
     # Keep this material exclusive to the liner; the viewer attaches flames
     # to the center of its mesh. IMG_0773, April 2026, shows its rusty interior
     # inside three running-bond courses of tumbled gray wedge blocks.
@@ -1029,7 +1037,7 @@ def build_exterior_site():
     from mathutils.bvhtree import BVHTree
     forest_floor=BVHTree.FromPolygons([v.co for v in land.data.vertices],
                                        [list(f.vertices) for f in land.data.polygons])
-    dress_garden_ground(site_group,pad,gravel_height,drain_x,forest_floor,local)
+    dress_garden_ground(site_group,pad,gravel_height,drain_x,forest_floor,local,land,helper,garden_offset)
     # The 2025 leaf-off ortho places the deck and a woodland edge behind the
     # house. Sentinel-2 only supplies a broad summer density, never plant positions.
     vegetation=json.loads((base_dir/'Woodland context'/'Summer vegetation.json').read_text())
