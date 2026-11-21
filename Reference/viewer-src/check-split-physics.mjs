@@ -4,13 +4,13 @@ import * as T from 'three';
 import {createSplitPhysics} from './split-physics.js';
 
 const material=new T.MeshStandardMaterial();
-function station(groundAt=()=>0,onContact,onSupport){
+function station(groundAt=()=>0,onContact,onSupport,onStockWood){
   const root=new T.Group();
   const stump=new T.Mesh(new T.CylinderGeometry(.305,.305,.47,20),material);
   stump.name='Scored chopping stump';stump.position.y=.235;root.add(stump);
   const round=new T.Mesh(new T.CylinderGeometry(.135,.135,.29,20),material);
   round.name='Unsplit round';round.visible=false;root.add(round);
-  return {root,round,physics:createSplitPhysics({root,groundAt,onContact,onSupport})};
+  return {root,round,physics:createSplitPhysics({root,groundAt,onContact,onSupport,onStockWood})};
 }
 function halves(angle,r=.135){
   const height=.29;
@@ -107,10 +107,51 @@ test('a loose billet can land sideways on the stump and remain available until t
   assert.deepEqual(changes,[true],'Actual support promotes a returned sideways piece');
   assert(!physics.canLoad());assert.equal(physics.clearBlock(),0,'Automatic reloading cannot nudge usable timber');
   assert(Math.abs(piece.mesh.quaternion.z)>.5,'The solver preserved the landed orientation');
-  assert(physics.clearBlock(true)>0);assert(Number.isFinite(settle(physics)));
+  assert(physics.clearBlock(true)>0);
+  // The face looks empty in mid-flight. A new round can only be placed once
+  // the manually swept piece can no longer rebound onto the rim.
+  for(let frame=0;frame<120 && physics.hasBlockWood;frame++)physics.step(1/60);
+  assert(!physics.hasBlockWood);assert.equal(physics.stackableCount,0);
+  assert(!physics.canLoad(),'Swept wood is still in flight');
+  assert(Number.isFinite(settle(physics)));
   assert.equal(changes.at(-1),false);assert(physics.canLoad());
   let carried;
   assert(!physics.take(()=>false),'With occupied hands nothing is removed');
   assert(physics.take((mass,mesh)=>{carried={mass,mesh};return true;}));
   assert.equal(carried.mesh,piece.mesh);assert(carried.mass>0);assert.equal(physics.count,0);
+});
+
+test('only an explicit stacking action banks the ground pile, preserving airborne and on-block wood',()=>{
+  const credits=[],{root,physics}=station(()=>0,null,null,n=>credits.push(n));
+  const drop={x:0,z:0,nx:0,nz:0};
+  function pieceAt(x,y,z){
+    const piece=halves(0,.08).result[0];piece.choppable=true;
+    piece.mesh.position.set(x,y,z);return piece;
+  }
+  const onStump=pieceAt(0,.75,0);
+  const ground=Array.from({length:20},(_,i)=>pieceAt(.85+(i%5)*.32,.3,(Math.floor(i/5)-1)*.32));
+  physics.release([onStump,...ground],drop);
+  assert(physics.hasBlockWood);
+  assert.equal(physics.stackGroundWood(),0);
+  assert(Number.isFinite(settle(physics)));
+  for(let i=0;i<300;i++)physics.step(1/60);
+  assert.equal(physics.count,21);assert.equal(physics.stackableCount,20);
+  assert.deepEqual(credits,[]);
+  assert(root.children.some(m=>m.name==='Settled split wood'));
+
+  const airborne=pieceAt(-1.5,1.7,0);
+  physics.release([airborne],drop);
+  assert.equal(physics.stackGroundWood(),20);assert.deepEqual(credits,[20]);
+  assert.equal(physics.stackableCount,0);assert.equal(physics.stackGroundWood(),0);
+  assert.equal(physics.count,2);assert(physics.hasBlockWood);
+  assert.equal(onStump.mesh.parent,root);assert.equal(airborne.mesh.parent,root);
+  assert(!root.children.some(m=>m.name==='Settled split wood'),'No phantom pile survives banking a render batch');
+  assert(ground.every(p=>!p.mesh.parent));assert(Number.isFinite(settle(physics)));
+
+  assert.equal(physics.stackableCount,1);
+  assert(physics.clearBlock(true));assert(Number.isFinite(settle(physics)));
+  assert(!physics.hasBlockWood);
+  assert.equal(physics.stackableCount,2);assert.deepEqual(credits,[20],'Clearing only moves the wood');
+  assert.equal(physics.stackGroundWood(),2);assert.deepEqual(credits,[20,2]);
+  assert.equal(physics.count,0);assert.equal(physics.stackGroundWood(),0);
 });

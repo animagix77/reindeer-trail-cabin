@@ -217,7 +217,7 @@ test('the first three heavy swings stay quick; repeated work tires the visitor a
   assert(Math.abs(time()-start-lengths[0])<.025);
 });
 
-test('only donated pieces count, once, after they settle away from the chopping face',t=>{
+test('cutting and carrying pieces leave the shared woodpile unchanged',t=>{
   const {stage,shaft,tap,guided,tick,until,stocked,carried,collect,pieces}=setup(t,{stocking:true});
   const ready=()=>until(()=>stage()==='ready','Waiting for the wood to settle');
   tap(shaft());ready();guided();ready();
@@ -230,13 +230,20 @@ test('only donated pieces count, once, after they settle away from the chopping 
   assert.equal(pieces().length,2);
 });
 
-test('clearing the block restocks each resulting billet once and cannot score empty swings',t=>{
-  const {el,stage,shaft,tap,guided,round,clear,tick,until,stocked,pieces}=setup(t,{stocking:true});
+test('clearing makes room for a new round and loose wood persists until a visitor chooses to stack it',t=>{
+  const {el,stage,stand,shaft,tap,guided,round,clear,tick,until,stocked,pieces}=setup(t,{stocking:true});
+  const stack=el('split-stack'),stackWood=()=>stack.dispatchEvent(new Event('click'));
   const ready=()=>until(()=>stage()==='ready','Waiting for the next swing');
   tap(shaft());ready();guided();ready();guided();ready();assert.equal(pieces().length,3);
-  clear();until(()=>stocked()===3 && round.visible,'Every finished piece should reach the woodpile');
+  assert(stack.disabled);stackWood();assert.equal(stocked(),0);
+  clear();until(()=>round.visible && !stack.disabled,'Clearing should free the block and leave wood to stack');
+  for(let i=0;i<600;i++)tick(1/60);
+  assert.equal(stocked(),0);assert.equal(pieces().length,3);
+  stand(0,3);stackWood();assert.equal(stocked(),0,'Visitors outside the station cannot bank wood');
+  stand(.04,.96);assert.equal(stage(),'parked');assert(!stack.disabled);
+  stackWood();tick();assert.equal(stocked(),3);
   assert.equal(pieces().length,0);assert.equal(el('split-score').textContent,'3 stacked');
-  clear();for(let i=0;i<240;i++)tick(1/60);
+  assert(stack.disabled);stackWood();clear();for(let i=0;i<240;i++)tick(1/60);
   assert.equal(stocked(),3);assert(el('split-clear').hidden);
 });
 

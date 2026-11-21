@@ -161,3 +161,25 @@ test('restocked wood combines across visitors, late joins and public host replac
   const later=arrive('Pine',0);
   await waitFor(()=>later.roster.length===3&&scores.get('Pine')===16);
 });
+
+test('large manual stacks arrive in bounded advances and resume after a host change',async t=>{
+  const net=signaling(),hostUpdates=[],totals=new Map();
+  const arrive=name=>visitor(t,net,name,{onStockTotal:total=>{
+    totals.set(name,total);if(name==='Host')hostUpdates.push(total);
+  }});
+  const host=arrive('Host');
+  await waitFor(()=>host.arrivals.length===1);
+  const bank=arrive('Bank'),pine=arrive('Pine');
+  await waitFor(()=>[host,bank,pine].every(p=>p.roster.length===3));
+
+  bank.room.stock(577);bank.room.stock(324);
+  await waitFor(()=>[...totals.values()].every(n=>n===901));
+  assert.deepEqual(hostUpdates,[0,256,512,768,901]);
+
+  host.room.leave();
+  bank.room.stock(738);pine.room.stock(517);
+  const expected=901+738+517;
+  await waitFor(()=>[bank,pine].every(p=>p.arrivals.length===2)&&totals.get('Bank')===expected&&totals.get('Pine')===expected);
+  const next=arrive('Birch');
+  await waitFor(()=>next.roster.length===3&&totals.get('Birch')===expected);
+});

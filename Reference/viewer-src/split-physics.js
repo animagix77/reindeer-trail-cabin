@@ -71,7 +71,9 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
   world.narrowphase.enableFrictionReduction=true;
   Object.assign(world.defaultContactMaterial,{friction:.61,restitution:.075,contactEquationStiffness:3e6});
   const tiles=new Map(),pieces=[],matrix=new T.Matrix4(),center=new T.Vector3(),size=new T.Vector3();
-  let accumulator=0,clock=0,active=false,regroup=false,collisionSpeed=0,nextSound=0;
+  let accumulator=0,active=false,regroup=false,collisionSpeed=0,nextSound=0;
+  let pileChanged=true,hasBlockWood=false;
+  const groundStock=[];
   function addTile(ix,iz){
     const key=ix+','+iz;if(tiles.has(key))return;
     const left=ix*terrainSize-terrainSize/2,far=iz*terrainSize+terrainSize/2,spacing=terrainSize/terrainCells;
@@ -138,7 +140,7 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
   // Follow real load-bearing contacts from the stump up through any stacked
   // pieces. Sleeping bodies keep their last support until something wakes them.
   function updateSupport(){
-    if(!onSupport || !stumpBody)return;
+    if(!stumpBody)return;
     const resting=new Set([stumpBody]);
     for(const item of pieces)
       if(item.supported && item.body.sleepState===Body.SLEEPING)resting.add(item.body);
@@ -157,7 +159,7 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
       const supported=resting.has(b) && b.velocity.lengthSquared()<.40**2 && b.angularVelocity.lengthSquared()<2.1**2;
       if(item.supported!==supported){
         item.supported=supported;
-        if(item.choppable){if(supported)item.unpack?.();onSupport(item.mesh,supported);}
+        if(item.choppable){if(supported)item.unpack?.();onSupport?.(item.mesh,supported);}
       }
     }
   }
@@ -195,10 +197,10 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
       const item={mesh,body,choppable,supported:false,unpack:null,nudges:0,restAt:world.time,restPos:body.position.clone(),restRot:body.quaternion.clone()};
       pieces.push(item);
       body.addEventListener('sleep',()=>{regroup=true;});
-      body.addEventListener('wakeup',()=>{item.unpack?.();item.restAt=world.time;active=true;});
+      body.addEventListener('wakeup',()=>{item.unpack?.();item.restAt=world.time;active=true;pileChanged=true;});
       if(onContact)body.addEventListener('collide',collision);
     }
-    active=true;
+    active=true;pileChanged=true;
   }
   function lodge(mesh,hit,energy){
     const item=pieces.find(piece=>piece.mesh===mesh);
@@ -227,14 +229,34 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
   function canStillSettleOnBlock(item){
     return item.choppable && (item.supported || item.body.sleepState!==Body.SLEEPING && overFace(item));
   }
-  function canLoad(){return !pieces.some(item=>blocksReload(item)||canStillSettleOnBlock(item));}
+  const swept=new Set();
+  function canLoad(){
+    // A swept half can bounce off the heap and back onto the rim. Keep the
+    // face reserved until those particular pieces have landed off the stump.
+    const occupied=pieces.some(item=>swept.has(item)
+      ? item.body.sleepState!==Body.SLEEPING || onChoppingFace(item)
+      : blocksReload(item) || canStillSettleOnBlock(item));
+    if(!occupied)swept.clear();
+    return !occupied;
+  }
+  function onChoppingFace(item){return item.supported || overFace(item) || blocksReload(item);}
+  function refreshPile(){
+    if(!pileChanged)return;
+    hasBlockWood=false;groundStock.length=0;
+    for(const item of pieces){
+      if(onChoppingFace(item))hasBlockWood=true;
+      else if(item.body.sleepState===Body.SLEEPING)groundStock.push(item);
+    }
+    pileChanged=false;
+  }
   function clearBlock(manual=false){
     let count=0;
     for(const item of pieces){
-      if(manual?!(item.supported||overFace(item)||blocksReload(item)):!blocksReload(item)||canStillSettleOnBlock(item)){
+      if(manual?!onChoppingFace(item):!blocksReload(item)||canStillSettleOnBlock(item)){
         item.nudges=0;continue;
       }
       const b=item.body,n=item.nudges++;
+      if(manual)swept.add(item);
       const radial=Math.hypot(b.position.x,b.position.z)<.02?-Math.PI/2:Math.atan2(b.position.z,b.position.x);
       // When the surrounding heap catches a half, lever it up and work around
       // that obstruction from alternate sides instead of repeating the same push.
@@ -255,30 +277,29 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
       return dx*dx+dz*dz<.18*.18;
     });
   }
-  function removePiece(index){
-    const item=pieces[index];
-    item.unpack?.();if(item.choppable)onSupport?.(item.mesh,false);
-    pieces.splice(index,1);world.removeBody(item.body);item.mesh.removeFromParent();item.mesh.geometry.dispose();
-    const at=item.body.position;
-    for(const {body} of pieces)if(body.position.distanceSquared(at)<.48*.48)body.wakeUp();
-    regroup=true;active=pieces.length>0;
-  }
-  function stackFinished(){
-    if(!onStockWood)return false;
-    let pending=false,count=0;
-    // Briefly leave fallen wood available to pick up. Only pieces that have
-    // stopped off the face transfer; their children can never earn twice.
-    for(let i=pieces.length-1;i>=0;i--){
-      const item=pieces[i];
-      if(item.body.sleepState!==Body.SLEEPING || item.supported || overFace(item) || blocksReload(item)){
-        item.stackAt=null;continue;
-      }
-      item.stackAt??=clock+2.5;
-      if(clock<item.stackAt){pending=true;continue;}
-      removePiece(i);count++;
+  function removePieces(items){
+    const removed=new Set(items);
+    let kept=0;
+    for(const piece of pieces){
+      if(!removed.has(piece)){pieces[kept++]=piece;continue;}
+      piece.unpack?.();if(piece.choppable)onSupport?.(piece.mesh,false);
+      world.removeBody(piece.body);piece.mesh.removeFromParent();piece.mesh.geometry.dispose();
     }
-    if(count)onStockWood(count);
-    return pending;
+    pieces.length=kept;
+    // Wood left behind can lose its support when a visitor carries or stacks
+    // the piece underneath. Wake only the neighbours of the removed wood.
+    for(const {body} of pieces)if(items.some(item=>body.position.distanceSquared(item.body.position)<.48*.48))body.wakeUp();
+    regroup=true;active=pieces.length>0;pileChanged=true;
+  }
+  function stackGroundWood(){
+    refreshPile();
+    const count=groundStock.length;
+    if(count){
+      removePieces(groundStock);
+      groundStock.length=0;
+      onStockWood?.(count);
+    }
+    return count;
   }
   function take(accept){
     if(!pieces.length)return false;
@@ -287,7 +308,7 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
     let chosen=pieces.findIndex(blocksReload);
     if(chosen<0)for(let i=0;i<pieces.length;i++)if(chosen<0 || pieces[i].body.position.y>=pieces[chosen].body.position.y)chosen=i;
     const item=pieces[chosen];if(accept && !accept(item.body.mass,item.mesh))return false;
-    removePiece(chosen);return true;
+    removePieces([item]);return true;
   }
   function settle(item){
     const b=item.body;if(b.sleepState===Body.SLEEPING)return;
@@ -315,9 +336,9 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
     if(!pieces.length)return false;
     // A suspended browser resumes from the last pose, without a giant integration step.
     const dt=Math.min(.15,Math.max(0,Number.isFinite(seconds)?seconds:0));
-    clock+=dt;accumulator+=dt;
+    accumulator+=dt;
     syncBlank(Math.floor(accumulator/stepSize)*stepSize);
-    if(!active){accumulator=0;const pending=stackFinished();return active||pending;}
+    if(!active){accumulator=0;return false;}
     for(const {body} of pieces)if(body.sleepState!==Body.SLEEPING)cover(body.position.x,body.position.z);
     while(accumulator>=stepSize){world.step(stepSize);accumulator-=stepSize;}
     active=false;
@@ -328,6 +349,7 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
       if(!unpack){mesh.position.copy(body.position);mesh.quaternion.copy(body.quaternion);}
     }
     updateSupport();
+    pileChanged=true;
     if(regroup){
       const resting=pieces.filter(r=>!r.unpack && !(r.choppable && r.supported) && r.body.sleepState===Body.SLEEPING);
       for(let i=0;i+batchSize<=resting.length;i+=batchSize)batchResting(resting.slice(i,i+batchSize),root);
@@ -337,8 +359,11 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
       onContact(collisionSpeed);nextSound=world.time+.075;
     }
     collisionSpeed=0;
-    const pending=stackFinished();
-    return active||pending;
+    return active;
   }
-  return {release,lodge,step,canLoad,clearBlock,blocksStep,take,get surface(){return pieces.filter(i=>i.supported||overFace(i)).map(i=>i.mesh);},get count(){return pieces.length;}};
+  return {release,lodge,step,canLoad,clearBlock,blocksStep,take,stackGroundWood,
+    get stackableCount(){refreshPile();return groundStock.length;},
+    get hasBlockWood(){refreshPile();return hasBlockWood;},
+    get surface(){return pieces.filter(i=>i.supported||overFace(i)).map(i=>i.mesh);},
+    get count(){return pieces.length;}};
 }

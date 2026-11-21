@@ -19,7 +19,7 @@ const validScene=s=>s && Number.isFinite(s.hour) && s.hour>=0 && s.hour<24 &&
   (s.localTime===undefined || typeof s.localTime==='boolean') && (s.localWeather===undefined || typeof s.localWeather==='boolean') &&
   (s.manualHour===undefined || (Number.isFinite(s.manualHour) && s.manualHour>=0 && s.manualHour<=23.75)) &&
   (s.manualWeather===undefined || weatherPreset(s.manualWeather)) && validReport(s.weatherReport);
-const fuelLimit={twigs:176,sticks:440,logs:960};
+const fuelLimit={twigs:176,sticks:440,logs:960},stockStep=256;
 const validWood=kind=>typeof kind==='string' && Object.hasOwn(fuelLimit,kind);
 const validFuel=f=>f && Object.entries(fuelLimit).every(([kind,limit])=>
   Number.isFinite(f[kind]) && f[kind]>=0 && f[kind]<=limit);
@@ -130,6 +130,7 @@ function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage
   let hostMember=hostId;
   const members=new Map(),links=new Map(),pending=new Set(),messages=[],timers=new Set();
   let id='',uplink=null,ended=false,ready=false,lastPose='';
+  let confirmedStock=0,sentStock=0;
   function later(fn,delay){const t=setTimeout(()=>{timers.delete(t);if(!ended)fn();},delay);timers.add(t);return t;}
   function finish(reason,code){
     if(ended)return;
@@ -140,9 +141,19 @@ function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage
   function publishStock(){
     if(!ready||ended)return;
     const count=stock.count(id);
-    if(count>0){
-      if(isHost)broadcast({t:'stock',id,count});
-      else safeSend(uplink,{t:'stock',count});
+    if(!count)return;
+    if(isHost){broadcast({t:'stock',id,count});return;}
+    // The host echoes each accepted cumulative total. Send one bounded advance
+    // per echo so a single large stack, or wood banked while reconnecting, fits
+    // the same validation as smaller stacks without filling the data channel.
+    if(count<=confirmedStock||sentStock>confirmedStock)return;
+    sentStock=Math.min(count,confirmedStock+stockStep);
+    safeSend(uplink,{t:'stock',count:sentStock});
+  }
+  function receiveStock(actor,count){
+    stock.merge(actor,count);
+    if(actor===id&&validCount(count)&&count>confirmedStock){
+      confirmedStock=count;publishStock();
     }
   }
   function publishFuel(){
@@ -224,7 +235,7 @@ function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage
         if(chatTokens>=1){chatTokens--;chat(c.peer,m.text);}
       }
       if(m.t==='move' && validPose(m.p) && now-lastMove>=70){lastMove=now;recordPose(c.peer,m.p);}
-      if(m.t==='stock'&&validCount(m.count)&&m.count-stock.count(c.peer)<=256&&stock.merge(c.peer,m.count)){
+      if(m.t==='stock'&&validCount(m.count)&&m.count-stock.count(c.peer)<=stockStep&&stock.merge(c.peer,m.count)){
         broadcast({t:'stock',id:c.peer,count:m.count});
       }
       if(m.t==='addWood' && validWood(m.kind) && onAddFuel){
@@ -273,9 +284,9 @@ function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage
       }
       if(!ready)return;
       if(m.t==='stockSnapshot'&&Array.isArray(m.entries)&&m.entries.length<=64){
-        for(const entry of m.entries)if(Array.isArray(entry)&&entry.length===2)stock.merge(entry[0],entry[1]);
+        for(const entry of m.entries)if(Array.isArray(entry)&&entry.length===2)receiveStock(entry[0],entry[1]);
       }
-      if(m.t==='stock')stock.merge(m.id,m.count);
+      if(m.t==='stock')receiveStock(m.id,m.count);
       if(m.t==='roster')replaceRoster(m.list);
       if(m.t==='chat'&&validItem(m.item)&&members.get(m.item.fromId)?.name===m.item.from)onMessage(m.item,false);
       if(m.t==='pose'&&members.has(m.id)&&validPose(m.p)){members.get(m.id).pose=m.p;onPose(m.id,m.p);}

@@ -42,7 +42,7 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
   const view={eye:eye.toArray(),target:worldPoint(0,.72,0).toArray(),fov:62};
   const el=id=>document.getElementById(id);
   const panel=el('woodwork'),action=el('split-action'),collect=el('split-collect');
-  const clear=el('split-clear');
+  const clear=el('split-clear'),stack=el('split-stack');
   const power=el('split-strength'),readout=el('split-strength-value'),reticle=el('split-reticle');
   const pile=el('split-score'),message=el('split-message'),canvas=el('view');
   const reduced=matchMedia('(prefers-reduced-motion: reduce)'),touch=matchMedia('(pointer: coarse)');
@@ -72,7 +72,9 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     const quantity=stockTotal()+' stacked';
     if(pile.textContent!==quantity)pile.textContent=quantity;
     collect.hidden=!n;collect.disabled=!!swing||distance>pickupReach;
-    clear.hidden=station.round.visible || !n || loading!==null || !equipped;clear.disabled=clearing || !!swing || distance>swingReach;
+    clear.hidden=station.round.visible || !n || loading!==null || (!clearing && !physics.hasBlockWood);
+    clear.disabled=clearing || !!swing || distance>pickupReach;
+    stack.disabled=!near || !n || !!swing || distance>pickupReach || !onStockWood || !physics.stackableCount;
     const text=equipped?'Swing':'Pick up axe';
     if(action.textContent!==text)action.textContent=text;
     action.disabled=!canReach() || !['ready','parked'].includes(stage);
@@ -240,18 +242,14 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     if(end===1)swing=null;
   }
   function reload(t){
-    if(clearing){
-      if(physics.canLoad())clearing=false;
-      else if(t-lastClear>.72){physics.clearBlock(true);lastClear=t;}
-    }
-    if(!loading && !clearing && !station.round.visible && !swing){
-      if(station.targets.length)reloadAfter=null;
+    if(!loading && !station.round.visible && !swing){
+      if(!clearing && station.targets.length)reloadAfter=null;
       else reloadAfter??=t+.28;
     }
     if(reloadAfter!==null && t>=reloadAfter && !swing){
       if(physics.canLoad()){
-        station.begin();preferred=notch=null;loading={start:t};reloadAfter=null;hint='';dirty();
-      }else if(t-lastClear>1.5){physics.clearBlock();lastClear=t;}
+        station.begin();preferred=notch=null;loading={start:t};reloadAfter=null;clearing=false;dirty();
+      }else if(t-lastClear>(clearing?.72:1.5)){physics.clearBlock(clearing);lastClear=t;}
     }
     if(!loading)return;
     const u=clamp((t-loading.start)/(reduced.matches?.12:loadSeconds),0,1);
@@ -294,8 +292,16 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     canvas.focus({preventScroll:true});
   });
   clear.addEventListener('click',()=>{
-    if(!canInput() || !equipped || swing || loading || station.round.visible || distance>swingReach)return;
-    physics.clearBlock(true);clearing=true;preferred=notch=null;hint='';lastClear=now();
+    if(!canInput() || clearing || swing || loading || station.round.visible || distance>pickupReach)return;
+    if(!physics.clearBlock(true))return;
+    clearing=true;preferred=notch=null;hint='';lastClear=now();
+    canvas.focus({preventScroll:true});refresh();
+  });
+  stack.addEventListener('click',()=>{
+    if(!canInput() || swing || distance>pickupReach || !onStockWood)return;
+    const count=physics.stackGroundWood();
+    if(!count)return;
+    hint='Stacked '+count+(count===1?' piece':' pieces')+' behind the swings.';dirty();
     canvas.focus({preventScroll:true});refresh();
   });
   collect.addEventListener('click',()=>{

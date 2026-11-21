@@ -69,11 +69,11 @@ export function installLoadingScreen(setWelcomeState){
       const download=source==='download';
       const mb=bytes=>(bytes/1000000).toFixed(1);
       const eta=stalled?'Waiting for more data…':download && loaded<total?transferTime(remainingSeconds):'';
-      display(download?'download':'embedded',download?'Downloading the cabin':'Reading the saved cabin',
+      display(download?'download':'embedded',download?'Downloading the 3D walkthrough':'Reading the saved walkthrough',
         mb(loaded)+' of '+mb(total)+' MB',eta,Math.floor(loaded/total*100));
     },
     async preparing(step,detail){
-      display('preparing','Preparing the cabin',detail,'Step '+step+' of 3');
+      display('preparing','Preparing the walkthrough',detail,'Step '+step+' of 3');
       await afterPaint();
     },
     ready(){
