@@ -291,6 +291,9 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
   #activity,#woodwork:not([hidden]){bottom:64px;max-height:calc(100dvh - 124px);width:min(302px,calc(100vw - 122px))}
   #sky-cue{top:28%}
 }
+@media(max-height:480px) and (min-width:550px) and (max-width:760px){
+  #world-tools:has(#world-action:not([hidden])){bottom:calc(62px + env(safe-area-inset-bottom))}
+}
 @media(pointer:coarse){
   #world-tools button,#views button,#location,.dock nav button,#woodwork button,#activity button,#activity select,#tour-guide button,#tour-guide .guide-row label,#produce label span{min-height:44px}
   #views button,.dock nav button,#activity button,#tour-guide button{min-width:44px}
@@ -304,6 +307,19 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 @media(max-width:345px){#scene-panel{gap:4px}.tour-brand h1{font-size:1.15rem}.dock nav button,#views button{padding-inline:7px}}
 #tour-guide,#property-map,#party,#water-notes{background:var(--paper);color:var(--pine);border-color:#c7b590;border-radius:6px}
 #tour-guide h2,#property-map h2,#party h2,#water-notes h2,#woodwork h2,#activity h2{font-family:var(--display);font-weight:600;letter-spacing:.01em}
+.dock nav #stay-open{background:#ffe0aa;color:#283b33;border-radius:3px;font-weight:700}
+.dock nav #stay-open:hover{background:#ffedce}
+#stay-dialog{width:min(390px,calc(100vw - 24px));max-height:calc(100dvh - 24px);margin:auto;padding:clamp(18px,4vw,27px);overflow:auto;overscroll-behavior:contain;color:var(--pine);background:var(--paper);border:1px solid #c7b590;border-radius:6px;box-shadow:0 15px 55px #10201d55}
+#stay-dialog::backdrop{background:#10231b88}
+.stay-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}
+#stay-title{margin:0;font:600 2.15rem/1 var(--display)}
+#stay-close{flex:none;width:44px;height:44px;padding:0;border:1px solid #b8b4a5;border-radius:50%;color:var(--pine);font-size:1.45rem}
+.stay-option{display:grid;gap:3px;min-height:54px;margin-top:8px;padding:12px 15px;border:1px solid #b5b5a3;border-radius:4px;background:#fff9ec;color:var(--pine);text-decoration:none}
+.stay-option:hover,.stay-option:focus-visible{background:#fbf1db;border-color:var(--pine)}
+.stay-option strong{text-decoration:underline;text-underline-offset:3px}
+.stay-option span,#stay-note{font-size:.875rem;color:#485a50}
+#stay-note{margin:14px 0 0}
+#stay-dialog :is(a,button):focus-visible{outline:3px solid var(--rust);outline-offset:2px}
 @media(forced-colors:active){#tour-controls nav,#scene-panel,.dock nav,#world-action{background:Canvas;color:CanvasText}#scene-hour{appearance:auto}}
 
 </style></head><body><main><canvas id="view" class="view" tabindex="0" aria-label="Walk the cabin and grounds. Drag to look around."></canvas><section id="status" aria-labelledby="load-title">
@@ -379,12 +395,26 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
     <div class="activity-actions"><button class="primary" id="hold-food">Hold out</button><button id="toss-food">Toss</button><button id="refill-basket">Refill</button></div><p id="deer-message" role="status"></p></div></section>
 <div class="dock" id="tools" hidden>
   <div><p class="hint" id="hint"><span id="walk-keys" hidden><span><kbd>W</kbd><kbd>S</kbd> Walk</span><span><kbd>A</kbd><kbd>D</kbd> Sidestep</span><span><kbd>←</kbd><kbd>→</kbd> Turn</span></span><span id="look-gesture">Drag to look</span></p></div>
-  <nav aria-label="Walking tools">
+  <nav aria-label="Walking tools and cabin stays">
     <button id="flashlight" type="button" aria-pressed="false" aria-keyshortcuts="L" title="Flashlight (L)" hidden>Flashlight</button>
     <button id="scene-stars" type="button" title="Set a clear night sky and look for stars">Stargaze</button>
     <button id="guide-open" type="button" aria-haspopup="dialog" aria-controls="tour-guide">Guide</button>
+    <button id="stay-open" type="button" aria-haspopup="dialog" aria-controls="stay-dialog">Stay here</button>
   </nav>
 </div></main>
+<dialog id="stay-dialog" closedby="any" aria-labelledby="stay-title" aria-describedby="stay-note">
+  <div class="stay-heading">
+    <h2 id="stay-title">Stay at the cabin</h2>
+    <button id="stay-close" type="button" aria-label="Close rental options">×</button>
+  </div>
+  <a class="stay-option" href="https://www.airbnb.com/rooms/1124495370358897568" target="_blank" rel="noopener noreferrer">
+    <strong>Check short-stay dates</strong><span>Airbnb</span>
+  </a>
+  <a class="stay-option" href="https://www.furnishedfinder.com/property/1070164_1" target="_blank" rel="noopener noreferrer">
+    <strong>Inquire about a longer stay</strong><span>Furnished Finder · 30 days or more</span>
+  </a>
+  <p id="stay-note">Listings open in a new tab.</p>
+</dialog>
 <dialog id="tour-guide" aria-labelledby="guide-title">
   <div class="guide-heading"><h2 id="guide-title">Cabin guide</h2><button type="button" id="guide-close" aria-label="Close cabin guide">×</button></div>
   <h3>Getting around</h3>
