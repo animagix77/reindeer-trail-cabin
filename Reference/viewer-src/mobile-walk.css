@@ -1,0 +1,136 @@
+/* On phones the cabin name sits above the current location, inside its touch target. */
+@media (max-width: 700px), (max-height: 500px) and (max-width: 1000px), (pointer: coarse) and (max-width: 1024px) {
+  main {
+    --hud-top: calc(env(safe-area-inset-top, 0px) + 6px);
+    --hud-left: calc(env(safe-area-inset-left, 0px) + 8px);
+    --hud-right: calc(env(safe-area-inset-right, 0px) + 8px);
+    --hud-bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+    --toolbar-height: 50px;
+    --settings-height: 99px;
+    --pad-size: 86px;
+    --pad-bottom: calc(var(--hud-bottom) + var(--toolbar-height) + 10px);
+  }
+
+  #tour-controls {
+    inset: var(--hud-top) var(--hud-right) auto var(--hud-left);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "nav" "sky";
+    gap: 3px;
+  }
+  #tour-controls > .tour-brand {
+    grid-area: nav;
+    align-self: start;
+    justify-self: start;
+    z-index: 1;
+    margin: 5px 0 0 9px;
+    padding: 0;
+    pointer-events: none;
+    text-shadow: none;
+  }
+  .tour-brand h1 {
+    color: var(--sub);
+    font: 600 .72rem/1 var(--display);
+    letter-spacing: .065em;
+    white-space: nowrap;
+  }
+  .tour-brand p { display: none; }
+  #tour-controls #views, #tour-controls #scene-panel {
+    justify-self: stretch;
+    width: auto;
+    min-width: 0;
+    border-radius: 7px;
+  }
+  #tour-controls #views { padding: 1px 3px 1px 7px; }
+  .view-picker { flex: 1 1 0; min-width: 0; padding: 0; }
+  .view-picker > span { display: none; }
+  #tour-controls #location {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    height: 44px;
+    padding: 11px 0 0;
+    font-size: 1rem;
+  }
+  #views button, .dock nav button {
+    min-height: 44px;
+    min-width: 44px;
+    line-height: 1.12;
+  }
+  #views button { border-left: 1px solid var(--hud-line); border-radius: 0; }
+  #views #party-toggle { max-width: 8.5em; padding-inline: 5px; overflow-wrap: anywhere; }
+  #tour-controls #scene-panel { gap: 7px; padding-inline: 9px; }
+  .time-setting { min-width: 0; }
+  .time-setting:has(#scene-hour:disabled) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto 12px;
+  }
+  #scene-hour:disabled { bottom: -4px; }
+  .time-setting label, #scene-clock { white-space: nowrap; }
+  #scene-weather { max-width: none; }
+  #tour-controls #scene-weather { font-size: 1rem; }
+  #scene-sound { min-width: 48px; }
+
+  #tools {
+    inset: auto var(--hud-right) var(--hud-bottom) var(--hud-left);
+    width: auto;
+    max-width: none;
+    transform: none;
+    line-height: 0;
+  }
+  #tools nav {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    border-radius: 7px;
+    width: min(100%, 360px);
+  }
+  #tools nav button { flex: 1 1 auto; padding-inline: 5px; white-space: nowrap; }
+  #tools > div {
+    position: fixed;
+    inset: calc(var(--hud-top) + var(--settings-height) + 4px) var(--hud-right) auto var(--hud-left);
+  }
+  #hint { margin: 0; line-height: 1.35; }
+  #stick { left: var(--hud-left); }
+  #world-tools, #world-tools:has(#world-action:not([hidden])) {
+    left: auto;
+    right: var(--hud-right);
+    bottom: calc(var(--pad-bottom) + (var(--pad-size) - 44px) / 2);
+    max-width: calc(100% - var(--hud-left) - var(--hud-right) - var(--pad-size) - 10px);
+    transform: none;
+  }
+  #world-tools button { max-width: 100%; white-space: normal; }
+  main:has(#woodwork:not([hidden])) #world-tools:has(#world-action:not([hidden])) {
+    left: var(--hud-left);
+    right: auto;
+    bottom: calc(var(--pad-bottom) + var(--pad-size) + 6px);
+    max-width: var(--pad-size);
+  }
+  main:has(#woodwork:not([hidden])) #world-action { padding-inline: 5px; }
+}
+
+@media (max-height: 500px) and (min-width: 550px) and (max-width: 1000px), (pointer: coarse) and (orientation: landscape) and (min-width: 550px) and (max-width: 1024px) {
+  main {
+    --settings-height: 48px;
+    --pad-size: 78px;
+    --pad-bottom: var(--hud-bottom);
+  }
+  #tour-controls {
+    grid-template-columns: minmax(0, 1.17fr) minmax(0, 1fr);
+    grid-template-areas: "nav sky";
+    gap: 6px;
+  }
+  .time-setting label span { display: none; }
+  #tour-controls #views, #tour-controls #scene-panel { max-width: 420px; }
+  #tour-controls #scene-panel { width: 100%; justify-self: end; }
+  #tour-controls #scene-panel { gap: 4px; padding-inline: 6px; }
+  #scene-panel .weather-setting { padding-left: 6px; }
+  .weather-setting > label { left: 7px; }
+  #tools {
+    left: calc(var(--hud-left) + var(--pad-size) + 8px);
+    text-align: right;
+  }
+  #tools nav { width: min(100%, 330px); }
+  #tools > div { text-align: center; }
+  #world-tools, #world-tools:has(#world-action:not([hidden])) {
+    bottom: calc(var(--hud-bottom) + var(--toolbar-height) + 6px);
+  }
+}

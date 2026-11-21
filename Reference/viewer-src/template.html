@@ -322,6 +322,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 #stay-dialog :is(a,button):focus-visible{outline:3px solid var(--rust);outline-offset:2px}
 @media(forced-colors:active){#tour-controls nav,#scene-panel,.dock nav,#world-action{background:Canvas;color:CanvasText}#scene-hour{appearance:auto}}
 
+%%MOBILE_STYLES%%
 </style></head><body><main><canvas id="view" class="view" tabindex="0" aria-label="Walk the cabin and grounds. Drag to look around."></canvas><section id="status" aria-labelledby="load-title">
     <img id="load-photo" alt="" decoding="async">
     <div class="load-arrival"><p class="load-location">The Reindeer Trail · Smallwood, NY</p>
@@ -453,7 +454,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
       <p class="welcome-route">Your walk begins on the driveway at golden hour. Explore the rooms at your own pace, or follow the path around back to the swings.</p>
       <form id="welcome-form">
         <div id="welcome-identity" hidden>
-          <label>Your hiker’s name<input id="welcome-name" required maxlength="28" autocomplete="nickname" placeholder="Name or nickname" aria-describedby="welcome-note"></label>
+          <label>Your hiker’s name<input id="welcome-name" required maxlength="28" autocomplete="nickname" enterkeyhint="go" placeholder="Name or nickname" aria-describedby="welcome-note"></label>
           <label>Hiker style<select id="welcome-avatar"><option value="man">Man</option><option value="woman">Woman</option></select></label>
         </div>
         <p id="welcome-note" hidden>Other visitors on the walk can see your hiker’s name.</p>

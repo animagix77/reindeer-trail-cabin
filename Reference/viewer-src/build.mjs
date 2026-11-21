@@ -39,7 +39,10 @@ const mapJSON=JSON.stringify({images:{
 },lines}).replaceAll('<','\\u003c');
 const welcomePhoto=(await fs.readFile(path.join(base,'welcome-yard.webp'))).toString('base64');
 const displayFont=await fs.readFile(path.join(base,'BarlowCondensed-SemiBold.ttf'));
-let template=(await fs.readFile(path.join(base,'template.html'),'utf8')).replace('%%FIELD_FONT%%',displayFont.toString('base64'));
+const mobileStyles=await Promise.all(['mobile-walk.css','mobile-welcome.css','mobile-panels.css'].map(file=>fs.readFile(path.join(base,file),'utf8')));
+let template=(await fs.readFile(path.join(base,'template.html'),'utf8'))
+  .replace('%%FIELD_FONT%%',displayFont.toString('base64'))
+  .replace('%%MOBILE_STYLES%%',()=>mobileStyles.join('\n'));
 if(web){
   const parts=[];
   for(let start=0;start<glb.length;start+=modelPartBytes){

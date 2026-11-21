@@ -29,6 +29,7 @@
 !/Reference/viewer-src/
 !/Reference/viewer-src/*.js
 !/Reference/viewer-src/*.mjs
+!/Reference/viewer-src/*.css
 !/Reference/viewer-src/package.json
 !/Reference/viewer-src/package-lock.json
 !/Reference/viewer-src/template.html

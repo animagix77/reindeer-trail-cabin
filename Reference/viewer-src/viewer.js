@@ -31,6 +31,34 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const element = id => document.getElementById(id);
+// Phone keyboards and browser bars can cover part of the layout viewport.
+const viewport=window.visualViewport;
+if(viewport){
+  const syncViewport=()=>{
+    if(Math.abs(viewport.scale-1)>.01)return;
+    const style=document.documentElement.style;
+    style.setProperty('--visible-height',viewport.height+'px');
+    style.setProperty('--visible-top',viewport.offsetTop+'px');
+  };
+  syncViewport();
+  let lastHeight=viewport.height;
+  viewport.addEventListener('resize',()=>{
+    const shrinking=viewport.height<lastHeight;
+    lastHeight=viewport.height;
+    syncViewport();
+    const field=document.activeElement;
+    if(!shrinking||Math.abs(viewport.scale-1)>.01||!field?.matches('#welcome-name,#party-input'))return;
+    requestAnimationFrame(()=>{
+      if(document.activeElement!==field)return;
+      const dialog=field.closest('dialog[open]');
+      if(!dialog)return;
+      const form=field.form;
+      const target=form&&form.offsetHeight+16<=dialog.clientHeight?form:field;
+      target.scrollIntoView({block:'nearest',inline:'nearest'});
+    });
+  });
+  viewport.addEventListener('scroll',syncViewport);
+}
 const canvas = element('view');
 const controlsPanel = element('tools');
 let sceneCanRender=false;
