@@ -80,7 +80,7 @@ export function installLoadingScreen(setWelcomeState){
       endQuotes();
       finished=true;canvas.inert=false;canvas.setAttribute('aria-busy','false');
       display('ready','Ready to explore','','',100);
-      full.hidden=true;compact.hidden=!dialog.open;
+      full.hidden=true;compact.hidden=true;
       setWelcomeState('ready');
       if(!dialog.open && document.activeElement===document.body)canvas.focus({preventScroll:true});
     },

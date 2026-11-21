@@ -162,7 +162,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
   sun.shadow.radius=1.35;
   sun.shadow.normalBias=.023;sun.shadow.bias=-.00017;
   scene.add(sun,sun.target);
-  const daylightMaterials=new Map(),lampMaterials=new Map();
+  const daylightMaterials=new Map(),lampMaterials=new Map(),pathLenses=new Set();
   const hiddenGeometry=/^(Walk(?:Surface|Block|Spawn)|Canopy|Backdrop)/i;
   model.traverse(obj=>{
     if(!obj.isMesh)return;
@@ -180,6 +180,9 @@ export function installTourLighting(scene,renderer,model,arrival) {
       }
       if(/Backdrop_Hardwood cutouts|Daylight through rooflights|Kitchen fabric/i.test(mat.name))daylightMaterials.set(mat,mat.emissiveIntensity);
       if(/Warm opal shade|Frosted sconce shade|amber wire filaments|String bulbs|warm milk.glass shades/i.test(mat.name))lampMaterials.set(mat,mat.emissiveIntensity);
+      if(mat.name==='Path lights · frosted lens'){
+        mat.emissive.setHex(0xffda9e);pathLenses.add(mat);
+      }
     }
     if(hiddenGeometry.test(obj.name))return;
     const isPane=mats.every(m=>m.transparent || /clear glass|sky glazing|window view/i.test(m.name));
@@ -198,12 +201,16 @@ export function installTourLighting(scene,renderer,model,arrival) {
     [16,7,1.92,0xffe7c8,10,3.5],[26.25,5.65,2.02,0xffedda,6,2.7],
     [30,2.8,1.96,0xffe2b8,8,3],[30,32,2.0,0xffd5a2,6,3.4]
   ].map(([x,y,z,color,power,range])=>({p:fromPlan(x,y,z),color,power,range}));
-  // Soft sunset bounce from the upper gravel landing onto the first flight.
-  // Reuse a local lamp slot so the driveway costs no extra lights per frame.
+  // The four low, frosted path lights run between the two stair flights.
+  // Model their soft pooled light on the risers and rails in existing nearby
+  // lamp slots. The steps stay readable after the motion heads switch off.
   const middleStep=model.getObjectByName('WalkSurface_RetainerTread04');
   const stepBounce={p:new THREE.Box3().setFromObject(middleStep).getCenter(new THREE.Vector3())
-    .add(new THREE.Vector3(1.1,1.25,.65)),color:0xffc88e,power:0,range:3.7};
-  zones.push(stepBounce);
+    .add(new THREE.Vector3(1.1,1.25,.65)),color:0xffc88e,power:0,range:3.7,approach:true};
+  const frontStep=model.getObjectByName('WalkSurface_FrontStep01');
+  const porchBounce={p:new THREE.Box3().setFromObject(frontStep).getCenter(new THREE.Vector3())
+    .add(new THREE.Vector3(.75,1.08,-.90)),color:0xffdaac,power:0,range:5.2,approach:true};
+  zones.push(stepBounce,porchBounce);
   // A practical light follows its modeled diffuser if the basement layout changes.
   model.traverse(fixture=>{
     if(!fixture.name.startsWith('BasementLamp_') || fixture.parent?.name.startsWith('BasementLamp_'))return;
@@ -258,10 +265,17 @@ export function installTourLighting(scene,renderer,model,arrival) {
     air.density=a.fog+.0026*lowSun;
     renderer.toneMappingExposure=1.05+.16*lowSun;
     const availableLight=a.day*a.light;
+    // Add a cool, low-level fill to surfaces after dusk. Keeping exposure and
+    // the sky shader independent preserves the contrast of the stars.
+    const nightFill=1-a.day;
     daylight=a.direction.y>0?availableLight:0;
-    stepBounce.power=4.8*lowSun*daylight;
+    const pathNight=1-THREE.MathUtils.smoothstep(a.day,.06,.42);
+    stepBounce.power=4.8*lowSun*daylight+16*pathNight;
+    stepBounce.range=3.7+2.1*pathNight;
+    porchBounce.power=13*pathNight;
+    for(const m of pathLenses)m.emissiveIntensity=1.8*pathNight;
     roomGain=.105+.36*availableLight;
-    skyGain=.065+.78*availableLight+.13*a.blueHour*(1-a.clouds);
+    skyGain=.065+.070*nightFill+.78*availableLight+.13*a.blueHour*(1-a.clouds);
     metalGain=.075+1.24*availableLight+.16*a.blueHour*(1-a.clouds);
     reflectedSky.value.setRGB(1,1,1).lerp(new THREE.Color('#ffccb3'),a.golden*(1-.70*a.clouds)*.78)
       .lerp(new THREE.Color('#aabdff'),Math.max(a.blueHour,.72*(1-a.day)));
@@ -269,14 +283,14 @@ export function installTourLighting(scene,renderer,model,arrival) {
     applyEnvironment();
     hemisphere.color.copy(a.skyTint);
     hemisphere.groundColor.copy(a.groundTint);
-    hemisphere.intensity=.19+a.day*(.83+.28*a.clouds-.13*lowSun)+.22*a.blueHour*(1-.66*a.clouds);
+    hemisphere.intensity=.19+.24*nightFill+a.day*(.83+.28*a.clouds-.13*lowSun)+.22*a.blueHour*(1-.66*a.clouds);
     const lunar=a.direction.y<0;
     const lightDirection=a.direction.clone().multiplyScalar(lunar?-1:1);
     lightDirection.y=Math.max(lightDirection.y,.07);
     sun.position.copy(lightDirection.normalize().multiplyScalar(44)).add(sun.target.position);
     sun.color.copy(lunar?new THREE.Color(0xadc8f4):a.sunTint);
     sun.intensity=lunar
-      ? .22*(1-a.day)*(1-.76*a.clouds)
+      ? .44*nightFill*(1-.76*a.clouds)
       : (2.60+1.28*lowSun)*a.day*(1-.91*a.clouds)*THREE.MathUtils.smoothstep(a.direction.y,-.06,.16);
     for(const [m,base] of daylightMaterials)m.emissiveIntensity=base*(.04+.96*availableLight);
     for(const [m,base] of lampMaterials)m.emissiveIntensity=base*(1+1.65*(1-availableLight));
@@ -306,7 +320,8 @@ export function installTourLighting(scene,renderer,model,arrival) {
       const downstairs=/^WalkSurface_Basement/.test(floor);
       const nearest=walking?zones.map((z,i)=>[i,z.p.distanceToSquared(eye)]).filter(([i,d])=>{
         const z=zones[i];
-        return d<58 && z.power>.01 && (Boolean(z.basement)===downstairs || (z.threshold && outdoors));
+        return d<58 && z.power>.01 && (!z.approach || outdoors) &&
+          (Boolean(z.basement)===downstairs || (z.threshold && outdoors));
       })
         .sort((a,b)=>a[1]-b[1]).slice(0,3).map(pair=>pair[0]):[];
       const key=nearest.join('/');
@@ -314,7 +329,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
         zoneKey=key;
         lamps.forEach((l,i)=>{
           const z=zones[nearest[i]];
-          l.intensity=z?z.power*(z===stepBounce?1:lampGain):0;
+          l.intensity=z?z.power*(z.approach?1:lampGain):0;
           if(z){l.position.copy(z.p);l.color.set(z.color);l.distance=z.range;}
         });
       }

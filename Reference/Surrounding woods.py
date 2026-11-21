@@ -5,6 +5,97 @@ masked to omit the tax parcel, state building footprints, and county roads.
 Tree forms, species, and seasonal appearance are illustrative.
 """
 
+def build_neighboring_homes(group, records, terrain):
+    from mathutils.bvhtree import BVHTree
+
+    # The visible local grading and the outer DEM mesh meet at a stitched edge.
+    terrain_trees = [BVHTree.FromPolygons([v.co for v in obj.data.vertices],
+                    [p.vertices[:] for p in obj.data.polygons]) for obj in terrain]
+    def ground_height(p):
+        for tree in terrain_trees:
+            hit = tree.ray_cast((p.x, p.y, 80), (0, 0, -1))[0]
+            if hit is not None:
+                return hit.z
+        raise ValueError(f'Neighboring footprint lies beyond the terrain at {p}')
+
+    # One flat-shaded surface per house. Corner colors group walls, roof and
+    # plinth into a single draw without loading any more textures.
+    finish = mat('Backdrop_Neighboring homes', '#ffffff', rough=.94)
+    tree = finish.node_tree
+    color = tree.nodes.new('ShaderNodeVertexColor')
+    color.layer_name = 'Exterior colors'
+    tree.links.new(color.outputs['Color'], tree.nodes.get('Principled BSDF').inputs['Base Color'])
+    walls = [(120, 112, 94), (112, 118, 103), (129, 117, 102), (101, 105, 101)]
+    roofs = [(74, 73, 70), (78, 79, 78), (86, 77, 68)]
+
+    for house in records:
+        ring = [Vector(p) for p in house['ring']]
+        if sum(a.cross(b) for a,b in zip(ring, ring[1:]+ring[:1])) < 0:
+            ring.reverse()
+        edges = list(zip(ring, ring[1:]+ring[:1]))
+        # Run the illustrative ridge along the long axis of the footprint.
+        ridge_direction = max((b-a for a,b in edges), key=lambda v: v.length_squared).normalized()
+        across = Vector((-ridge_direction.y, ridge_direction.x))
+        projections = [p.dot(across) for p in ring]
+        ridge = (min(projections) + max(projections)) * .5
+        half_width = (max(projections) - min(projections)) * .5
+        grade = [ground_height(p) for a,b in edges for p in (a, (a+b)*.5)]
+        floor = max(grade) + .12
+        eave = floor + 2.58
+        rise = min(2.4, half_width*.48)
+        def roof_z(p):
+            return eave + rise * (1 - abs(p.dot(across)-ridge) / half_width)
+
+        points, faces, tones = [], [], []
+        def face(coords, tone):
+            offset = len(points)
+            points.extend(coords)
+            faces.append(tuple(range(offset, len(points))))
+            tones.append(tone)
+
+        def at_height(a, b, low_a, low_b, high_a, high_b, tone):
+            face([(*a,low_a), (*b,low_b), (*b,high_b), (*a,high_a)], tone)
+
+        roof = roofs[house['id'] % len(roofs)]
+        wall = walls[house['id'] % len(walls)]
+        for a,b in edges:
+            d0,d1 = a.dot(across)-ridge,b.dot(across)-ridge
+            mid = [a.lerp(b,d0/(d0-d1))] if d0*d1 < 0 else []
+            for p,q in zip([a]+mid,mid+[b]):
+                at_height(p,q,min(grade)-.20,min(grade)-.20,floor,floor,(88,86,79))
+                at_height(p,q,floor,floor,roof_z(p),roof_z(q),wall)
+                at_height(p,q,roof_z(p),roof_z(q),roof_z(p)+.14,roof_z(q)+.14,roof)
+            # Two flat panes on broad faces make the distant masses legible as homes.
+            if (b-a).length < 5.5:
+                continue
+            along = (b-a).normalized()
+            outward = Vector((along.y,-along.x)) * .018
+            for station in (.29,.71):
+                center = a.lerp(b,station) + outward
+                at_height(center-along*.56, center+along*.56, floor+.85, floor+.85,
+                          floor+1.85, floor+1.85, (63,73,72))
+
+        # Split each plan triangle at the ridge before lifting it. This keeps
+        # the gable planar and respects the small returns of L-shaped homes.
+        for tri in tessellate_polygon([[p.to_3d() for p in ring]]):
+            triangle = [ring[i] for i in tri]
+            for side in (-1,1):
+                panel = []
+                for a,b in zip(triangle, triangle[1:]+triangle[:1]):
+                    d0,d1 = (a.dot(across)-ridge)*side,(b.dot(across)-ridge)*side
+                    if d0 >= 0:
+                        panel.append(a)
+                    if d0*d1 < 0:
+                        panel.append(a.lerp(b,d0/(d0-d1)))
+                if len(panel) >= 3:
+                    face([(*p,roof_z(p)+.14) for p in panel], roof)
+        obj = mesh('Backdrop_Neighbor_'+str(house['id']),points,faces,finish,group)
+        attr = obj.data.color_attributes.new(name=color.layer_name,type='BYTE_COLOR',domain='CORNER')
+        for polygon, tone in zip(obj.data.polygons,tones):
+            rgba = (*[v/255 for v in tone], 1)
+            for i in polygon.loop_indices:
+                attr.data[i].color_srgb = rgba
+
 def build_surrounding_woods():
     import random
     import numpy as np
@@ -104,6 +195,10 @@ def build_surrounding_woods():
     for polyface in land.data.polygons:
         polyface.use_smooth = True
     land['basis'] = 'USGS 1 m DEM, resampled to 3 m beyond site, 2021 NY orthophoto with subdued leaf-off colors.'
+    homes = json.loads((folder / 'Neighboring homes.json').read_text())
+    if homes['origin'] != [OX,OY]:
+        raise ValueError('Neighboring footprints use a different horizontal origin')
+    build_neighboring_homes(c, homes['homes'], [site_land, land])
 
     def trees(records, name, small=False):
         vert, polygons, coords = [], [], []

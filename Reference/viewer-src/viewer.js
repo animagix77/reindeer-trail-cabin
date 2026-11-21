@@ -419,11 +419,7 @@ const waterNotes=installWaterNotes({
 const welcome=installWelcome({
   pause(){stopWalking();pointers.clear();},
   resume(){if(sceneCanRender) schedule();},
-  enter(){
-    history.replaceState(null,'','#'+tourAreas.outside.slug+party.suffix);
-    if(sceneCanRender && activeView!=='outside')changeView('outside');
-    canvas.focus({preventScroll:true});
-  }
+  invite:party.invite,offline:party.offline,enter:party.enter
 });
 const loading=installLoadingScreen(welcome.setLoadState);
 const tourInterface=installTourInterface({
@@ -603,7 +599,6 @@ async function show() {
   element('views').hidden=false;
   element('tour-controls').hidden=false;
   loading.ready();
-  party.initial();
 }
 show().catch(error=>{
   console.error(error);

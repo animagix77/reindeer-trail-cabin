@@ -21,7 +21,9 @@
 !/Reference/Interior materials/*.png
 !/Reference/Woodland context/
 !/Reference/Woodland context/Woodland canopy.json
+!/Reference/Woodland context/Neighboring homes.json
 !/Reference/Woodland context/Woodland heights.npz
+!/Reference/Woodland context/Neighboring homes.json
 !/Reference/Woodland context/Woodland terrain.jpg
 !/Reference/Woodland context/Hardwood silhouettes.png
 !/Reference/viewer-src/

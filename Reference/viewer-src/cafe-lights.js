@@ -31,7 +31,9 @@ export function installCafeLights(scene,model){
       }`});
   const glow=new THREE.Points(geometry,mat);glow.name='Warm cafe lights · deck and pergola';glow.visible=false;scene.add(glow);
   const pools=[];
-  for(const [name,power,reach] of [['Deck',12,6.1],['Pergola',9,5.9],['Picnic',9,6.2]]){
+  // Each emitter stands in for a run of several bulbs. Enough reach for the
+  // warm pools to overlap on the route from the porch to the swing seats.
+  for(const [name,power,reach] of [['Deck',38,8.9],['Pergola',30,8.4],['Picnic',28,9.1]]){
     const marker=model.getObjectByName('FestoonPool_'+name);
     if(!marker)continue;
     const lamp=new THREE.PointLight(0xffce91,0,reach,2);
@@ -40,8 +42,8 @@ export function installCafeLights(scene,model){
   }
   return {set(daylight){
     const night=Math.pow(1-daylight,1.4);
-    uniforms.gain.value=.10+.94*night;
-    for(const {lamp,power} of pools)lamp.intensity=power*(.035+night);
+    uniforms.gain.value=.10+1.18*night;
+    for(const {lamp,power} of pools)lamp.intensity=.33+power*night;
   },update(walking,height){
     glow.visible=walking;uniforms.height.value=height;
   }};

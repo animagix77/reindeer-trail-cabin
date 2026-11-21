@@ -1,7 +1,6 @@
 import Peer from 'peerjs';
 
-// PeerJS introduces browsers. The host admits each WebRTC connection using
-// the random key in the invitation and assigns its identity and driveway slot.
+// PeerJS introduces browsers. The host assigns each visitor a driveway slot.
 const newKey=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),v=>v.toString(16).padStart(2,'0')).join('');
 const validId=s=>typeof s==='string' && /^[a-z0-9_-]{1,80}$/i.test(s);
 const validName=s=>typeof s==='string' && s.trim().length>0 && s.length<=28;
@@ -49,18 +48,83 @@ export function readRoom(){
   return /^[a-z0-9_-]{1,80}\.[a-f0-9]{32}$/i.test(token)?token:'';
 }
 
-export function openTourRoom({invite,name,avatar,onReady,onEnd,onRoster,onMessage,onScene,onPose,onPlace,snapshot,snapshotFuel,onFuelState,onAddFuel}){
-  if(!validName(name)||!validAvatar(avatar))throw Error('A name and avatar are required');
-  const isHost=!invite,hostId=invite.split('.')[0];
-  const key=isHost?newKey():invite.split('.')[1];
-  const peer=new Peer({secure:true,debug:0});
+// All views of one published tour meet at one signaling address. Different
+// deployments (including local previews) get their own room.
+export function publicRoomId(url=new URL(location.href)){
+  const address=url.origin+url.pathname.replace(/\/(?:index\.html)?$/i,'');
+  let hash=2166136261;
+  for(const letter of address)hash=Math.imul(hash^letter.charCodeAt(0),16777619);
+  return 'reindeer-trail-open-v1-'+(hash>>>0).toString(36);
+}
+
+const createPeer=id=>id?new Peer(id,{secure:true,debug:0}):new Peer({secure:true,debug:0});
+
+export function openTourRoom(options,makePeer=createPeer){
+  if(!validName(options.name)||!validAvatar(options.avatar))throw Error('A name and avatar are required');
+  if(!options.publicRoom)return connectTourRoom(options,makePeer);
+
+  // Exactly one browser can register the public address. The others join it.
+  // When that browser leaves, the remaining visitors elect another the same way.
+  const address=publicRoomId(),visitor='visitor-'+newKey();
+  let current=null,retry=null,closed=false,entered=false,waiting=false,attempts=0;
+  const connectionExpired=()=>end('The open house could not connect. Check your connection and try again.');
+  let timeout=setTimeout(connectionExpired,25000);
+  function end(reason){
+    if(closed)return;
+    closed=true;clearTimeout(retry);clearTimeout(timeout);current?.leave();current=null;options.onEnd(reason);
+  }
+  function connect(asHost){
+    if(closed)return;
+    try{
+      current=connectTourRoom({
+        ...options,
+        onReady(token,arrival){
+          clearTimeout(timeout);
+          const reconnected=entered;
+          entered=true;waiting=false;attempts=0;
+          options.onReady('',{...arrival,reconnected});
+        },
+        onEnd(reason,code){
+          current=null;
+          if(closed)return;
+          if(code==='full'||code==='unsupported'){end(reason);return;}
+          if(entered&&!waiting){
+            waiting=true;timeout=setTimeout(connectionExpired,40000);
+            options.onReconnecting?.('Reconnecting to the open house…');
+          }
+          if(asHost&&code==='unavailable-id'){
+            retry=setTimeout(()=>connect(false),0);
+          }else{
+            attempts++;
+            const backoff=Math.min(4000,350*2**Math.min(attempts,4));
+            retry=setTimeout(()=>connect(true),backoff+Math.random()*350);
+          }
+        }
+      },makePeer,{address,visitor,asHost});
+    }catch{end('This browser could not open a multiplayer connection.');}
+  }
+  connect(true);
+  return {
+    send(text){current?.send(text);},move(p){current?.move(p);},
+    fuel(kind){current?.fuel(kind);},conditions(scene){current?.conditions(scene);},
+    place(){return false;},
+    leave(){end('You left the open house.');}
+  };
+}
+
+function connectTourRoom({invite='',name,avatar,onReady,onEnd,onRoster,onMessage,onScene,onPose,onPlace,snapshot,snapshotFuel,onFuelState,onAddFuel},makePeer,publicSession){
+  const isHost=publicSession?publicSession.asHost:!invite;
+  const hostId=publicSession?.address||invite.split('.')[0];
+  const key=publicSession?'':isHost?newKey():invite.split('.')[1];
+  const peer=makePeer(publicSession?(isHost?hostId:publicSession.visitor):undefined);
+  let hostMember=hostId;
   const members=new Map(),links=new Map(),pending=new Set(),messages=[],timers=new Set();
   let id='',uplink=null,ended=false,ready=false,lastPose='';
   function later(fn,delay){const t=setTimeout(()=>{timers.delete(t);if(!ended)fn();},delay);timers.add(t);return t;}
-  function finish(reason){
+  function finish(reason,code){
     if(ended)return;
     ended=true;for(const timer of timers)clearTimeout(timer);
-    peer.destroy();onEnd(reason);
+    peer.destroy();onEnd(reason,code);
   }
   function broadcast(m){for(const c of links.values())safeSend(c,m);}
   function publishFuel(){
@@ -91,7 +155,7 @@ export function openTourRoom({invite,name,avatar,onReady,onEnd,onRoster,onMessag
   }
   function chat(from,text){
     const item={fromId:from,from:members.get(from).name,text:text.trim()};
-    messages.push(item);if(messages.length>45)messages.shift();
+    if(!publicSession){messages.push(item);if(messages.length>45)messages.shift();}
     onMessage(item,false);broadcast({t:'chat',item});
   }
   function recordPose(from,p){
@@ -99,24 +163,38 @@ export function openTourRoom({invite,name,avatar,onReady,onEnd,onRoster,onMessag
     member.pose=p;onPose(from,p);broadcast({t:'pose',id:from,p});
   }
   function replaceRoster(list){
-    const people=readRoster(list,hostId,id);
+    const people=readRoster(list,hostMember,id);
     if(!people)return false;
     members.clear();for(const m of people)members.set(m.id,m);
     onRoster(people,id);return true;
   }
+  function watchConnection(c){
+    // Wi-Fi changes may disconnect ICE briefly. Re-elect only after the
+    // channel has stayed unreachable long enough for a normal recovery.
+    if(!publicSession)return;
+    let lost=null;
+    c.on('iceStateChanged',state=>{
+      clearTimeout(lost);timers.delete(lost);
+      if(state==='disconnected')lost=later(()=>c.close(),10000);
+    });
+  }
   function attach(c){
-    if(!isHost||ended||pending.size+links.size>=7||!validId(c.peer)||c.label!=='cabin-tour'){c.close();return;}
+    if(!isHost||ended||pending.size>=16||!validId(c.peer)||c.label!=='cabin-tour'){c.close();return;}
+    watchConnection(c);
     pending.add(c);let admitted=false,lastMove=-1000,lastWood=-1000,chatTokens=5,chatClock=performance.now();
     later(()=>{if(!admitted){pending.delete(c);c.close();}},12000);
     c.on('data',raw=>{
       const m=packet(raw);if(!m||ended)return;
       if(!admitted){
         if(!pending.has(c)||m.t!=='hello'||m.key!==key||!validName(m.name)||!validAvatar(m.avatar)||members.has(c.peer)){pending.delete(c);c.close();return;}
+        if(members.size>=8){
+          safeSend(c,{t:'full'});pending.delete(c);later(()=>c.close(),500);return;
+        }
         const used=new Set(Array.from(members.values(),p=>p.slot));
         let slot=1;while(used.has(slot))slot++;
         admitted=true;pending.delete(c);links.set(c.peer,c);
         members.set(c.peer,{id:c.peer,name:m.name.trim(),avatar:m.avatar,slot,pose:null});
-        safeSend(c,{t:'welcome',list:Array.from(members.values()),messages,scene:snapshot(),fuel:snapshotFuel?.()});
+        safeSend(c,{t:'welcome',hostMember:id,list:Array.from(members.values()),messages,scene:snapshot(),fuel:snapshotFuel?.()});
         publishRoster();return;
       }
       if(links.get(c.peer)!==c)return;
@@ -136,21 +214,29 @@ export function openTourRoom({invite,name,avatar,onReady,onEnd,onRoster,onMessag
     c.on('close',drop);c.on('error',drop);
   }
   peer.on('connection',attach);
-  later(()=>{if(!ready)finish('The group could not connect. Check that the host still has the cabin open, then try again.');},25000);
+  later(()=>{if(!ready)finish('The group could not connect. Check that the host still has the cabin open, then try again.');},publicSession?12000:25000);
   peer.on('open',own=>{
     if(ended||id)return;
-    id=own;
+    id=publicSession?.visitor||own;
     if(isHost){
       members.set(id,{id,name:name.trim(),avatar,slot:0,pose:null});
-      publishRoster();joined(id+'.'+key);if(snapshotFuel)later(alignBurn,15000);return;
+      publishRoster();joined(publicSession?'':id+'.'+key);if(snapshotFuel)later(alignBurn,15000);return;
     }
     uplink=peer.connect(hostId,{label:'cabin-tour',serialization:'raw',reliable:true});
+    watchConnection(uplink);
     uplink.on('open',()=>safeSend(uplink,{t:'hello',key,name,avatar}));
     uplink.on('close',()=>finish('The connection to the host closed. You can keep exploring on your own.'));
     uplink.on('error',()=>finish('Your connection to the host was interrupted.'));
     uplink.on('data',raw=>{
       const m=packet(raw);if(!m||ended)return;
+      if(m.t==='full'&&!ready){
+        finish(publicSession?'The open house is full (8 visitors). Try again in a little while.':'The group is full (8 visitors).','full');return;
+      }
       if(m.t==='welcome'&&!ready){
+        if(publicSession){
+          if(!validId(m.hostMember))return;
+          hostMember=m.hostMember;
+        }
         if(!replaceRoster(m.list))return;
         if(validScene(m.scene))onScene(m.scene);
         if(validFuel(m.fuel))onFuelState?.(m.fuel);
@@ -164,11 +250,15 @@ export function openTourRoom({invite,name,avatar,onReady,onEnd,onRoster,onMessag
       if(m.t==='pose'&&members.has(m.id)&&validPose(m.p)){members.get(m.id).pose=m.p;onPose(m.id,m.p);}
       if(m.t==='scene'&&validScene(m.scene))onScene(m.scene);
       if(m.t==='fuelState'&&validFuel(m.fuel))onFuelState?.(m.fuel);
-      if(m.t==='place'&&validPose(m.p)&&m.p.view!=='property')onPlace(m.p);
+      if(!publicSession&&m.t==='place'&&validPose(m.p)&&m.p.view!=='property')onPlace(m.p);
     });
   });
   peer.on('error',e=>{
-    if(!ready || !isHost&&e.type!=='network')finish(e.type==='peer-unavailable'?'This group has closed. You can start a new one.':'The group could not connect. Please try again.');
+    if(ended)return;
+    if(e.type==='browser-incompatible'){finish('This browser does not support multiplayer.','unsupported');return;}
+    if(!ready || e.type==='unavailable-id' || !isHost&&e.type!=='network'){
+      finish(e.type==='peer-unavailable'?'This group has closed. You can start a new one.':'The group could not connect. Please try again.',e.type);
+    }
   });
   peer.on('disconnected',()=>{if(!ended&&!peer.destroyed)later(()=>{if(peer.disconnected&&!peer.destroyed)peer.reconnect();},1500);});
   return {
@@ -179,7 +269,7 @@ export function openTourRoom({invite,name,avatar,onReady,onEnd,onRoster,onMessag
       // The local animation has already landed; only the host broadcasts totals.
       if(isHost)publishFuel();else safeSend(uplink,{t:'addWood',kind});},
     conditions(scene){if(!ready||ended||!validScene(scene))return;const m={t:'scene',scene};isHost?broadcast(m):safeSend(uplink,m);},
-    place(guestId,p){if(!isHost||!ready||ended||!links.has(guestId)||!validPose(p)||p.view==='property')return false;
+    place(guestId,p){if(publicSession||!isHost||!ready||ended||!links.has(guestId)||!validPose(p)||p.view==='property')return false;
       safeSend(links.get(guestId),{t:'place',p});return true;},
     leave(){finish('You left the group.');}
   };

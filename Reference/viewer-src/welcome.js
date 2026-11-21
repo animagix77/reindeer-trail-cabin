@@ -1,53 +1,54 @@
-export function installWelcome({pause, resume, enter}) {
-  const dialog = document.getElementById('welcome');
-  const revisit = document.getElementById('welcome-again');
-  const start = document.getElementById('welcome-start');
-  const title = document.getElementById('welcome-title');
-  let loadState = 'loading';
-  let firstVisit = false;
-  let accepted = false;
-
-  function updateButton() {
-    start.disabled = loadState !== 'ready';
-    let label = firstVisit ? 'Start exploring' : 'Return to the cabin';
-    if (loadState === 'loading') label = 'Loading…';
-    if (loadState === 'error') label = 'Cabin unavailable';
-    start.firstElementChild.textContent = label;
+export function installWelcome({pause,resume,enter,invite,offline}){
+  const get=id=>document.getElementById(id);
+  const dialog=get('welcome'),form=get('welcome-form'),start=get('welcome-start');
+  const name=get('welcome-name'),avatar=get('welcome-avatar'),feedback=get('welcome-feedback');
+  const close=get('welcome-close'),revisit=get('welcome-again'),solo=get('welcome-solo');
+  let loadState='loading',entered=false,connecting=false;
+  if(offline)get('welcome-note').textContent='Enter a name to explore this saved copy on your own.';
+  else if(invite)get('welcome-note').textContent='Join this invited group. Other visitors in the group can see your name and chat with you.';
+  function refresh(){
+    start.disabled=loadState!=='ready'||connecting||(!entered&&!name.value.trim());
+    start.firstElementChild.textContent=loadState==='error'?'Cabin unavailable':
+      loadState!=='ready'?'Loading…':connecting?'Connecting…':entered?'Return to the cabin':
+      offline?'Start exploring':invite?'Join group':'Enter open house';
+    name.disabled=avatar.disabled=connecting;
   }
-
-  function open(first) {
-    firstVisit = first;
-    accepted = false;
-    updateButton();
-    if (document.pointerLockElement) document.exitPointerLock();
-    pause();
-    dialog.showModal();
-    (start.disabled ? title : start).focus({preventScroll:true});
+  function open(){
+    if(dialog.open)return;
+    if(document.pointerLockElement)document.exitPointerLock();
+    pause();refresh();dialog.showModal();
+    const focusTarget=!entered&&matchMedia('(pointer: fine)').matches?name:get('welcome-title');
+    focusTarget.focus({preventScroll:true});
   }
-
-  start.addEventListener('click', () => { accepted = true; dialog.close(); });
-  document.getElementById('welcome-close').addEventListener('click', () => dialog.close());
-  revisit.addEventListener('click', () => open(false));
-  dialog.addEventListener('keydown', event => event.stopPropagation());
-  dialog.addEventListener('close', () => {
-    try { sessionStorage.setItem('reindeer-welcome-seen','1'); } catch {}
-    if (accepted && firstVisit) enter();
-    else if (!firstVisit) revisit.focus({preventScroll:true});
-    else document.getElementById('view').focus({preventScroll:true});
+  async function submit(alone){
+    if(entered){dialog.close();return;}
+    const displayName=name.value.trim();
+    if(loadState!=='ready'||connecting||!displayName)return;
+    connecting=true;solo.hidden=true;feedback.textContent='';refresh();
+    try{
+      await enter({name:displayName,avatar:avatar.value},alone||offline);
+      entered=true;get('welcome-identity').hidden=get('welcome-note').hidden=true;
+      close.hidden=false;dialog.setAttribute('closedby','closerequest');dialog.close();
+    }catch(error){
+      feedback.textContent=error.message||'Couldn’t connect to the cabin. Please try again.';
+      solo.hidden=false;
+    }finally{connecting=false;refresh();}
+  }
+  name.addEventListener('input',refresh);
+  form.addEventListener('submit',e=>{e.preventDefault();void submit(false);});
+  solo.addEventListener('click',()=>{void submit(true);});
+  close.addEventListener('click',()=>{if(entered)dialog.close();});
+  revisit.addEventListener('click',open);
+  dialog.addEventListener('cancel',e=>{if(!entered)e.preventDefault();});
+  dialog.addEventListener('keydown',e=>{
+    if(!entered&&e.key==='Escape')e.preventDefault();
+    e.stopPropagation();
+  });
+  dialog.addEventListener('close',()=>{
+    if(!entered){open();return;}
+    (get('tour-guide').open?revisit:get('view')).focus({preventScroll:true});
     resume();
   });
-  window.addEventListener('hashchange', () => { if (dialog.open) dialog.close(); });
-
-  let seen = false;
-  try { seen = sessionStorage.getItem('reindeer-welcome-seen')==='1'; } catch {}
-  // Shared locations and invitation URLs retain their own entry point.
-  if (!seen && !location.hash && !location.search) open(true);
-  return {
-    get open(){return dialog.open;},
-    setLoadState(state) {
-      loadState = state;
-      updateButton();
-      if (!start.disabled && dialog.open && document.activeElement === title) start.focus({preventScroll:true});
-    }
-  };
+  open();
+  return {get open(){return dialog.open;},setLoadState(state){loadState=state;refresh();}};
 }

@@ -1,0 +1,29 @@
+{
+  "crs": "EPSG:26918",
+  "origin": [
+    516338,
+    4612439
+  ],
+  "coordinates": "East and north offsets in meters. Each ring closes from its last vertex to its first.",
+  "footprints": {
+    "provider": "NYS ITS Geospatial Services, NYSERDA and Sullivan County Real Property Tax Services; local source dated 2010.",
+    "layer": "https://services6.arcgis.com/EbVsqZ18sv1kVJ3k/arcgis/rest/services/NYS_Building_Footprints/FeatureServer/2",
+    "terms": "https://www.arcgis.com/home/item.html?id=a6bbc64e38f04c1c9dfa3c2399f536c4"
+  },
+  "validation": {
+    "selection": "Neighboring footprints within 60 m of the mapped cabin centroid. Each contains a Sullivan County rooftop address point and aligns with a visible roof in the 2025 six-inch orthoimagery. The cabin footprint is excluded.",
+    "addressPoints": "https://gis.sullivanny.us/arcgis/rest/services/911_Addressing_Data/MapServer/0",
+    "orthophoto": "NYS Statewide Digital Orthoimagery Program, Sullivan County (2025), tile e_04081030_06_12600_4bd_2025. See ../map-provenance.json.",
+    "detail": "Heights, colors and roof profiles are illustrative."
+  },
+  "homes": [
+    {"id": 2569402, "ring": [[-24.41, 0.7], [-35.82, 1.73], [-35.36, 11.06], [-23.94, 10.03]]},
+    {"id": 2569401, "ring": [[-20.4, -21.8], [-12.47, -22.95], [-12.81, -27.18], [-10.6, -27.5], [-11.03, -32.81], [-13.15, -32.51], [-13.33, -34.76], [-21.34, -33.6]]},
+    {"id": 2569398, "ring": [[32.4, 3.47], [41.91, 3.38], [41.9, 1.47], [46.3, 1.43], [46.27, -5.06], [32.37, -4.94]]},
+    {"id": 2569391, "ring": [[-17.94, 49.32], [-18.0, 38.01], [-26.24, 38.1], [-26.18, 49.4]]},
+    {"id": 2569403, "ring": [[-45.97, 2.66], [-52.0, 3.5], [-51.15, 14.42], [-47.8, 13.95], [-47.96, 11.91], [-45.27, 11.53]]},
+    {"id": 2569394, "ring": [[24.93, 48.04], [33.73, 47.43], [33.41, 39.3], [29.23, 39.6], [29.2, 38.85], [24.59, 39.18]]},
+    {"id": 2569399, "ring": [[26.61, -27.82], [31.57, -27.93], [31.53, -31.84], [35.3, -31.93], [35.21, -39.64], [26.47, -39.45]]},
+    {"id": 2569388, "ring": [[-45.37, 52.32], [-36.81, 51.95], [-37.17, 36.62], [-45.73, 37.0]]}
+  ]
+}

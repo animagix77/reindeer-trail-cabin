@@ -70,6 +70,34 @@ function hits(objects,from,direction){
   ray.set(from,direction);
   return ray.intersectObjects(objects,false);
 }
+// Verify the exported east/north conversion against every mapped corner.
+// Projected roof area also catches filled-in notches on nonrectangular homes.
+const neighborhood=JSON.parse(await fs.readFile(new URL('../Woodland context/Neighboring homes.json',import.meta.url)));
+const contextGround=[...land,scene.getObjectByName('Backdrop_Woodland_terrain')].filter(Boolean);
+for(const {id,ring} of neighborhood.homes){
+  const house=scene.getObjectByName('Backdrop_Neighbor_'+id);
+  assert(house?.isMesh,'Missing mapped neighboring home '+id);
+  const position=house.geometry.getAttribute('position');
+  const vertices=Array.from({length:position.count},(_,i)=>
+    new T.Vector3().fromBufferAttribute(position,i).applyMatrix4(house.matrixWorld));
+  for(const [east,north] of ring){
+    const column=vertices.filter(p=>Math.hypot(p.x-east,p.z+north)<.003);
+    const ground=hits(contextGround,new T.Vector3(east,80,-north),down)[0]?.point.y;
+    assert(column.some(p=>p.y<ground) && column.some(p=>p.y>ground+2),
+      'Neighboring home '+id+' must meet the rendered hillside at every mapped corner');
+  }
+  let roofArea=0;
+  const indices=house.geometry.index.array;
+  for(let i=0;i<indices.length;i+=3){
+    const a=vertices[indices[i]],b=vertices[indices[i+1]],c=vertices[indices[i+2]];
+    roofArea+=Math.max(0,((b.z-a.z)*(c.x-a.x)-(b.x-a.x)*(c.z-a.z))*.5);
+  }
+  const planArea=Math.abs(ring.reduce((sum,[x,y],i)=>{
+    const [u,v]=ring[(i+1)%ring.length];
+    return sum+x*v-y*u;
+  },0))*.5;
+  assert(Math.abs(roofArea-planArea)<.02,'Roof differs from mapped footprint on '+id);
+}
 // Both faces of the pergola carry bulbs, with a direct run to the deck and a
 // longer return by the picnic table. Check the rendered filaments in plan.
 const filaments=[];

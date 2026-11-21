@@ -3,27 +3,26 @@ import {openTourRoom,readRoom} from './tour-room.js';
 
 export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snapshotFuel,applyFuel,addRemoteFuel,stop,schedule}){
   const get=id=>document.getElementById(id);
-  const dialog=get('party'),button=get('party-toggle'),start=get('party-start'),notice=get('party-status');
-  const details=get('party-details'),join=get('party-join'),share=get('party-link'),log=get('party-log');
-  const input=get('party-input'),markers=new Map(),speakerLabels=new Map();
-  let room=null,own='',slot=0,active='',invite=readRoom(),pulse=null,lastTick=null,unread=0,ready=false,applying=false,isHost=false;
+  const dialog=get('party'),button=get('party-toggle'),notice=get('party-status'),rejoin=get('party-rejoin');
+  const details=get('party-details'),share=get('party-link'),log=get('party-log'),input=get('party-input');
+  const markers=new Map(),speakerLabels=new Map();
+  const invite=readRoom(),publicRoom=!invite,offline=location.protocol==='file:';
+  let profile=null,room=null,own='',slot=0,pulse,lastTick=null,unread=0,ready=false,applying=false,isHost=false;
+  let pendingEntry=null,departing=false,hasEntered=false;
   const neighbors=()=>Array.from(markers.values(),m=>m.target).filter(Boolean);
   function meetAt(p){meet(p,{index:slot,occupied:neighbors()});}
-  function lobby(){
-    get('party-solo').hidden=!invite;
-    start.textContent=invite?'Join group':'Create group';
-    get('party-note').textContent=invite?'Choose an avatar to join your friend at the cabin.':'Invite up to seven friends to explore with you. Keep this tab open while they visit.';
-    details.hidden=true;join.hidden=false;start.disabled=false;
-  }
   function open(){
     if(dialog.open)return;stop();if(document.pointerLockElement)document.exitPointerLock();
     unread=0;badge();dialog.showModal();
-    (ready?input:get('party-name')).focus({preventScroll:true});
+    (ready?input:rejoin.hidden?get('party-close'):rejoin).focus({preventScroll:true});
   }
-  function badge(){button.textContent=unread?'Chat ('+unread+')':ready?'Group chat':'Friends';}
-  function address(token){
-    const base=location.hash.split('?')[0]||'#driveway';
-    history.replaceState(null,'',base+(token?'?room='+token:''));
+  function badge(){
+    button.textContent=unread?'Chat ('+unread+')':'Cabin chat';
+    button.setAttribute('aria-label',unread?'Cabin chat, '+unread+' unread messages':'Cabin chat');
+  }
+  function canChat(value){
+    input.disabled=!value;
+    get('party-chat').querySelector('button').disabled=!value;
   }
   function removeMarker(marker){world.remove(marker.root);marker.dispose();}
   function members(list,local){
@@ -51,7 +50,7 @@ export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snap
       m.displayName=speakerLabels.get(guest.id);
       const chip=document.createElement('button');chip.type='button';chip.textContent=m.displayName;row.append(chip);m.chip=chip;
       chip.onclick=()=>{if(m.target&&m.target.view!=='property'){dialog.close();meetAt({...m.target});}};
-      if(isHost){
+      if(isHost&&!publicRoom){
         const place=document.createElement('button');place.type='button';place.className='place';place.textContent='Place nearby';
         place.setAttribute('aria-label','Place '+m.displayName+' nearby');row.append(place);
         place.onclick=()=>{
@@ -86,52 +85,67 @@ export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snap
     schedule();
   }
   function end(reason){
-    clearInterval(pulse);pulse=null;lastTick=null;
-    const hadRoom=ready;
-    ready=false;own='';room=null;unread=0;active='';if(hadRoom){invite='';address('');}
-    for(const m of markers.values())removeMarker(m);markers.clear();speakerLabels.clear();
-    log.replaceChildren();share.value='';get('party-people').replaceChildren();badge();lobby();
-    solo();notice.textContent=reason;if(!dialog.open&&hadRoom)open();schedule();
+    clearInterval(pulse);lastTick=null;
+    ready=false;own='';room=null;unread=0;
+    for(const m of markers.values())removeMarker(m);
+    markers.clear();speakerLabels.clear();log.replaceChildren();get('party-people').replaceChildren();
+    details.hidden=true;rejoin.hidden=offline;canChat(false);badge();solo();
+    notice.textContent=reason;
+    if(pendingEntry){pendingEntry.reject(new Error(reason));pendingEntry=null;}
+    else if(hasEntered&&!departing&&!dialog.open)open();
+    schedule();
   }
-  function begin(e){
-    e.preventDefault();if(room)return;
-    if(location.protocol==='file:'){notice.textContent='Open the public cabin tour to invite friends.';return;}
-    const name=get('party-name').value.trim(),avatar=join.elements.avatar.value;
-    if(!name){get('party-name').focus();return;}
-    if(!avatar){join.querySelector('input[name=avatar]').focus();return;}
-    isHost=!invite;notice.textContent='Connecting…';start.disabled=true;
-    try{
-      room=openTourRoom({name,avatar,invite,snapshot,onEnd:end,onRoster:members,onPose:pose,onMessage:message,
-        snapshotFuel,onFuelState:applyFuel,onAddFuel:addRemoteFuel,
-        onPlace(p){if(dialog.open)dialog.close();meetAt(p);},
-        onScene(s){applying=true;try{apply(s,!isHost);}finally{applying=false;}},
-        async onReady(token,arrival){
-          ready=true;slot=arrival.index;active=token;address(token);
-          // The first shared pose must be at the guest's assigned arrival slot.
-          const session=room;
-          await joined(arrival);
-          if(room!==session||!ready)return;
-          room.move(getPose());pulse=setInterval(()=>room?.move(getPose()),160);
-          share.value=location.href.split('#')[0]+'#driveway?room='+active;
-          join.hidden=true;details.hidden=false;notice.textContent=isHost?'Your group is open. Share the invitation below.':'You joined the group.';
-          badge();if(isHost)input.focus();else if(dialog.open)dialog.close();
-          schedule();
-        }
-      });
-    }catch{end('This browser could not open a group connection. Try again in the public tour.');}
+  function connect(){
+    if(room||!profile)return Promise.reject(new Error('A connection is already in progress.'));
+    rejoin.hidden=true;notice.textContent='Connecting…';
+    return new Promise((resolve,reject)=>{
+      pendingEntry={resolve,reject};
+      try{
+        const handle=openTourRoom({...profile,invite,publicRoom,snapshot,onEnd:end,onRoster:members,onPose:pose,onMessage:message,
+          snapshotFuel,onFuelState:applyFuel,onAddFuel:addRemoteFuel,
+          onPlace(p){if(dialog.open)dialog.close();meetAt(p);},
+          onScene(s){applying=true;try{apply(s,!isHost);}finally{applying=false;}},
+          onReconnecting(reason){
+            ready=false;isHost=false;canChat(false);clearInterval(pulse);lastTick=null;
+            notice.textContent=reason;button.textContent='Chat reconnecting…';schedule();
+          },
+          onReady(token,arrival){
+            isHost=arrival.isHost;slot=arrival.index;ready=true;hasEntered=true;
+            if(isHost)solo();
+            if(!arrival.reconnected)joined(arrival);
+            room.move(getPose());clearInterval(pulse);pulse=setInterval(()=>room?.move(getPose()),160);
+            share.value=location.origin+location.pathname+(publicRoom?'':'#driveway?room='+token);
+            details.hidden=false;canChat(true);notice.textContent='';badge();schedule();
+            pendingEntry?.resolve();pendingEntry=null;
+          }
+        });
+        // A browser without WebRTC can fail during construction.
+        if(pendingEntry)room=handle;
+      }catch{end('The cabin could not connect. Try again or explore on your own.');}
+    });
   }
   button.addEventListener('click',open);get('party-close').onclick=()=>dialog.close();
-  get('party-solo').onclick=()=>{room?.leave();invite='';address('');lobby();dialog.close();};
-  join.addEventListener('submit',begin);
-  get('party-chat').addEventListener('submit',e=>{e.preventDefault();if(!input.value.trim())return;room?.send(input.value.trim());input.value='';});
+  rejoin.onclick=()=>{connect().catch(()=>{});};
+  get('party-chat').addEventListener('submit',e=>{
+    e.preventDefault();if(!ready||!input.value.trim())return;room.send(input.value.trim());input.value='';
+  });
   get('party-copy').onclick=async()=>{
-    try{await navigator.clipboard.writeText(share.value);notice.textContent='Invitation copied.';}
-    catch{share.focus();share.select();notice.textContent='Copy the selected invitation link.';}
+    try{await navigator.clipboard.writeText(share.value);notice.textContent='Cabin link copied.';}
+    catch{share.focus();share.select();notice.textContent='Copy the selected cabin link.';}
   };
   get('party-leave').onclick=()=>room?.leave();
-  window.addEventListener('pagehide',()=>{if(room){ready=false;room.leave();}});
-  lobby();
+  if(invite)get('party-note').textContent='Everyone in this invited group can see your messages.';
+  window.addEventListener('pagehide',()=>{departing=true;room?.leave();});
+  window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
   return {
+    invite,offline,
+    enter(person,alone){
+      profile=person;
+      if(!alone)return connect();
+      hasEntered=true;details.hidden=true;rejoin.hidden=offline;
+      notice.textContent=offline?'Cabin chat is available in the online tour.':'You’re exploring on your own.';
+      joined({index:0,people:[]});
+    },
     neighbors,
     seatOccupied(seat,resolveTie=false){
       for(const [id,guest] of markers){
@@ -140,9 +154,8 @@ export function installParty({world,getPose,joined,meet,snapshot,apply,solo,snap
       }
       return false;
     },
-    initial(){if(invite)open();},
     get open(){return dialog.open;},
-    get suffix(){const value=active||invite;return value?'?room='+value:'';},
+    get suffix(){return invite?'?room='+invite:'';},
     fuel(kind){if(ready)room.fuel(kind);},
     conditions(){if(ready&&!applying)room.conditions(snapshot());},
     update(seconds){

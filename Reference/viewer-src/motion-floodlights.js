@@ -8,13 +8,13 @@ function plan(x,y,height){
   return new THREE.Vector3(4.65-ft*(c*x+s*y),2.88+height,-8.5+ft*(-s*x+c*y));
 }
 
-// L1040560 shows two black rectangular LED heads and a sensor immediately to
-// the right of the bedroom window, below the white fascia and inside the downspout.
-function frontFixture(scene){
+// L1040560 shows the twin heads and sensor beside the front bedroom window.
+// Use the same compact fitting on the solid rear wall beside the patio slider.
+function wallFixture(scene,name,position,rotation){
   const fixture=new THREE.Group(),casting=[],glass=[];
-  fixture.name='Front entry · twin motion floodlight';
-  fixture.position.copy(plan(39.07,-.08,1.81));
-  fixture.rotation.y=-angle; // Local -Z points away from the front of the house.
+  fixture.name=name+' · twin motion floodlight';
+  fixture.position.copy(position);
+  fixture.rotation.y=rotation; // Local -Z faces away from the mounting wall.
   function part(geometry,x,y,z,rx=0,ry=0,bucket=casting){
     geometry.rotateX(rx).rotateY(ry).translate(x,y,z);
     bucket.push(geometry);
@@ -43,7 +43,9 @@ function frontFixture(scene){
 }
 
 export function installMotionFloodlights(scene,model,schedule){
-  const entryLens=frontFixture(scene),garageLenses=new Set();
+  const entryLens=wallFixture(scene,'Front entry',plan(39.07,-.08,1.81),-angle);
+  const rearLens=wallFixture(scene,'Rear deck',plan(37.9,26.08,2.13),Math.PI-angle);
+  const garageLenses=new Set();
   // This is the opal glass on the twin heads already present in the cabin GLB.
   model.traverse(object=>{
     if(!object.isMesh)return;
@@ -53,22 +55,26 @@ export function installMotionFloodlights(scene,model,schedule){
       }
     }
   });
-  function station(name,position,aim,outward,range,power,lenses){
-    // Each twin fitting shares a wide, soft-edged pool and one static shadow
-    // map. Railings, the retaining wall and trunks interrupt it on the ground.
+  function station(name,position,aim,outward,range,power,lenses,{shadow=true,fanEdge=.27}={}){
+    // The rear cone faces out from the wall like the two LED heads. Keep the
+    // two existing shadow maps across all three fixtures for mobile GPUs.
     const light=new THREE.SpotLight(lampColor,0,range+5,.93,.65,2);
     light.name=name+' motion flood';light.position.copy(position);light.target.position.copy(aim);
-    light.castShadow=true;light.shadow.mapSize.set(512,512);
+    light.castShadow=shadow;light.shadow.mapSize.set(512,512);
     light.shadow.camera.near=.16;light.shadow.normalBias=.018;light.shadow.bias=-.00035;
     light.shadow.autoUpdate=false;light.shadow.needsUpdate=true;
     scene.add(light,light.target);
-    return {light,outward,range,power,lenses,lastX:NaN,lastZ:NaN,until:-Infinity,onAt:-Infinity,initial:0,level:0};
+    return {light,outward,range,power,lenses,fanEdge,lastX:NaN,lastZ:NaN,until:-Infinity,onAt:-Infinity,initial:0,level:0};
   }
-  const garage=station('Driveway',plan(-.66,15.75,-2.72+2.151*1.08),plan(-18,8,-2.66),
+  // Aim the central ray between the gravel arrival and toe of the retaining
+  // steps. The garage head can rake the stairs along its own exterior wall.
+  const garage=station('Driveway',plan(-.66,15.75,-2.72+2.151*1.08),plan(-5,-4,-2.45),
     new THREE.Vector3(c,0,s),11.6,285,garageLenses);
-  const front=station('Front entry',plan(39.07,-.50,1.83),plan(31.7,-14.3,-.55),
+  const front=station('Front entry',plan(39.07,-.50,1.83),plan(31,-7.2,-.36),
     new THREE.Vector3(s,0,-c),10.3,205,[entryLens]);
-  const stations=[garage,front];
+  const rear=station('Rear deck',plan(37.9,26.51,2.13),plan(32,46,-1.5),
+    new THREE.Vector3(-s,0,c),14.2,305,[rearLens],{shadow:false,fanEdge:.08});
+  const stations=[garage,front,rear];
   let timer=null,wakeAt=Infinity;
   function wakeForFade(deadline,seconds){
     if(deadline===Infinity){clearTimeout(timer);timer=null;wakeAt=Infinity;return;}
@@ -88,7 +94,7 @@ export function installMotionFloodlights(scene,model,schedule){
         // The outward-facing fan ends at the wall. The supplied floor test also
         // excludes nearby people standing inside the cabin at a window.
         const seen=walkingOutside && darkness>0 && Math.abs(dy)<4 && distance<range &&
-          ahead>0 && ahead>distance*.27;
+          ahead>distance*sensor.fanEdge;
         if(seen){
           if(!Number.isFinite(sensor.lastX) || Math.hypot(eye.x-sensor.lastX,eye.z-sensor.lastZ)>.10){
             if(seconds>=sensor.until){
