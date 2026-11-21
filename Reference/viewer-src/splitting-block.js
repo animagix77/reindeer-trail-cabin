@@ -95,8 +95,8 @@ export function makeSplittingBlock(model){
   flakes.name='Dislodged oak fibres';flakes.visible=false;flakes.frustumCulled=false;root.add(flakes);
   let chipHit=null;
   function clearChips(){chipHit=null;flakes.visible=false;}
-  function flyChips(t){
-    const age=(t-tool.impactFraction)*tool.swingDuration;
+  function flyChips(t,duration){
+    const age=(t-tool.impactFraction)*duration;
     if(age<0 || t>=1){clearChips();return;}
     flakes.visible=true;
     for(let i=0;i<flakes.count;i++){
@@ -111,39 +111,84 @@ export function makeSplittingBlock(model){
     flakes.instanceMatrix.needsUpdate=true;
   }
 
-  function rebuild(){
-    round.geometry.dispose();round.geometry=oakGeometry(wood);
+  const stock=new Map();
+  const wholeCenter={x:0,z:0};
+  stock.set(round,{wood,center:wholeCenter,centerY:0});
+  let opening=[];
+  function openCheck(u){
+    const ease=1-(1-clamp01(u))**3;
+    for(const {mesh,center,shiftX,shiftZ} of opening){
+      mesh.position.x=center.x+ease*shiftX;
+      mesh.position.z=center.z+ease*shiftZ;
+    }
+    if(u>=1)opening=[];
   }
   return {...tool,root,round,top,
     get height(){return wood.height;},get radius(){return wood.radius;},get progress(){return wood.progress;},
-    begin(){
-      clearChips();wood=createOakRound(++index);rebuild();round.visible=true;
+    get targets(){return Array.from(stock.keys());},
+    grainCenter(target=stock.keys().next().value){
+      const item=stock.get(target);
+      return item && {x:target.position.x+item.wood.center.x-item.center.x,z:target.position.z+item.wood.center.z-item.center.z};
     },
-    rest(){clearChips();tool.rest();},
+    aimDirection(target,nx,nz){
+      const seam=stock.get(target)?.wood.faces[0];
+      if(!seam)return {nx,nz};
+      // Turn the bit across the first cleavage to quarter the half. The actual
+      // bearing and chosen spot still influence where the second cut opens.
+      const side=nx*seam.nz-nz*seam.nx<0?-1:1;
+      const x=.76*side*seam.nz+.24*nx,z=-.76*side*seam.nx+.24*nz,length=Math.hypot(x,z);
+      return {nx:x/length,nz:z/length};
+    },
+    begin(){
+      if(stock.size)return false;
+      clearChips();wood=createOakRound(++index);
+      round.geometry.dispose();round.geometry=oakGeometry(wood);round.visible=true;
+      stock.set(round,{wood,center:wholeCenter,centerY:0});return true;
+    },
+    rest(){clearChips();openCheck(1);tool.rest();},
     stroke(t,good,reduced,camera,aim){
       tool.stroke(t,good,reduced,camera,aim);
+      const duration=aim?.duration??tool.swingDuration;
+      if(opening.length)openCheck(reduced?1:(t-tool.impactFraction)*duration/.13);
       if(chipHit){
-        if(reduced)clearChips();else flyChips(t);
+        if(reduced)clearChips();else flyChips(t,duration);
       }
     },
     impact(hit){
-      const before=wood.revision,result=wood.strike(hit);
-      result.bite=wood.revision!==before;
+      const target=hit.target??round,item=stock.get(target);
+      if(!item)return {split:false,bite:false,pieces:[]};
+      const billet=item.wood,before=billet.revision;
+      const offsetX=target.position.x-item.center.x,offsetZ=target.position.z-item.center.z;
+      const result=billet.strike({...hit,x:hit.x-offsetX,z:hit.z-offsetZ});
+      result.bite=billet.revision!==before;
       if(result.bite){
         chipHit={x:hit.x,y:hit.y??top+wood.height,z:hit.z,angle:Math.atan2(hit.nz,hit.nx)};
         flakes.count=result.split?8:4;
       }
+      const cut=result.cut;
+      if(cut)result.cut={...cut,x:cut.x+offsetX,z:cut.z+offsetZ};
       if(!result.split){
-        if(result.bite)rebuild();
+        if(result.bite){
+          target.geometry.dispose();
+          target.geometry=oakGeometry(billet,billet.ring,null,item.center,item.centerY);
+        }
         return result;
       }
-      round.visible=false;
-      result.pieces=result.pieces.map(({polygon,center,...physics})=>{
-        const geometry=oakGeometry(wood,polygon,result.cut,center,wood.height/2);
-        const mesh=marker(new T.Mesh(geometry,materials),'Split oak firewood');
-        mesh.position.set(center.x,top+wood.height/2,center.z);
-        return {mesh,...physics};
-      });
+      stock.delete(target);
+      if(target===round)round.visible=false;
+      else {target.removeFromParent();target.geometry.dispose();}
+      const airborne=[];
+      for(const {polygon,center,half,...body} of result.pieces){
+        const geometry=oakGeometry(billet,polygon,cut,center,billet.height/2);
+        const mesh=marker(new T.Mesh(geometry,materials),half?'Oak half on block':'Split oak firewood');
+        mesh.position.set(center.x+offsetX,top+billet.height/2,center.z+offsetZ);
+        if(half){
+          root.add(mesh);stock.set(mesh,{wood:half,center,centerY:billet.height/2});
+          mesh.userData.choppingHull={hull:body.hull,height:body.height};
+          opening.push({mesh,center,shiftX:body.side*cut.nx*.028,shiftZ:body.side*cut.nz*.028});
+        }else airborne.push({mesh,...body});
+      }
+      result.pieces=airborne;
       return result;
     }
   };

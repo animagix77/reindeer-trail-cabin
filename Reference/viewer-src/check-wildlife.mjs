@@ -5,6 +5,7 @@ import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {WalkSpace} from './walking.js';
 import {installWildlife} from './wildlife.js';
+import {makeDeer} from './wildlife-model.js';
 
 const bytes=await fs.readFile(process.argv[2]);
 const loader=new GLTFLoader();
@@ -51,22 +52,42 @@ const gap=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const spread=()=>Math.max(...deer.flatMap(a=>deer.map(b=>gap(a.position,b.position))));
 
 home();run(.3);assert.deepEqual(state.inventory,stock);
-assert(herd.hold('apple'));const initialPositions=deer.map(d=>d.position.clone());
+const initialPositions=deer.map(d=>d.position.clone());
+assert.equal(deer.length,3);
 assert(spread()>15,'The herd should occupy both sides of the woods');
+const radians=5.4*Math.PI/180;
+function inCover(p){
+  const dx=(p.x-4.65)/.3048,dz=(p.z+8.5)/.3048;
+  const x=-Math.cos(radians)*dx-Math.sin(radians)*dz,y=-Math.sin(radians)*dx+Math.cos(radians)*dz;
+  return Math.min(x+39.75,60.2-x,78.65-y)<11.6 && y>39.4 && (x< -6.4 || x>45.4);
+}
+const ranges=deer.map(()=>0);
+for(let j=0;j<90;j++){
+  run(.5);
+  for(const [i,d] of deer.entries()){
+    assert(inCover(d.position),'Food-free browsing strayed from the wooded property line');
+    assert(gap(d.position,camera.position)>6.5,'An uninvited deer wandered into the clearing');
+    ranges[i]=Math.max(ranges[i],gap(initialPositions[i],d.position));
+  }
+}
+assert(ranges.every(r=>r>1.4),'A deer remained motionless on its wooded route: '+ranges);
+assert(herd.hold('apple'));
 until(()=>events.some(m=>m.includes('curious deer is')),4,'No curiosity toward a still visitor');
-const direction=new T.Vector3().subVectors(deer[0].position,camera.position);direction.y=0;direction.normalize();
+const nearest=()=>deer.reduce((best,d)=>gap(d.position,camera.position)<gap(best.position,camera.position)?d:best);
+until(()=>gap(nearest().position,camera.position)<4.2,55,'No deer left cover on seeing the apple');
+const curious=nearest(),beforeAlarm=curious.position.clone(),buckBefore=deer[1].position.clone();
+const direction=new T.Vector3().subVectors(curious.position,camera.position);direction.y=0;direction.normalize();
 let body=space.spawn(camera.position.x,camera.position.z,camera.position.y,camera.position.y-1.59);
-for(let f=0;f<65;f++){
+for(let f=0;f<65 && !events.some(m=>m.includes('scattered'));f++){
   body=space.move(body,.048*direction.x,.048*direction.z);
   camera.position.set(body.x,body.y+body.eye,body.z);frame();
 }
-assert(events.some(m=>m.includes('scattered')),'Visitor approach did not alert the herd');
-assert.equal(bites.length,0,'The herd ate during flight');
+assert(events.some(m=>m.includes('scattered')),'Walking toward the approaching deer did not startle it');
+assert.equal(bites.length,0,'The deer ate during flight');
 run(2.8);
-const displacement=deer.map((d,i)=>gap(d.position,initialPositions[i]));
-assert(displacement[0]>3 && displacement[2]>3,'The nearby doe and yearling did not scatter');
-assert(displacement[1]<2.6 && displacement[3]<2.6,'A local alarm sent distant animals into flight');
-until(()=>bites.length>0,30,'No curious deer returned after the visitor stopped');
+assert(gap(curious.position,beforeAlarm)>1.5,'The startled deer failed to bound away');
+assert(gap(deer[1].position,buckBefore)<1.8,'A local alarm sent the distant buck into flight');
+until(()=>bites.length>0,70,'No curious deer returned after the visitor stopped');
 const afterMeal=events.length;run(18);
 assert(!events.slice(afterMeal).some(m=>m.includes('scattered')),'A stationary hand-feeder triggered another alarm');
 
@@ -76,11 +97,11 @@ assert.equal(herd.toss('carrot'),false,'Allowed to toss from outside the yard');
 home();run(4);
 for(const kind of Object.keys(stock)){
   const initial=bites.length;
-  assert(herd.hold(kind));until(()=>!state.holding,35,'Hand offering timed out');
+  assert(herd.hold(kind));until(()=>!state.holding,60,'Hand offering timed out');
   assert.deepEqual(bites.slice(initial).map(b=>[b.kind,b.hand]),[[kind,true]]);
 }
 for(const kind of Object.keys(stock))toss(kind);
-until(()=>!foods.size,55,'Simultaneously tossed food remained in the clearing');
+until(()=>!foods.size,85,'Simultaneously tossed food remained in the clearing');
 
 herd.refill();assert.deepEqual(state.inventory,stock);
 for(const [kind,amount] of Object.entries(stock)){
@@ -124,7 +145,7 @@ const excursions=deer.map(()=>0);
 for(let f=0;f<65*30;f++){
   herd.update(camera,'outside',clock+=1/30);
   for(const [i,d] of deer.entries()){
-    assert(gap(previous[i],d.position)<.105,'A roaming deer jumped between patches');
+    assert(gap(previous[i],d.position)<.115,'A roaming deer jumped between patches');
     excursions[i]=Math.max(excursions[i],gap(d.position,origins[i]));previous[i].copy(d.position);
     if(f%15===0){
       const ground=space.spawn(d.position.x,d.position.z,d.position.y+1.59,d.position.y);
@@ -132,7 +153,45 @@ for(let f=0;f<65*30;f++){
     }
   }
 }
+assert(deer.every(d=>inCover(d.position)),'A diner stayed in the clearing after the food was gone');
 assert(!state.near);
-assert(excursions.every(d=>d>3),'A distant deer stopped roaming while the visitor was on the driveway');
+assert(excursions.every(d=>d>1.4),'A distant deer stopped roaming while the visitor was on the driveway');
+// Measure the actual skinned rig at its toe bones. A walking hoof stays on
+// the ground through stance. A bounding deer has an airborne interval.
+function sampleGait(speed,length){
+  const rig=makeDeer(),shadow=new T.Object3D();
+  const feet=rig.object.children[0].skeleton.bones.filter(b=>b.name.startsWith('Pastern'));
+  assert.equal(feet.length,4);
+  const touchdowns=[],lift=[0,0,0,0];
+  let previous=null,airborne=0,slip=0,contactSamples=0;
+  const dt=length/speed/120;
+  for(let f=0;f<=240;f++){
+    const stride=f/120;
+    rig.object.position.z=stride*length;
+    rig.pose(f*dt,stride,speed,0,0,0,speed>1);
+    rig.fitHooves(()=>0,shadow,dt);rig.object.updateMatrixWorld(true);
+    const toes=feet.map(b=>b.localToWorld(new T.Vector3(0,-.115,.052)));
+    if(f>120){
+      if(toes.every(p=>p.y>.005))airborne++;
+      toes.forEach((p,i)=>{
+        assert(p.y>-.004,'Hoof sank into level ground');
+        lift[i]=Math.max(lift[i],p.y);
+        if(p.y<.009 && previous[i].y>=.009)touchdowns.push(f);
+        if(p.y<.009 && previous[i].y<.009){
+          slip+=p.distanceTo(previous[i]);contactSamples++;
+        }
+      });
+    }
+    previous=toes;
+  }
+  assert(slip/contactSamples<.0015,'Hooves slid along the ground during stance');
+  assert.equal(touchdowns.length,4);
+  return {touchdowns,airborne,lift};
+}
+const walk=sampleGait(.43,.83),bound=sampleGait(3.1,1.67);
+assert.equal(walk.airborne,0);
+assert(walk.touchdowns.slice(1).every((f,i)=>f-walk.touchdowns[i]>23),'Walking deer lost its four-beat footfall');
+assert(bound.airborne>15 && bound.lift.every(h=>h>.16),'The escape bound had no suspension or folded legs');
+console.log('Four-beat walk, planted hooves and airborne escape bound passed.');
 console.log('Forest roaming, local alarm, long-range food approach, safe routes, refunds and simultaneous throws passed.');
 console.log(bites.length+' mouth contacts, maximum distance '+Math.round(100*Math.max(...bites.map(b=>b.distance)))+' cm.');

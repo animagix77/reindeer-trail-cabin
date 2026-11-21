@@ -63,7 +63,7 @@ function batchResting(records,root){
   for(const item of records){item.mesh.visible=false;item.unpack=unpack;}
 }
 
-export function createSplitPhysics({root,groundAt,onContact}){
+export function createSplitPhysics({root,groundAt,onContact,getWorkpieces}){
   const world=new World({gravity:new Vec3(0,-9.81,0),allowSleep:true});
   world.broadphase=new SAPBroadphase(world);
   world.broadphase.useBoundingBoxes=true;
@@ -134,6 +134,27 @@ export function createSplitPhysics({root,groundAt,onContact}){
     }
     for(const {body} of pieces)if(body.sleepState===Body.SLEEPING && body.position.distanceSquared(center)<.45*.45)body.wakeUp();
     active=true;
+  }
+  // Upright halves remain on the broad stump until struck again. Their fresh
+  // split faces also support and deflect quarters from the neighboring half.
+  const standing=new Map();
+  function syncHalves(){
+    if(!getWorkpieces)return;
+    const targets=getWorkpieces();
+    for(const [mesh,body] of standing){
+      if(!targets.includes(mesh)){world.removeBody(body);standing.delete(mesh);}
+    }
+    for(const mesh of targets){
+      const shape=mesh.userData.choppingHull;if(!shape)continue;
+      let body=standing.get(mesh);
+      if(!body){
+        body=new Body({mass:0,shape:prism(shape.hull,shape.height)});
+        body.quaternion.copy(mesh.quaternion);standing.set(mesh,body);world.addBody(body);
+      }
+      if(body.position.distanceSquared(mesh.position)>1e-12){
+        body.position.copy(mesh.position);body.aabbNeedsUpdate=true;world.broadphase.dirty=true;
+      }
+    }
   }
   function collision({contact}){
     collisionSpeed=Math.max(collisionSpeed,Math.abs(contact.getImpactVelocityAlongNormal()));
@@ -239,7 +260,7 @@ export function createSplitPhysics({root,groundAt,onContact}){
     if(!pieces.length)return false;
     // A suspended browser resumes from the last pose, without a giant integration step.
     accumulator+=Math.min(.15,Math.max(0,Number.isFinite(seconds)?seconds:0));
-    syncBlank(Math.floor(accumulator/stepSize)*stepSize);
+    syncBlank(Math.floor(accumulator/stepSize)*stepSize);syncHalves();
     if(!active){accumulator=0;return false;}
     for(const {body} of pieces)if(body.sleepState!==Body.SLEEPING)cover(body.position.x,body.position.z);
     while(accumulator>=stepSize){world.step(stepSize);accumulator-=stepSize;}

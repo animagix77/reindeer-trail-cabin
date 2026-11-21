@@ -47,7 +47,13 @@ export function createOakRound(index=0){
     const r=radius*(1+.029*Math.sin(3*a+.7+phase)+.009*Math.cos(5*a-phase));
     return {x:r*Math.cos(a),z:r*(.97+.016*Math.sin(phase))*Math.sin(a)};
   });
-  const grain=phase+.25;
+  return billet({ring,radius,phase,resistance});
+}
+
+// Keep a shared coordinate system for the whole tree cross-section. A quarter
+// inherits the old split face and growth rings and develops its own check.
+function billet({ring,radius,phase,resistance,faces=[],scars=[]}){
+  const center=areaCenter(ring),grain=phase+.25;
   const checks=[];
   let damage=0,progress=0,split=false;
   let revision=0;
@@ -59,7 +65,9 @@ export function createOakRound(index=0){
     if(!cut || split || energy<=0)return result();
     // A tangential strike on the outside of the bark cannot split off a zero-volume sliver.
     const offsets=ring.map(p=>(p.x-cut.x)*cut.nx+(p.z-cut.z)*cut.nz);
-    if(Math.min(...offsets)>-.005 || Math.max(...offsets)<.005)return result();
+    const low=Math.min(...offsets),high=Math.max(...offsets);
+    const purchase=Math.max(.005,(high-low)*.11);
+    if(low>-purchase || high<purchase)return result();
     if(!ring.every((a,i)=>{
       const b=ring[(i+1)%ring.length];
       return (b.x-a.x)*(cut.z-a.z)-(b.z-a.z)*(cut.x-a.x)>=-1e-7;
@@ -72,7 +80,7 @@ export function createOakRound(index=0){
       const match=alignment*clamp(1-across/(radius*.30),0,1);
       if(alignment>.77 && match>.45 && match>best){seam=check;best=match;}
     }
-    const edgeDistance=Math.abs(cut.x*cut.nx+cut.z*cut.nz)/radius;
+    const edgeDistance=Math.abs((cut.x-center.x)*cut.nx+(cut.z-center.z)*cut.nz)/radius;
     const grainFit=Math.abs(Math.cos(grain)*cut.nx+Math.sin(grain)*cut.nz);
     const bite=energy*(.84+.19*grainFit)*(1-.30*edgeDistance);
     if(!seam){seam={...cut,lo:-.016,hi:.016,stress:0};checks.push(seam);}
@@ -89,18 +97,19 @@ export function createOakRound(index=0){
     const plane={x:seam.x,z:seam.z,nx:seam.nx,nz:seam.nz,energy};
     const pieces=[1,-1].map(side=>{
       const polygon=clipRing(ring,plane,side),center=areaCenter(polygon);
-      return {polygon,center,hull:polygon.map(p=>({x:p.x-center.x,z:p.z-center.z})),height,side,density:710+Math.round(38*Math.sin(phase))};
+      const half=faces.length ? null : billet({ring:polygon,radius,phase,resistance:.24+.46*resistance,faces:[plane],scars:[...checks]});
+      return {half,polygon,center,hull:polygon.map(p=>({x:p.x-center.x,z:p.z-center.z})),height,side,density:710+Math.round(38*Math.sin(phase))};
     });
     split=true;progress=1;return result(pieces,plane);
   }
-  return {ring,radius,height,phase,checks,strike,get progress(){return progress;},get revision(){return revision;}};
+  return {ring,radius,height,phase,center,faces,scars,checks,strike,get marks(){return scars.length?scars.concat(checks):checks;},get progress(){return progress;},get revision(){return revision;}};
 }
 
 // In millimetres at the lip and deepest beneath the center of the maul.
 // The same field displaces and darkens the end grain on both resulting pieces.
-function indent(p,round){
+function indent(p,round,marks){
   let depth=0,shade=1;
-  for(const c of round.checks){
+  for(const c of marks){
     const x=p.x-c.x,z=p.z-c.z,along=z*c.nx-x*c.nz;
     // The steel bit starts the mouth. Fine checks run ahead of it where the
     // fibres part, far enough to see and follow from a standing position.
@@ -132,24 +141,26 @@ export function oakGeometry(round,polygon=round.ring,cut=null,center={x:0,z:0},c
   const ri=round.radius,h=round.height;
   const rotationCos=Math.cos(round.phase),rotationSin=Math.sin(round.phase);
   const point=(a,b,t)=>({x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t});
-  const onCut=p=>Math.abs((p.x-cut.x)*cut.nx+(p.z-cut.z)*cut.nz)<1e-7;
-  let exposed;
+  const faces=cut?[...round.faces,cut]:round.faces,marks=round.marks;
+  const onCut=(p,f)=>Math.abs((p.x-f.x)*f.nx+(p.z-f.z)*f.nz)<1e-7;
+  const exposed=[];
   function barkVertex(p,y,u){
     vertex(p,y,u,y/h);
   }
   for(let i=0;i<polygon.length;i++){
     const a=polygon[i],b=polygon[(i+1)%polygon.length];
-    if(cut && onCut(a) && onCut(b)){exposed=[a,b];continue;}
+    const face=faces.find(f=>onCut(a,f) && onCut(b,f));
+    if(face){exposed.push({a,b,face});continue;}
     const ua=(Math.atan2(a.z,a.x)+Math.PI)/tau,ub=(Math.atan2(b.z,b.x)+Math.PI)/tau;
     const u0=ua+round.phase*.12,u1=(ub<ua-.5?ub+1:ub)+round.phase*.12;
-    const ay=h-indent(a,round).depth,by=h-indent(b,round).depth;
+    const ay=h-indent(a,round,marks).depth,by=h-indent(b,round,marks).depth;
     barkVertex(a,0,u0);barkVertex(a,ay,u0);barkVertex(b,0,u1);
     barkVertex(b,0,u1);barkVertex(a,ay,u0);barkVertex(b,by,u1);
   }
   group(0);
   const centerPoint=areaCenter(polygon);
   const endVertex=(p,top)=>{
-    const dent=top?indent(p,round):{depth:0,shade:1};
+    const dent=top?indent(p,round,marks):{depth:0,shade:1};
     vertex(p,top?h-dent.depth:0,.5+(p.x*rotationCos-p.z*rotationSin)*.46/ri,
       .5+(p.x*rotationSin+p.z*rotationCos)*.46/ri,dent.shade);
   };
@@ -157,7 +168,7 @@ export function oakGeometry(round,polygon=round.ring,cut=null,center={x:0,z:0},c
     const p={x:(a.x+b.x+c.x)/3,z:(a.z+b.z+c.z)/3};
     const bound=Math.sqrt(Math.max(...[a,b,c].map(q=>(p.x-q.x)**2+(p.z-q.z)**2)));
     // Refine only close to a groove. Leaves the unmarked end-grain mesh light.
-    if(level<(cut?4:6) && bound>.0025 && round.checks.some(check=>{
+    if(level<(cut?4:6) && bound>.0025 && marks.some(check=>{
       const x=p.x-check.x,z=p.z-check.z,t=z*check.nx-x*check.nz;
       return Math.abs(x*check.nx+z*check.nz)<=bound+.014 && t>=check.lo-bound-.057 && t<=check.hi+bound+.057;
     })){
@@ -171,19 +182,19 @@ export function oakGeometry(round,polygon=round.ring,cut=null,center={x:0,z:0},c
     cutEnd(centerPoint,b,a,0);
   }
   group(1);
-  if(exposed){
-    const tangent=p=>p.z*cut.nx-p.x*cut.nz;
-    const reverse=tangent(exposed[0])>tangent(exposed[1]);
-    const [a,b]=reverse?[exposed[1],exposed[0]]:exposed;
+  for(const edge of exposed){
+    const face=edge.face,tangent=p=>p.z*face.nx-p.x*face.nz;
+    const reverse=tangent(edge.a)>tangent(edge.b);
+    const [a,b]=reverse?[edge.b,edge.a]:[edge.a,edge.b];
     const width=Math.hypot(b.x-a.x,b.z-a.z);
     const columns=Math.max(6,Math.round(width/.010)),rows=6;
     function fibre(u,v){
       const p=point(a,b,u);
-      const d=p.z*cut.nx-p.x*cut.nz;
+      const d=tangent(p);
       const edgeFade=Math.sin(Math.PI*u)*Math.sin(Math.PI*v);
       const ridge=.0017*(Math.sin(183*d+v*1.8)+.48*Math.sin(371*d+v*.9))*edgeFade;
-      const y=v*(h-indent(p,round).depth);
-      vertex({x:p.x+cut.nx*ridge,z:p.z+cut.nz*ridge},y,.5+d/(2*ri),v);
+      const y=v*(h-indent(p,round,marks).depth);
+      vertex({x:p.x+face.nx*ridge,z:p.z+face.nz*ridge},y,.5+d/(2*ri),v);
     }
     for(let j=0;j<rows;j++)for(let i=0;i<columns;i++){
       const u=i/columns,v=j/rows,uu=(i+1)/columns,vv=(j+1)/rows;
@@ -193,8 +204,8 @@ export function oakGeometry(round,polygon=round.ring,cut=null,center={x:0,z:0},c
         fibre(u,v);fibre(u,vv);fibre(uu,v);fibre(uu,v);fibre(u,vv);fibre(uu,vv);
       }
     }
-    group(2);
   }
+  group(2);
   g.setAttribute('position',new T.Float32BufferAttribute(positions,3));
   g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));
   g.setAttribute('color',new T.Float32BufferAttribute(colors,3));

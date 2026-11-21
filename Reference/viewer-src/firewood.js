@@ -2,6 +2,7 @@ import * as T from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {fuelDuration} from './fires.js';
 import {makeOfferingHand} from './wildlife-model.js';
+import {createTossMotion,tossArc} from './toss-motion.js';
 
 const kinds=Object.keys(fuelDuration);
 const initial={twigs:6,sticks:5,logs:4};
@@ -145,6 +146,7 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
   if(!ringObject)throw Error('The firewood activity needs the fire ring.');
   const bounds=new T.Box3().setFromObject(ringObject,true),ring=bounds.getCenter(v());
   ring.y=bounds.min.y+.010;
+  const ringRadius=.5*Math.min(bounds.max.x-bounds.min.x,bounds.max.z-bounds.min.z);
   const looseGravel=[],obstacles=[],floorRay=new T.Raycaster(),down=v(0,-1,0);
   let barkPhoto,stackEnds;
   model.traverse(o=>{
@@ -210,6 +212,7 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
   }
   const pieces=new T.Group();pieces.name='Firewood · loose supplies and laid fuel';scene.add(pieces);
   const stock={},laid={},counts={...initial};
+  const restPoses={twigs:[],sticks:[],logs:[]};
   const form=new T.Object3D(),tintValue=new T.Color(),white=new T.Color(1,1,1),charcoal=new T.Color(.21,.16,.12);
   for(const k of kinds){
     stock[k]=new T.InstancedMesh(geometry[k],wood,32);stock[k].name='Gatherable '+k;
@@ -237,20 +240,17 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     carry[k]=obj;obj.visible=false;palm.add(obj);
   }
   let held=null,inFlight=null,body=null,currentView='property',message='Gather loose wood at the foot of the woodpile.';
-  let lastDrop=null,reportedState;
+  let lastDrop=null,reportedState,clock=performance.now()*.001;
   let offeringFood=false;
   let nearPit=false,nearStockpile=false,canToss=false,nearby=[],lastReport='';
   const forward=v(),toward=v(),lastFuel={twigs:-1,sticks:-1,logs:-1};
   const arcRay=new T.Ray(),probe=v(),hit=v(),arcEnd=v(),arcHand=v(),cachedHand=v(Infinity,0,0);
   let cachedClear=false;
   function flightDuration(start,end){return clamp(.47+.082*Math.hypot(end.x-start.x,end.z-start.z),.53,.93);}
-  function arcPoint(out,start,end,duration,t){
-    out.lerpVectors(start,end,t);out.y+=.5*9.81*duration*duration*t*(1.-t);return out;
-  }
   function clearArc(start,end){
     const duration=flightDuration(start,end);arcRay.origin.copy(start);
     for(let i=1;i<=14;i++){
-      arcPoint(probe,start,end,duration,i/14);
+      tossArc(probe,start,end,duration,i/14);
       const length=probe.distanceToSquared(arcRay.origin);
       arcRay.direction.subVectors(probe,arcRay.origin).normalize();
       if(obstacles.some(box=>box.containsPoint(arcRay.origin) ||
@@ -335,8 +335,12 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     if(!clearArc(mesh.position,destination.position)){
       scene.remove(mesh);return result(false,'Step around the chair or railing for a clear toss.');
     }
-    inFlight={kind,mesh,origin:mesh.position.clone(),rotation:mesh.quaternion.clone(),end:destination.position.clone(),
-      final:destination.quaternion.clone(),duration:flightDuration(mesh.position,destination.position),start:performance.now()*.001};
+    const contact=destination.position.clone(),duration=flightDuration(mesh.position,contact);
+    // Keep the entire piece inside the steel rim as it rolls across the ember bed.
+    const clearance=ringRadius-(kind==='twigs'?.16:.23);
+    const motion=createTossMotion({kind,start:mesh.position,contact,duration,orientation:mesh.quaternion,
+      groundAt:(x,z)=>Math.hypot(x-ring.x,z-ring.z)<=clearance?contact.y:null});
+    inFlight={kind,mesh,motion,start:clock};
     held=null;return result(true,'Tossing the '+names[kind]+'.');
   }
   function settleFuel(){
@@ -347,8 +351,11 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
       lastFuel[kind]=bank;
       const total=bank/fuelDuration[kind],count=Math.ceil(total);
       const mesh=laid[kind];mesh.count=count;
+      restPoses[kind].length=count;
       for(let i=0;i<count;i++){
         const pose=stackedPose(kind,i);
+        const resting=restPoses[kind][i];
+        if(resting){pose.position.copy(resting.position);pose.quaternion.copy(resting.quaternion);}
         const intact=clamp(total-i,0,1);
         pose.scale.setScalar(.42+.58*Math.sqrt(intact));
         pose.updateMatrix();mesh.setMatrixAt(i,pose.matrix);
@@ -359,15 +366,16 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
     }
   }
   function update(newBody,viewName,time=performance.now()*.001,foodInHand=false){
-    body=newBody;currentView=viewName;offeringFood=!!foodInHand;measure();
+    clock=time;body=newBody;currentView=viewName;offeringFood=!!foodInHand;measure();
     if(inFlight){
-      const f=inFlight,t=clamp((time-f.start)/f.duration,0,1);
-      arcPoint(f.mesh.position,f.origin,f.end,f.duration,t);
-      f.mesh.quaternion.slerpQuaternions(f.rotation,f.final,t);
-      f.mesh.rotateX(Math.PI*2*t);
-      if(t===1){
+      const f=inFlight;
+      if(f.motion.sample(time-f.start,f.mesh)){
         scene.remove(f.mesh);inFlight=null;
-        fires.addFuel(f.kind);onFuelAdded(f.kind);
+        fires.addFuel(f.kind);
+        const slot=Math.ceil(fires.fuelSnapshot()[f.kind]/fuelDuration[f.kind])-1;
+        restPoses[f.kind][slot]={position:f.mesh.position.clone(),quaternion:f.mesh.quaternion.clone()};
+        lastFuel[f.kind]=-1;
+        onFuelAdded(f.kind);
         lastDrop=f.kind;
         measure();
       }

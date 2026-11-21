@@ -48,13 +48,13 @@
 .welcome-copy{align-self:center;padding:clamp(28px,3.6vw,51px);font:400 1rem/1.53 "DM Sans","Avenir Next",system-ui,sans-serif}
 .welcome-copy .welcome-location{color:#536347;font-size:.78rem;letter-spacing:.1em;margin:0 0 16px}
 #welcome-title{font:400 clamp(3.25rem,5.5vw,5.4rem)/.94 "Baskervville","Iowan Old Style",Georgia,serif;letter-spacing:-.053em;color:#213926;margin:0 0 24px;text-wrap:balance}
-.welcome-copy p{margin:0 0 14px}.welcome-photo{display:block;min-height:100%;height:100%;object-fit:cover;object-position:47% 66%;min-width:0;position:absolute;inset:0 0 0 auto;width:55%}
+.welcome-copy p{margin:0 0 14px}.welcome-photo{display:block;min-height:100%;height:100%;object-fit:cover;object-position:55% 60%;min-width:0;position:absolute;inset:0 0 0 auto;width:55%}
 #welcome-start{margin-top:10px;background:#29472f;color:#fffdf3;padding:12px 19px;border-radius:7px;display:inline-flex;gap:20px;align-items:center;min-height:45px}
 #welcome-start:hover{background:#173621}#welcome-start span+span{font-size:1.15rem;line-height:1}
 #welcome-close{position:absolute;right:12px;top:12px;width:35px;height:35px;min-width:35px;min-height:35px;display:grid;place-content:center;line-height:1;padding:0;border-radius:50%;background:#f6f3e8ee;color:#293e2d;font-size:1.4rem}
 #welcome button:focus-visible{outline:3px solid #9a672d;outline-offset:3px}
 
-@media(max-width:680px){#welcome{width:min(475px,calc(100vw - 18px));max-height:calc(100dvh - 18px)}.welcome-layout{display:flex;flex-direction:column}.welcome-photo{order:-1;position:relative;width:100%;height:clamp(100px,24dvh,195px);min-height:0;object-position:50% 75%}.welcome-copy{padding:19px 22px 22px;font-size:.93rem;line-height:1.45}.welcome-copy .welcome-location{margin-bottom:7px;font-size:.72rem}#welcome-title{font-size:clamp(2.45rem,10vw,3.35rem);margin-bottom:14px}.welcome-copy p{margin-bottom:10px}#welcome-start{margin-top:4px}}
+@media(max-width:680px){#welcome{width:min(475px,calc(100vw - 18px));max-height:calc(100dvh - 18px)}.welcome-layout{display:flex;flex-direction:column}.welcome-photo{order:-1;position:relative;width:100%;height:clamp(100px,24dvh,195px);min-height:0;object-position:50% 60%}.welcome-copy{padding:19px 22px 22px;font-size:.93rem;line-height:1.45}.welcome-copy .welcome-location{margin-bottom:7px;font-size:.72rem}#welcome-title{font-size:clamp(2.45rem,10vw,3.35rem);margin-bottom:14px}.welcome-copy p{margin-bottom:10px}#welcome-start{margin-top:4px}}
 @media(min-width:681px) and (max-height:490px){#welcome{max-height:calc(100dvh - 10px)}.welcome-copy{padding:20px 26px;font-size:.88rem;line-height:1.38}.welcome-copy .welcome-location{margin-bottom:7px}#welcome-title{font-size:3rem;margin-bottom:12px}#welcome-start{margin-top:0}}
 #party{width:min(425px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:clamp(15px,4.8vw,24px);overflow:auto;overscroll-behavior:contain;border:1px solid #b9c9b9;color:#243c30;background:#f8faf5;border-radius:18px;box-shadow:0 14px 85px #12231955}
 #party::backdrop{background:#14261e72}#party h2{font:400 clamp(1.7rem,5vw,2.15rem)/1.12 "Baskervville",Georgia,serif;letter-spacing:-.04em;margin:0 30px 12px 0}
@@ -135,7 +135,7 @@
 #split-reticle::after{content:"";width:3px;height:3px;border-radius:50%;background:#fff4cf;box-shadow:0 0 0 1px #33251480}
 #split-reticle[data-ready=false]{border-style:dashed;opacity:.58}
 #status{position:absolute;inset:0;z-index:8;isolation:isolate;display:flex;align-items:flex-end;padding:clamp(24px,9vh,92px) max(7vw,env(safe-area-inset-right)) max(8vh,env(safe-area-inset-bottom)) max(7vw,env(safe-area-inset-left));overflow:auto;color:#fffaf0;background:radial-gradient(ellipse at 76% 12%,#384838,#162a22 72%)}
-#load-photo{position:absolute;z-index:-2;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:55% 65%;pointer-events:none}
+#load-photo{position:absolute;z-index:-2;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:54% 58%;pointer-events:none}
 #status::before{content:"";position:absolute;z-index:-1;inset:0;pointer-events:none;background:linear-gradient(0deg,#0b1712f2 0%,#0b1712b0 30%,#0b17121f 74%),linear-gradient(90deg,#0a171194,transparent 72%)}
 main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activity,#woodwork,#world-tools){visibility:hidden}
 .load-arrival{width:min(100%,44rem);margin-top:auto}
@@ -166,7 +166,7 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
 [data-load-retry]:focus-visible{outline:2px solid currentColor;outline-offset:3px}
 #welcome-loading{--load-track:#d6d9cd;--load-fill:#47694c;--load-secondary:#4d5e50;width:100%;margin:-4px 0 1.35rem;padding:12px 0;border-block:1px solid #d7d9ce}
 #welcome-loading .load-line{font-size:.95rem}
-@media(max-width:680px){#status{padding:24px max(22px,env(safe-area-inset-right)) max(7vh,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left))}#load-photo{object-position:52% 68%}#welcome-loading{margin:0 0 12px;padding:8px 0}}
+@media(max-width:680px){#status{padding:24px max(22px,env(safe-area-inset-right)) max(7vh,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left))}#load-photo{object-position:58% 58%}#welcome-loading{margin:0 0 12px;padding:8px 0}}
 @media(max-width:375px) and (max-height:650px){.welcome-photo{height:clamp(76px,16dvh,100px)}.welcome-copy{padding:13px 17px 16px}#welcome-title{font-size:2rem;margin-bottom:10px}}
 @media(max-width:375px) and (max-height:650px){
   #welcome:has(#welcome-loading:not([hidden])) .welcome-copy{display:flex;flex-direction:column}
@@ -403,7 +403,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
       <button type="button" id="welcome-start"><span>Start exploring</span><span aria-hidden="true">→</span></button>
     </div>
     <div class="welcome-photo">
-      <img class="welcome-image" src="data:image/webp;base64,%%WELCOME_PHOTO%%" alt="Wooden chairs around the cabin’s fire pit, beneath string lights and autumn trees.">
+      <img class="welcome-image" src="data:image/webp;base64,%%WELCOME_PHOTO%%" alt="Snow covers the backyard chairs and fire ring beneath string lights stretching from the pergola to the cabin deck.">
       <q data-load-quote></q>
     </div>
     <script>document.getElementById("load-photo").src=document.querySelector(".welcome-image").src;</script>

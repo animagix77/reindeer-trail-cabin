@@ -9,6 +9,52 @@ const mix=T.MathUtils.lerp, tau=2*Math.PI;
 const color=(hex)=>new T.Color(hex);
 const ellipsoid=new T.SphereGeometry(1,20,14);
 const HIGH=new T.Vector3(0,1,0);
+// One stride from touchdown to the next touchdown of the same hoof. Channels
+// are forward placement (m), clearance (m), hoof pitch and cannon pitch (rad).
+// During stance the hoof travels backwards at the ground speed of that gait.
+const WALK=[
+  [0,    .238,0,    0,    .04],
+  [.16,  .105,0,    0,   -.02],
+  [.36, -.061,0,    0,   -.04],
+  [.57, -.235,0,    .07, -.10],
+  [.65, -.267,.039, .43, -.12],
+  [.77, -.075,.112, .28,  .19],
+  [.89,  .194,.074,-.16,  .23],
+  [.96,  .263,.027,-.09,  .10],
+  [1,    .238,0,    0,    .04]
+];
+const BOUND=[
+  [0,    .26,0,    -.06, -.10],
+  [.09,  .11,0,     .02, -.15],
+  [.26, -.174,0,    .05, -.12],
+  [.34, -.308,.014, .27, -.20],
+  [.45, -.337,.092, .66, -.28],
+  [.62, -.099,.216, .81,  .33],
+  [.77,  .212,.167, .18,  .40],
+  [.90,  .355,.081,-.31,  .19],
+  [1,    .26,0,    -.06, -.10]
+];
+function bakeStride(keys){
+  const samples=96,clip=new Float32Array(samples*4);
+  for(let i=0;i<samples;i++){
+    const t=i/samples,k=keys.findIndex((key,j)=>j>0&&key[0]>=t);
+    const a=keys[k-1],b=keys[k],prev=keys[k-2]||keys.at(-2),next=keys[k+1]||keys[1];
+    const span=b[0]-a[0],u=(t-a[0])/span;
+    for(let c=1;c<=4;c++){
+      const left=span*(b[c]-prev[c])/(b[0]-prev[0]+(k===1?1:0));
+      const right=span*(next[c]-a[c])/(next[0]-a[0]+(k===keys.length-1?1:0));
+      const flat=a[c]===b[c];
+      clip[4*i+c-1]=flat?a[c]:mix(a[c],b[c],u*u*(3-2*u))+
+        left*u*(1-u)**2-right*u*u*(1-u);
+    }
+  }
+  return clip;
+}
+const walkClip=bakeStride(WALK),boundClip=bakeStride(BOUND);
+function sampleStride(clip,phase,out){
+  const n=clip.length/4,pos=(phase-Math.floor(phase))*n,i=Math.floor(pos),blend=pos-i;
+  for(let c=0;c<4;c++)out[c]=mix(clip[i*4+c],clip[(i+1)%n*4+c],blend);
+}
 function makeGrain() {
   const w=128,p=new Uint8Array(w*w*4);
   let seed=47;
@@ -104,7 +150,8 @@ export function makeDeer({buck=false,young=false,phase=0}={}){
   pelt('head',head,[[0,1.313,.552,.031,.054],[0,1.340,.607,.083,.118],[0,1.338,.688,.109,.127],
     [0,1.300,.767,.079,.102],[0,1.237,.850,.057,.072],[0,1.217,.906,.052,.050],[0,1.214,.933,.033,.033]]);
   oval(head,[0,1.217,.918],[.052,.038,.034],nose);
-  oval(head,[0,1.187,.871],[.047,.023,.069],cream,[-.20,0,0]);
+  const jaw=bone('Lower jaw',head,0,1.247,.772);
+  oval(jaw,[0,1.187,.871],[.047,.023,.069],cream,[-.20,0,0]);
   const ears=[];
   for(const side of [-1,1]){
     oval(head,[.041*side,1.224,.935],[.012,.007,.004],dark,[0,side*.37,-side*.17]);
@@ -148,7 +195,11 @@ export function makeDeer({buck=false,young=false,phase=0}={}){
     pelt('leg',foot,[[x,ankleY+.019,ankleZ,.024,.028],[x,ankleY,ankleZ,.027,.033],
       [x,.049,ankleZ+.037,.023,.030],[x,.025,ankleZ+.040,.020,.026]]);
     for(const toe of [-1,1]) oval(foot,[x+toe*.012,.026,ankleZ+.051],[.016,.026,.047],edge,[.18,0,toe*.025]);
-    legs.push({hind,side,x,toeZ:ankleZ+.052,shoulderY:baseY,upper:bones[upper],mid:bones[mid],hock:bones[hock],foot:bones[foot]});
+    legs.push({hind,side,x,toeZ:ankleZ+.052,baseY,baseZ,ankleY,hockDY:ankleY-hockY,hockDZ:ankleZ-hockZ,
+      upperLength:Math.hypot(baseY-midY,midZ-baseZ),midLength:Math.hypot(midY-hockY,hockZ-midZ),
+      upperRest:Math.atan2(midZ-baseZ,baseY-midY),midRest:Math.atan2(hockZ-midZ,midY-hockY),
+      walk:new Float32Array(4),bound:new Float32Array(4),reach:0,lift:0,toePitch:0,cannonPitch:0,
+      upper:bones[upper],mid:bones[mid],hock:bones[hock],foot:bones[foot]});
   }
   // Each yearling keeps a short, dusky coat. An older juvenile has lost its fawn spots.
   parts.push(skinGeometry(fields,{buff,deep,cream}));
@@ -159,59 +210,83 @@ export function makeDeer({buck=false,young=false,phase=0}={}){
   const object=new T.Group();object.name=mesh.name;object.add(mesh);
   object.scale.setScalar(young?.79:buck?1.08:1);
   const muzzle= new T.Object3D();muzzle.name='Muzzle';muzzle.position.copy(v(0,1.217,.943).sub(joints[head]));bones[head].add(muzzle);
-  // Resolve the four contact heights independently. The pastern follows the
-  // local slope beneath that hoof while the gait still supplies its swing.
+  const localTarget=v(0,0,0),inverse=new T.Quaternion();
+  let walk=0,flag=0,earsUp=0,lastPose=null,bodyPitch=0,bodyRoll=0,slopePitch=0,slopeRoll=0;
+  // Place each sole on the sampled terrain throughout stance. The upper leg
+  // and knee solve for the hock while the hoof rolls off at the end of contact.
   function fitHooves(ground,shadow,dt){
     const s=object.scale.x,sin=Math.sin(object.rotation.y),cos=Math.cos(object.rotation.y);
     let along=0,across=0;
     for(const leg of legs){
-      const x=object.position.x+s*(cos*leg.x+sin*leg.toeZ);
-      const z=object.position.z+s*(cos*leg.toeZ-sin*leg.x);
+      const toe=leg.toeZ+leg.reach;
+      const x=object.position.x+s*(cos*leg.x+sin*toe);
+      const z=object.position.z+s*(cos*toe-sin*leg.x);
       const h=ground(x,z)??object.position.y;
       const dy=h-object.position.y;
-      const reach=T.MathUtils.clamp(1-dy/(s*leg.shoulderY),.74,1.28);
-      leg.upper.scale.y=dt?T.MathUtils.damp(leg.upper.scale.y,reach,18,dt):reach;
+      leg.height=dy/s;
       along+=dy*(leg.hind?-1:1);
       across+=dy*leg.side;
     }
-    shadow.rotation.set(-Math.atan(along/(1.46*s)),object.rotation.y,Math.atan(across/(.55*s)),'YXZ');
+    const pitch=-Math.atan(along/(1.46*s)),roll=Math.atan(across/(.55*s));
+    shadow.rotation.set(pitch,object.rotation.y,roll,'YXZ');
+    slopePitch=T.MathUtils.damp(slopePitch,T.MathUtils.clamp(pitch,-.29,.29)*walk,11,dt);
+    slopeRoll=T.MathUtils.damp(slopeRoll,T.MathUtils.clamp(roll,-.15,.15)*walk,11,dt);
+    mesh.rotation.set(bodyPitch+slopePitch,0,bodyRoll+slopeRoll);
+    inverse.copy(mesh.quaternion).invert();
+    for(const leg of legs){
+      localTarget.set(leg.x,leg.height+leg.lift-mesh.position.y,leg.toeZ+leg.reach).applyQuaternion(inverse);
+      const cannon=leg.cannonPitch-mesh.rotation.x,toe=leg.toePitch-mesh.rotation.x;
+      const ankleY=-leg.ankleY,ankleZ=.052;
+      const hockY=localTarget.y-(leg.hockDY*Math.cos(cannon)-leg.hockDZ*Math.sin(cannon))-(ankleY*Math.cos(toe)-ankleZ*Math.sin(toe));
+      const hockZ=localTarget.z-(leg.hockDZ*Math.cos(cannon)+leg.hockDY*Math.sin(cannon))-(ankleZ*Math.cos(toe)+ankleY*Math.sin(toe));
+      const down=leg.baseY-hockY,forward=hockZ-leg.baseZ,L=leg.upperLength,M=leg.midLength;
+      const distance=T.MathUtils.clamp(Math.hypot(down,forward),Math.abs(L-M)+.001,L+M-.0005);
+      const bend=Math.acos(T.MathUtils.clamp((L*L+distance*distance-M*M)/(2*L*distance),-1,1));
+      const aim=Math.atan2(forward,down),upper=aim+(leg.hind?bend:-bend);
+      const mid=Math.atan2(distance*Math.sin(aim)-L*Math.sin(upper),distance*Math.cos(aim)-L*Math.cos(upper));
+      leg.upper.rotation.x=leg.upperRest-upper;
+      leg.mid.rotation.x=leg.midRest-mid-leg.upper.rotation.x;
+      leg.hock.rotation.x=cannon-leg.upper.rotation.x-leg.mid.rotation.x;
+      leg.foot.rotation.x=toe-cannon;
+    }
   }
-  let flag=0,lastPose=null;
-  return {object,muzzle,fitHooves,pose(time,stride,speed,lower,chew,look=0,alarmed=false) {
+  return {object,muzzle,fitHooves,pose(time,stride,speed,lower,chew,look=0,alarmed=false,listening=false) {
     const dt=lastPose===null?0:Math.min(.14,Math.max(0,time-lastPose));
     lastPose=time;
     flag=T.MathUtils.damp(flag,alarmed?1:0,alarmed?11:2.2,dt);
-    const walk=T.MathUtils.smoothstep(speed,0,.65);
-    const bound=T.MathUtils.smoothstep(speed,1.05,2.35);
+    earsUp=T.MathUtils.damp(earsUp,listening||alarmed?1:0,7,dt);
+    walk=T.MathUtils.smoothstep(speed,0,.38);
+    const bound=T.MathUtils.smoothstep(speed,.95,2.4);
     const cyc=stride*tau,breath=Math.sin(time*2.05+phase);
     const lift=Math.max(0,Math.sin(cyc));
     // At a walk each foot lands in sequence. In flight, the hind legs gather
     // and push together, with the forelegs reaching to catch the body.
-    mesh.position.y=.0028*breath+walk*mix(.012*Math.sin(2*cyc),.074*lift*lift,bound);
-    mesh.rotation.x=bound*(.078*Math.cos(cyc)-.025);
-    mesh.rotation.z=.012*walk*Math.sin(cyc)*(1-bound);
+    mesh.position.y=.0028*breath+walk*mix(-.033+.011*Math.sin(2*cyc),-.067+.132*lift*lift,bound);
+    bodyPitch=bound*(.102*Math.cos(cyc)-.025);
+    bodyRoll=.014*walk*Math.sin(cyc)*(1-bound);
     const listen=1-lower;
-    bones[neck].rotation.x=mix(.025+.025*Math.sin(time*.97+phase)+.026*Math.sin(cyc)*walk-.12*flag+.115*bound*Math.cos(cyc),2.29,lower);
+    bones[neck].rotation.x=mix(.025+.025*Math.sin(time*.97+phase)+.026*Math.sin(cyc)*walk-.16*earsUp+.115*bound*Math.cos(cyc),2.29,lower);
     bones[neck].rotation.y=look*listen*.60+.035*Math.sin(time*.63+phase)*listen;
-    bones[head].rotation.x=mix(.018*Math.sin(time*1.42+phase)-.07*bound*Math.cos(cyc),-.62,lower)+chew*.047*(.5+.5*Math.sin(time*8));
+    bones[head].rotation.x=mix(.018*Math.sin(time*1.42+phase)-.07*bound*Math.cos(cyc),-.62,lower);
+    const chewing=chew||T.MathUtils.smoothstep(lower,.83,.95);
+    bones[jaw].rotation.x=chewing*.15*(.5+.5*Math.sin(time*7.4+phase));
+    bones[jaw].rotation.z=chewing*.047*Math.cos(time*7.4+phase);
     bones[head].rotation.y=look*listen*.30;
     ears.forEach((ear,i)=>{
       const side=i?1:-1,beat=time*(i?1.31:1.07)+phase+i*2.2;
       const swivel=Math.max(0,Math.sin(beat))**7;
-      ear.rotation.y=side*(.27*swivel+.14*Math.sin(time*.78+phase+i))*(1-flag)+look*.4*listen;
-      ear.rotation.z=side*(.055*Math.sin(beat)+.16*swivel-.16*flag);
+      ear.rotation.y=side*(.27*swivel+.14*Math.sin(time*.78+phase+i))*(1-earsUp)+look*.4*listen;
+      ear.rotation.z=side*(.055*Math.sin(beat)+.16*swivel-.21*earsUp);
     });
     bones[tail].rotation.x=1.58*flag+.14*bound*Math.cos(cyc);
     bones[tail].rotation.z=.10*Math.sin(time*.75+phase)+.32*Math.pow(Math.max(0,Math.sin(time*1.16+phase)),18);
     for(const l of legs){
-      const walkPhase=cyc+(l.side>0?Math.PI:0)+(l.hind?-.46:Math.PI*.73);
-      const runPhase=cyc+(l.hind?.82:3.73)+(l.side>0?.37:0);
-      const swing=mix(Math.sin(walkPhase),Math.sin(runPhase),bound);
-      const fold=mix(Math.max(0,Math.cos(walkPhase)),Math.max(0,Math.cos(runPhase)),bound);
-      l.upper.rotation.x=walk*mix(.34,.61,bound)*swing;
-      l.mid.rotation.x=walk*(l.hind?-.34:.28)*(1+bound*.65)*fold;
-      l.hock.rotation.x=walk*(l.hind?.48:.33)*(1+bound*.55)*fold;
-      l.foot.rotation.x=walk*(-.17*swing-.13*fold)*(1+bound*.5);
+      sampleStride(walkClip,stride+(l.side>0?.5:0)+(l.hind?0:.76),l.walk);
+      sampleStride(boundClip,stride+(l.side>0?.075:0)+(l.hind?0:.48),l.bound);
+      l.reach=walk*mix(l.walk[0],l.bound[0],bound);
+      l.lift=walk*Math.max(0,mix(l.walk[1],l.bound[1],bound));
+      l.toePitch=walk*mix(l.walk[2],l.bound[2],bound);
+      l.cannonPitch=walk*mix(l.walk[3],l.bound[3],bound);
     }
   }};
 }

@@ -64,19 +64,38 @@ test('fresh split oak pieces have complementary cut surfaces, centered collision
   }
 });
 
-test('the splitting block replaces its damaged geometry and releases separate ownable meshes',t=>{
+test('a full round and its two upright halves give exactly four pieces and preserve both cleavage faces',t=>{
   globalThis.document={createElement:()=>({getContext:()=>({fillRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){}})})};
   t.after(()=>{delete globalThis.document;});
   const station=makeSplittingBlock(new Group());
   const first=station.impact(blow());
   assert(first.split);assert.equal(station.round.visible,false);
-  for(const p of first.pieces){
-    assert(p.mesh.isMesh && p.hull.length>=3 && p.density>600);
-    assert.equal(p.mesh.position.y,station.top+p.height/2);
+  assert.equal(first.pieces.length,0,'Both halves remain on the stump');
+  const halves=station.targets;assert.equal(halves.length,2);
+  assert.equal(station.begin(),false,'The next round cannot overwrite remaining halves');
+  station.rest();
+  let sum=0;
+  for(const half of halves){
+    const center=station.grainCenter(half),direction=station.aimDirection(half,1,0);
+    assert(Math.abs(direction.nz)>.7,'Aim across the first seam to produce quarters');
+    const second=station.impact({...blow(center.x,center.z,direction.nx,direction.nz,1),target:half});
+    assert(second.split);assert.equal(second.pieces.length,2);
+    for(const p of second.pieces){
+      assert(p.mesh.isMesh && p.hull.length>=3 && p.density>600);
+      assert.equal(p.mesh.position.y,station.top+p.height/2);
+      assert.deepEqual(p.mesh.geometry.groups.map(g=>g.materialIndex),[0,1,2]);
+      const geom=p.mesh.geometry,face=geom.groups[2],normals=geom.attributes.normal;
+      const normal0=[normals.getX(face.start),normals.getZ(face.start)];
+      assert(Array.from({length:face.count},(_,i)=>face.start+i).some(i=>Math.abs(normal0[0]*normals.getX(i)+normal0[1]*normals.getZ(i))<.65),'Quarter retains the two distinct internal split faces');
+      assert(volume(geom)>area(p.hull)*p.height*.98);
+      sum+=area(p.hull);
+    }
+    assert(!station.impact({...blow(),target:half}).split,'A spent half cannot be struck twice');
   }
-  station.begin();assert(station.round.visible);assert.equal(station.progress,0);
+  assert(Math.abs(sum-area(createOakRound(0).ring))<1e-8);
+  assert.equal(station.targets.length,0);assert(station.begin());
+  assert(station.round.visible);assert.equal(station.progress,0);
   const pristine=station.round.geometry;
-  const dent=station.impact(blow());assert(!dent.split);
+  const dent=station.impact(blow());assert(!dent.split);assert(dent.bite);
   assert.notEqual(station.round.geometry,pristine);
-  assert.equal(first.pieces[0].mesh.geometry.groups.length,3,'loading a round leaves older fragments intact');
 });
