@@ -210,6 +210,7 @@ exec(compile((work/'Front yard paving.py').read_text(),'Front yard paving.py','e
 exec(compile((work/'Rear clearing.py').read_text(),'Rear clearing.py','exec'),globals())
 exec(compile((work/'Exterior site.py').read_text(),'Exterior site.py','exec'),globals())
 exec(compile((work/'Deck barbecue.py').read_text(),'Deck barbecue.py','exec'),globals())
+exec(compile((work/'Deck firewood rack.py').read_text(),'Deck firewood rack.py','exec'),globals())
 exec(compile((work/'Surrounding woods.py').read_text(),'Surrounding woods.py','exec'),globals())
 # Default viewpoint: north-east corner, showing the front entry and downhill garage.
 def aim(o,target):o.rotation_euler=(Vector(target)-o.location).to_track_quat('-Z','Y').to_euler()

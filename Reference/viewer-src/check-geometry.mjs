@@ -249,24 +249,82 @@ const stairRoute=[[25.35,20.16],[19.9,19.56],[16.94,19.35],[16.94,16.83],[15.65,
 assert.equal(traverseRoute('Tree nook to loft',stairRoute).label,'WalkSurface_LoftLanding');
 assert.equal(traverseRoute('Loft down to tree nook',[...stairRoute].reverse(),2.21).label,'WalkSurface_MainFloor_west');
 traverseRoute('Woodpile to the fire ring between the chairs',[[34.65,46.92],[32.,46.2],[30.4,47.6],[30.1,50.6],[29.1,52.5]],-1.11);
+const visibleSolids=[];
+scene.traverse(mesh=>{
+  if(mesh.isMesh && !/^Walk(Surface|Block)_/.test(mesh.userData.part)){
+    visibleSolids.push({mesh,bounds:new T.Box3().setFromObject(mesh)});
+  }
+});
+const probe=new T.Raycaster(),bounds=new T.Box3();
+function firstVisible(a,b){
+  const length=a.distanceTo(b);
+  if(length<1e-7)return;
+  bounds.setFromPoints([a,b]).expandByScalar(.001);
+  probe.set(a,b.clone().sub(a).divideScalar(length));
+  probe.far=length;
+  return probe.intersectObjects(visibleSolids.filter(part=>part.bounds.intersectsBox(bounds)).map(part=>part.mesh),false)[0];
+}
+
+// Probe the rendered timber and joinery themselves. Their world-aligned boxes
+// overlap on an angled building even when the gap beside the newel is clear.
+function checkDeck(){
+  const timber='Porch · deck boards, posts and guardrails';
+  for(const [height,y] of [[.778,26.122],[.865,26.12]]){
+    const seam=at(23.57,y,height);
+    const post=firstVisible(seam,at(22.9,y,height));
+    const casing=firstVisible(seam,at(24.2,y,height));
+    assert.equal(post?.object.userData.part,timber,'Missing house-end newel of deck guard');
+    assert.match(casing?.object.userData.part||'',/^Dining nook 1 · frame/,'Missing dining sash beside guard');
+    assert(post.point.distanceTo(casing.point)>.08,'Window casing overlaps or crowds the deck guard');
+  }
+  const facade=firstVisible(at(23.57,26.42,1.24),at(23.57,25.72,1.24));
+  assert.match(facade?.object.userData.part||'',/^Exterior · wall 5/,'Open wall behind the deck guard');
+  const opening=firstVisible(at(26.8,26.35,1.4),at(26.8,25.72,1.4));
+  assert.match(opening?.object.userData.part||'',/^Dining nook 1 · clear glazing/,'New dining opening is blocked');
+  const sideRail=firstVisible(at(23.25,29.2,1.03),at(23.25,29.2,.70));
+  assert.equal(sideRail?.object.userData.part,timber,'Missing side guard cap away from house');
+
+  const rackEye=at(27.9,29.75,1.525),frame='Deck firewood rack · tubular steel frame';
+  const logs='Deck firewood rack · split logs';
+  const materialFaces=new Set();
+  for(const x of [24.25,24.6,24.95,25.3,25.65,26.0,26.35,26.7]){
+    for(const h of [.11,.24,.39,.54,.7,.83]){
+      const seen=firstVisible(rackEye,at(x,26.4,h));
+      if(seen)materialFaces.add(seen.object.userData.part);
+    }
+  }
+  assert(materialFaces.has(frame) && materialFaces.has(logs),'Standing visitor must see the rack frame and split logs');
+  const feetMeshes=visibleSolids.filter(part=>part.mesh.userData.part===frame).map(part=>part.mesh);
+  const deckBoards=visibleSolids.filter(part=>part.mesh.userData.part===timber).map(part=>part.mesh);
+  for(const side of [-1,1])for(const end of [-1,1]){
+    const x=25.48+side*.274/feet,y=27.18+end*.10/feet;
+    const underside=hits(feetMeshes,at(x,y,-.18),down.clone().negate())[0];
+    const floor=hits(deckBoards,at(x,y,.06),down)[0];
+    assert(underside && floor && Math.abs(underside.point.y-floor.point.y)<.007,
+      'Both rack feet must rest on the deck boards');
+  }
+  const center=at(25.48,27.18,-.065),approach=at(25.48,29.7,-.065);
+  const guest=walks.spawn(approach.x,approach.z,approach.y+1.59,approach.y);
+  assert.equal(guest?.label,'WalkSurface_CoveredDeck','Cannot stand in front of the rack');
+  const stop=walks.move(guest,center.x-guest.x,center.z-guest.z);
+  const beforeRack=(stop.x-center.x)*inward.x+(stop.z-center.z)*inward.z;
+  assert(beforeRack>.405 && beforeRack<.50,'Visitor must stop just in front of the rack');
+
+  // From the yard, take both short flights at the grill end. Walk between
+  // the grill and chair, to the rack, then through the slider and back out.
+  const path=[[11.1,60.2],[11.1,41.6],[22,42.3],[40,42.3],[44.72,40.2],
+    [44.72,33.6],[38.32,33.6],[38.25,32.05],[35,32.05],[34.63,30.3],
+    [34.63,29.2],[27.9,29.75],[30.7,27.5],[30.7,24.8]];
+  const yard=scene.getObjectByName('TourEye_yard').getWorldPosition(new T.Vector3());
+  const yardHeight=yard.y-at(0,0,1.59).y;
+  assert.equal(traverseRoute('Yard steps to rack and dining slider',path,yardHeight).label,'WalkSurface_MainFloor_west');
+  assert.equal(traverseRoute('Dining slider past wood rack to garden',[...path].reverse()).label,'WalkSurface_ParcelGround');
+}
+checkDeck();
+
 // A visitor reaches the lower level from the two actual outdoor starts, walks
 // to each fixture at standing height, and retraces the same steps to daylight.
 function checkBasement(){
-  const solid=[];
-  scene.traverse(mesh=>{
-    if(mesh.isMesh && !/^Walk(Surface|Block)_/.test(mesh.userData.part)){
-      solid.push({mesh,bounds:new T.Box3().setFromObject(mesh)});
-    }
-  });
-  const probe=new T.Raycaster(),bounds=new T.Box3();
-  function firstVisible(a,b){
-    const length=a.distanceTo(b);
-    if(length<1e-7)return;
-    bounds.setFromPoints([a,b]).expandByScalar(.001);
-    probe.set(a,b.clone().sub(a).divideScalar(length));
-    probe.far=length;
-    return probe.intersectObjects(solid.filter(part=>part.bounds.intersectsBox(bounds)).map(part=>part.mesh),false)[0];
-  }
   function assertClear(a,b,label){
     const hit=firstVisible(a,b);
     if(hit)assert.fail(label+' crosses '+hit.object.userData.part+' at '+hit.point.toArray().map(v=>v.toFixed(2)));
@@ -466,5 +524,5 @@ assert(paved>.63,'Paving should cover roughly two-thirds of the developed fronta
 for(const [x,y,expected] of [[21.38,-20.7,hardFinishes[1]],[21.38,-17,hardFinishes[1]],[28,-15.9,hardFinishes[2]]]){
   assert.equal(hits(land,at(x,y,10),down)[0]?.object.material.name,expected,'Frontage finish at '+[x,y]);
 }
-console.log(`Checked ${primitives} mesh primitives, ${triangles.toLocaleString()} triangles and ${spawns} authored walk starts. Straight front hall, kitchen counter backing, side doorways, entry, front ground, well casing and stair access, pergola and deck lighting, tree nook closure, primary passage, loft stairs and basement round trips passed.`);
+console.log(`Checked ${primitives} mesh primitives, ${triangles.toLocaleString()} triangles and ${spawns} authored walk starts. Straight front hall, kitchen counter backing, side doorways, entry, front ground, well casing and stair access, pergola lighting, covered-deck window and firewood rack, tree nook closure, primary passage, loft stairs and basement round trips passed.`);
 console.log('Developed frontage paving',Math.round(paved*1000)/10+'%',counts);

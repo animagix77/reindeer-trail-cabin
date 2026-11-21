@@ -22,7 +22,8 @@ def build_dining_room():
         face('Dining · sloping plaster header',[(x,ya,la),(x,yb,lb),(x,yb,zb),(x,ya,za)],ochre)
         face('Dining · painted opening reveal',[(x,ya,la),(21.006,ya,la),(21.006,yb,lb),(x,yb,lb)],ceilingmat)
     black=material('Dining chairs · dark stained wood','#262522',.02,.51)
-    tx,ty,hw,hd=24.55,24.17,2.04,1.43
+    left_jamb,right_jamb,_,head=dinwin
+    tx,ty,hw,hd=(left_jamb+right_jamb)/2,24.17,2.04,1.43
     # In L1040608 the top nearly reaches the window sill. IMG_4658
     # shows it at island height, with tall seats and low foot rails.
     table_rise=.145
@@ -83,10 +84,10 @@ def build_dining_room():
         collider('dining_chair_'+label,cx-rx,cx+rx,cy-ry,cy+ry,.015,.94+table_rise)
     side=group('Dining | window and slider blinds, display shelf and framed sign')
     for j in range(43):
-        h=dinwin[3]-.037-j*.016
-        bx(side,23.12,25.96,25.695,25.755,h,h+.012,cream)
-    bx(side,23.06,26.0,25.64,25.81,dinwin[3]-.038,dinwin[3]+.006,cream)
-    for x in (23.3,25.82):line(side,(x,25.711,dinwin[3]-.71),(x,25.711,dinwin[3]-.025),.0015,paper)
+        h=head-.037-j*.016
+        bx(side,left_jamb+.12,right_jamb-.09,25.695,25.755,h,h+.012,cream)
+    bx(side,left_jamb+.06,right_jamb-.05,25.64,25.81,head-.038,head+.006,cream)
+    for x in (left_jamb+.30,right_jamb-.23):line(side,(x,25.711,head-.71),(x,25.711,head-.025),.0015,paper)
     # The open patio leaf stacks over the stationary, internally blinded panel.
     for j in range(81):
         h=1.945-j*.023
@@ -95,14 +96,18 @@ def build_dining_room():
     line(side,(32.49,25.874,.915),(32.49,25.835,.949),.009,cream,12)
     line(side,(32.49,25.835,.949),(32.49,25.835,1.117),.009,cream,12)
     line(side,(32.49,25.835,1.117),(32.49,25.874,1.151),.009,cream,12)
-    bx(side,26.46,28.46,25.40,25.85,1.719,1.755,darkoak)
-    bx(side,26.52,28.40,25.76,25.84,1.56,1.73,darkoak)
-    for j,(x,col) in enumerate([(26.82,brass2),(27.41,terr),(28.04,honey)]):
+    # In L1040608 the little shelf fits entirely on the pier between the
+    # sash casing and the patio slider. Lay out its hooks and lettering there.
+    center=(right_jamb+slider[0])/2
+    bx(side,center-.76,center+.76,25.40,25.85,1.719,1.755,darkoak)
+    bx(side,center-.70,center+.70,25.76,25.84,1.56,1.73,darkoak)
+    for offset,col in ((-.54,brass2),(-.06,terr),(.42,honey)):
+        x=center+offset
         line(side,(x,25.73,1.683),(x+.08,25.65,1.618),.012,col,8)
         line(side,(x+.08,25.65,1.618),(x+.13,25.674,1.63),.002,steel)
     # The narrow hand-lettered shelf sign is visible looking out from the hall.
-    bx(side,26.68,28.25,25.56,25.75,1.756,2.018,darkoak)
-    bx(side,26.73,28.20,25.552,25.561,1.769,2.006,cream)
+    bx(side,center-.69,center+.69,25.56,25.75,1.756,2.018,darkoak)
+    bx(side,center-.64,center+.64,25.552,25.561,1.769,2.006,cream)
     strokes={
         'L':[[(0,1),(0,0),(1,0)]],
         'E':[[(1,1),(0,1),(0,0),(1,0)],[(0,.52),(.76,.52)]],
@@ -110,10 +115,10 @@ def build_dining_room():
         '’':[[(.40,1),(.20,.84)]],
         'S':[[(1,.92),(.77,1),(.27,1),(0,.86),(.08,.64),(.78,.48),(1,.34),(.96,.12),(.72,0),(.20,0),(0,.08)]],
         'A':[[(0,0),(.44,1),(.56,1),(1,0)],[(.23,.40),(.78,.40)]]}
-    for letter,x,w in [('L',26.80,.11),('E',27.00,.11),('T',27.20,.14),('’',27.37,.07),('S',27.46,.12),
-                       ('E',27.73,.10),('A',27.90,.12),('T',28.08,.11)]:
+    for letter,offset,w in [('L',-.59,.10),('E',-.43,.10),('T',-.27,.12),('’',-.13,.06),('S',-.05,.10),
+                            ('E',.18,.09),('A',.33,.10),('T',.49,.10)]:
         for path in strokes[letter]:
-            points=[(x+u*w,25.548,1.805+v*.168) for u,v in path]
+            points=[(center+offset+u*w,25.548,1.805+v*.168) for u,v in path]
             for start,end in zip(points,points[1:]):line(side,start,end,.0028,black,7)
     finish(side)
     # IMG_0007 (Dec 2025) and IMG_0776 (Apr 2026) show the heat pump

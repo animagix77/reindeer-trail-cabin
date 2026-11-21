@@ -10,6 +10,7 @@ You arrive on the driveway at golden hour. Walk forward or back with **W / S** a
 - At the woodpile, look at the twigs, sticks or split logs and pick up a piece. Carry it to the fire ring. Face the ring and toss the wood. Each piece rebounds briefly and rolls to rest among the coals. Twigs flare quickly, sticks last longer, and logs sustain the fire. You can lay wood in a cold ring before lighting it.
 - Approach an Adirondack chair and select **Sit by the fire**. You can look around, stargaze and chat from your seat. Choose **Stand up** to continue walking.
 - Visit the deck grill to light it, cook steak, chicken or vegetable skewers, turn the food and serve it.
+- Step through the dining-room slider and turn left to see the black hoop firewood rack beneath the window. The patio stove is at that end of the deck.
 - Look for a doe and yearling browsing together near the wooded property line, with a buck farther along the trees. Food can draw them into the yard. A sudden approach sends them bounding for cover. Choose **Feed deer** when it appears along the wooded edge to open your basket. Toss an apple, carrot or greens, or hold food out and stand still. Curious deer can follow it to your hand.
 - On a night walk, select **Flashlight** or press **L** to shine a beam where you look. The driveway and front-entry floodlights switch on when you approach after dark.
 - Visit the Christmas tree beside the loft stairs. Choose **Stargaze** for a clear night wherever you’re standing. Facing north, look for Polaris above the trees.

@@ -87,6 +87,9 @@ def soffit(u,v):return roofZ(u,v,1)-main-.14
 # Fixed floor datum for the ordinary main-floor sash openings. Counter-height
 # kitchen windows and the upper loft glazing each occupy a separate level.
 room_sash_levels=(.82,1.74)
+# IMG_3970 shows the casing clear of the house-end deck post. Share its
+# bounds with the dining furnishings, wall opening and presentation light.
+dining_window=(24.0,27.05,*room_sash_levels)
 east_window=(18.6,26.0,*room_sash_levels)
 loft_window=(16.25,18.05,2.65,3.40)
 south_window=(6.9,14.1,*room_sash_levels)

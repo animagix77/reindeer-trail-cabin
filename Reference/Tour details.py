@@ -98,11 +98,15 @@ def build_details():
     tube('Roof · rain cap',xx,yy,zr+.64,zr+.67,.175,iron,roof)
     # Warmth from the real entrances, fixtures and windows; render rig lights
     # do not get duplicated in the Three.js real-time lighting system.
+    x0,x1,lo,hi=dining_window
+    sash_x=(x0+x1)/2
+    sash_h=(lo+hi)/2
+    sash_light_width=min((x1-x0)*ft,hi-lo)-.12
     for name,xyz,target,power,size,color in [
         ('Kitchen window',(39.9,21.8,1.56),(32,20,1),110,1.4,(1,.96,.84)),
         ('Island pendant · sink side',(32.82,18.40,1.83),(32.82,18.40,.92),32,.65,(1,.84,.65)),
         ('Island pendant · patio side',(32.82,21.70,1.83),(32.82,21.70,.92),32,.65,(1,.84,.65)),
-        ('Dining window',(26,25.3,1.64),(25.5,19,.8),90,1.5,(1,.93,.82)),
+        ('Dining window',(sash_x,25.1,sash_h),(sash_x,19,sash_h-.24),90,sash_light_width,(1,.93,.82)),
         ('Bedroom queen',(20.2,9.7,1.68),(16,11,.8),125,1.7,(1,.96,.9)),
         ('Bedroom double',(39.8,4,1.61),(36,8.2,.8),92,1.35,(1,.94,.86)),
         ('Bedroom bunk',(1,10.4,1.66),(4,6.4,1.1),85,1.6,(.92,.97,1)),

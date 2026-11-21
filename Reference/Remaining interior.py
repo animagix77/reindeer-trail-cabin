@@ -165,7 +165,7 @@ def _furnish_remaining():
         strip(a+.035,b-.035,mid-.012,mid+.012,cream,.038,-.055)
     for o in list(inter.objects):
         if o.name.startswith(('Paired front windows','Front foyer window','Front west window','East gable windows A','Rear porch glazed opening','Front entry surround','Front entry door')):bpy.data.objects.remove(o,do_unlink=True)
-    dinwin=(23.0,26.05,*room_sash_levels);slider=(29.1,35.5,.025,2.01)
+    dinwin=dining_window;slider=(29.1,35.5,.025,2.01)
     # Front windows flanking the door are the same sash size. The protected
     # bath and full-bedroom interior fittings follow these coordinates.
     foyerwin=(24.35,26.85,*room_sash_levels)
