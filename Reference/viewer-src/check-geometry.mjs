@@ -99,6 +99,20 @@ for(const x of [34.71,35.29]){
 assert(lampsAlong([40.70,35.84],[34.71,48.325])>=5,'Missing direct pergola-to-deck lights');
 assert.equal(lampsAlong([13.25,54.4],[23.30,35.84]),7,'Expected seven pendants on the flue-side span');
 for(const name of ['Deck','Picnic','Pergola'])assert(scene.getObjectByName('FestoonPool_'+name),'Missing outdoor lamp anchor '+name);
+// Each basket needs its own upholstered seat inside the wicker shell.
+const swingPads=[];
+scene.traverse(mesh=>{
+  if(mesh.isMesh && mesh.material.name==='Patio cushion · oatmeal')swingPads.push(mesh);
+});
+for(const id of [1,2]){
+  const basket=scene.getObjectByName('WalkBlock_HangingBasket'+id);
+  const bounds=new T.Box3().setFromObject(basket);
+  const above=bounds.getCenter(new T.Vector3());
+  above.y=bounds.max.y;
+  const seat=hits(swingPads,above,down)[0];
+  assert(seat && seat.point.y>bounds.min.y+.45 && seat.point.y<bounds.min.y+.75,
+    'Missing seat cushion inside hanging basket '+id);
+}
 let spawns=0;
 for(const name of names.filter(n=>n.startsWith('TourEye_'))){
   const v=scene.getObjectByName(name).getWorldPosition(new T.Vector3());

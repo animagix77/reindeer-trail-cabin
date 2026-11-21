@@ -13,6 +13,7 @@ const surfaces={
   porcelain:{relief:.00028},
   cedar:{relief:.0013,exterior:true},
   bark:{relief:.006,exterior:true},
+  wicker:{relief:.0016,exterior:true},
   oak:{relief:.0009,grain:true},
   satin:{relief:.00045,grain:true}
 };
@@ -26,6 +27,7 @@ function surfaceType(name){
   if(/split.face (shower|ledgestone)|Ledgestone split face/i.test(name))return 'stone';
   if(/^(Porch · natural sawn timber|Blue lap siding|Midnight blue siding|Entry wing · blue cedar shakes|Deck boards|Timber$|Adirondack slat|Weathered railing timber|Weathered timber ties|Garage · weathered timber|Entry · weathered cedar)/i.test(name))return 'cedar';
   if(/^(Hardwood bark|Oak and maple branchwood)/i.test(name))return 'bark';
+  if(name==='Outdoor wicker · woven taupe')return 'wicker';
   if(/^(Floor · photograph of clear-finished|Living · gray boards|Cabin furnishing • Storage table|Room detail \| Island · dark stained)/i.test(name))return 'satin';
   if(/knotty pine|Joinery · amber oak|Loft · stained|honey pine boarding|photographed walnut drawer|photographed weathered mirror|Media console · dark weathered grain|Master · weathered timber/i.test(name))return 'oak';
   return null;
@@ -82,20 +84,76 @@ vec4 groundPhoto(vec2 metricUV){
   w*=w;w/=max(.0001,w.x+w.y+w.z);
   return w.x*patchSample(corner,uv,dx,dy)+w.y*patchSample(id+vec2(1,0),uv,dx,dy)+w.z*patchSample(id+vec2(0,1),uv,dx,dy);
 }`;
+// Height ranges in metres, with middle luminance sampled in linear light.
+// Use a height field only for photographs whose dark crevices correspond to
+// physical features. Finishes with printed or painted patterns keep their UVs.
+const heightFields=new Map([
+  ['Bark',{depth:.015,mid:.095,contrast:.85}],
+  ['Porch timber',{depth:.0028,mid:.347,contrast:1.25}],
+  ['Weathered ties',{depth:.007,mid:.075,contrast:1.00}],
+  ['Old entrance masonry',{depth:.012,mid:.205,contrast:.90}],
+  ['Tumbled fire pit stone',{depth:.004,mid:.56,contrast:1.10}],
+  ['Hearth - split face ledgestone',{depth:.012,mid:.18,contrast:.46}],
+  ['Bathroom - split face stone',{depth:.006,mid:.40,contrast:1.0}],
+  ['Wicker weave',{depth:.0018,mid:.149,contrast:2.3}]
+]);
+
+// Trace a view ray through the shallow relief of one material. Project the
+// ray into the authored UVs per metre, so a planed board and its narrow edge
+// have the same physical depth even with unequal or mirrored texture scales.
+const reliefTrace=`
+float surfaceHeight(vec3 color){
+  float luminance=dot(color,vec3(.2126,.7152,.0722));
+  return clamp(.5+reliefContrast*log2(max(.002,luminance)/reliefMid),0.,1.);
+}
+vec2 traceRelief(vec2 uv,vec2 dx,vec2 dy){
+  vec3 px=dFdx(-vViewPosition),py=dFdy(-vViewPosition);
+  vec3 area=cross(px,py);
+  float det=length(area),range=length(vViewPosition);
+  if(det<1.e-10 || range>=5.)return uv;
+  vec3 n=area/det,eye=vViewPosition/max(range,.001);
+  vec3 ray=n-eye/max(.28,dot(n,eye));
+  vec2 offset=(dx*dot(ray,cross(py,n))+dy*dot(ray,cross(n,px)))
+              *reliefDepth*(1.-smoothstep(2.5,5.,range))/det;
+  // Skip subpixel offsets. Magnification changes smoothly into the ordinary
+  // filtered surface as a visitor backs away.
+  float pixels=length(offset)/max(.000001,max(length(dx),length(dy)));
+  if(pixels<=.25)return uv;
+  offset*=smoothstep(.25,1.15,pixels);
+  float gap=1.-surfaceHeight(textureGrad(map,uv,dx,dy).rgb);
+  for(int i=1;i<=5;i++){
+    float layer=float(i)*.2;
+    float nextGap=1.-surfaceHeight(textureGrad(map,uv+offset*layer,dx,dy).rgb)-layer;
+    if(nextGap<=0.)return uv+offset*(layer-.2+.2*gap/max(.00001,gap-nextGap));
+    gap=nextGap;
+  }
+  return uv+offset;
+}`;
 function addRelief(m,type,substitute){
   const profile=surfaces[type];
+  const field=heightFields.get(m.map.name);
   // Rotate the rectified gravel in metre space before projecting it into the source photo.
   const rowScale=m.name.startsWith('Fire circle · pale')?'3.7':'1.0';
   const previous=m.onBeforeCompile,key=m.customProgramCacheKey();
   m.onBeforeCompile=(shader,renderer)=>{
     previous.call(m,shader,renderer);
     if(profile.scatter)shader.fragmentShader=shader.fragmentShader.replace('#include <map_pars_fragment>','#include <map_pars_fragment>\n#ifdef USE_MAP\nconst float photoRowScale='+rowScale+';\n'+tileNoise+'\n#endif');
+    if(field){
+      shader.uniforms.reliefDepth={value:field.depth};
+      shader.uniforms.reliefMid={value:field.mid};
+      shader.uniforms.reliefContrast={value:field.contrast};
+      shader.fragmentShader=shader.fragmentShader.replace('#include <map_pars_fragment>',
+        '#include <map_pars_fragment>\n#ifdef USE_MAP\nuniform float reliefDepth,reliefMid,reliefContrast;\n'+reliefTrace+'\n#endif');
+    }
+    const normalMaps=field ? T.ShaderChunk.normal_fragment_maps.replaceAll('vNormalMapUv','(vNormalMapUv+reliefUV-vMapUv)') : '#include <normal_fragment_maps>';
     shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`
-      float photoHeight=0.;
+      float photoHeight=0.,metricHeight=0.;
       #ifdef USE_MAP
-        vec4 photo=${profile.scatter?'groundPhoto(vMapUv)':'texture2D(map,vMapUv)'};
+        ${field?'vec2 dxUV=dFdx(vMapUv),dyUV=dFdy(vMapUv);vec2 reliefUV=traceRelief(vMapUv,dxUV,dyUV);':''}
+        vec4 photo=${field?'textureGrad(map,reliefUV,dxUV,dyUV)':profile.scatter?'groundPhoto(vMapUv)':'texture2D(map,vMapUv)'};
         float photoLuma=dot(photo.rgb,vec3(.2126,.7152,.0722));
         photoHeight=clamp(log2(max(.022,photoLuma))*.31,-1.45,.12);
+        metricHeight=${field?'reliefDepth*surfaceHeight(photo.rgb)':profile.relief.toFixed(6)+'*photoHeight'};
         ${substitute?'diffuseColor.rgb*=clamp(.99+.38*(photoHeight+.60),.72,1.23);':'diffuseColor*=photo;'}
       #endif`)
       .replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
@@ -104,15 +162,15 @@ function addRelief(m,type,substitute){
             ? 'roughnessFactor=clamp(roughnessFactor-.22*(photoHeight+1.01),.18,.32);'
             : 'roughnessFactor=clamp(roughnessFactor-.080*(photoHeight+.60),.17,1.);'}
         #endif`)
-      .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+      .replace('#include <normal_fragment_maps>',`${normalMaps}
         #ifdef USE_MAP
           // Screen-space height derivatives and position derivatives in metres
           // produce a scale-correct perturbation without uploading duplicate maps.
           vec3 px=dFdx(-vViewPosition),py=dFdy(-vViewPosition);
           vec3 r1=cross(py,normal),r2=cross(normal,px);
           float photoDet=dot(px,r1);
-          vec3 slope=(dFdx(photoHeight)*r1+dFdy(photoHeight)*r2)*
-            (${profile.relief.toFixed(6)}*sign(photoDet)/max(1.e-9,abs(photoDet)));
+          vec3 slope=(dFdx(metricHeight)*r1+dFdy(metricHeight)*r2)*
+            (sign(photoDet)/max(1.e-9,abs(photoDet)));
           normal=normalize(normal-slope*min(1.,.46/max(.001,length(slope))));
           // Fold subpixel normal variation into the microfacet width. Sharp
           // highlights on grain and stone then stay stable as the walker moves.
@@ -122,7 +180,7 @@ function addRelief(m,type,substitute){
           roughnessFactor=sqrt(sqrt(alpha*alpha+variance));
         #endif`);
   };
-  m.customProgramCacheKey=()=>key+'|surface-'+type+'-'+Number(substitute)+'-'+rowScale;
+  m.customProgramCacheKey=()=>key+'|surface-'+type+'-'+Number(substitute)+'-'+rowScale+'-'+Number(!!field);
   m.needsUpdate=true;
 }
 

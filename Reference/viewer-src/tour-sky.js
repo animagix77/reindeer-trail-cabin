@@ -21,18 +21,18 @@ export function atmosphere(hour,weather,sunDirection=null) {
   const twilight=1-smooth(.015,.30,Math.abs(alt+.015));
   const golden=smooth(-.095,.035,alt)*(1-smooth(.085,.38,alt));
   const blueHour=smooth(-.235,-.115,alt)*(1-smooth(-.065,.055,alt));
-  const zenith=color('#12213c').lerp(color('#337bb3'),day)
-    .lerp(color('#536baa'),golden*.64).lerp(color('#344e91'),blueHour*.84);
-  const horizon=color('#323f56').lerp(color('#d9e7ed'),day)
-    .lerp(color('#d8ac9b'),golden*.65).lerp(color('#8193ba'),blueHour*.91);
-  const cloudTint=color('#28354a').lerp(color(weather==='rain'?'#929faf':'#e2e9ee'),day)
-    .lerp(color('#dba9a0'),golden*.56).lerp(color('#737d9d'),blueHour*.75);
+  const zenith=color('#10223a').lerp(color('#367e98'),day)
+    .lerp(color('#6b7894'),golden*.85).lerp(color('#384d85'),blueHour*.90);
+  const horizon=color('#2b3b53').lerp(color('#b3d0c6'),day)
+    .lerp(color('#f7b17f'),golden*.94).lerp(color('#a68ca4'),blueHour*.85);
+  const cloudTint=color('#26364c').lerp(color(weather==='rain'?'#8497a0':'#e2e5d7'),day)
+    .lerp(color('#d99b83'),golden*.80).lerp(color('#777f9c'),blueHour*.78);
   zenith.lerp(cloudTint,cover*.61);
   horizon.lerp(cloudTint,cover*.65);
-  const sunTint=color('#ff985c').lerp(color('#fff1d9'),smooth(.025,.48,alt))
+  const sunTint=color('#ff9e57').lerp(color('#ffedc7'),smooth(.025,.48,alt))
     .lerp(color('#ecf1fa'),cover*.45);
-  const skyTint=color('#8ba4cc').lerp(color('#e3eeff'),day)
-    .lerp(color('#b4c4e4'),golden*.66).lerp(color('#a6b9ed'),blueHour*.85);
+  const skyTint=color('#8ba4cc').lerp(color('#d9efee'),day)
+    .lerp(color('#a9c7d4'),golden*.76).lerp(color('#a6b9ed'),blueHour*.85);
   const groundTint=color('#646b81').lerp(color('#b3a28f'),day)
     .lerp(color('#c49c84'),golden*.62).lerp(color('#696b88'),blueHour*.70);
   return {direction,day,twilight,golden,blueHour,zenith,horizon,cloudTint,sunTint,skyTint,groundTint,...weatherData};
@@ -96,10 +96,14 @@ export function createSky(scene) {
         float lowAir=exp(-5.1*up);
         vec3 color=mix(horizon,zenith,1.-exp(-2.75*up));
         float towardsSun=smoothstep(-.28,.97,dot(d,sunDirection));
-        // The cooler band opposite the sun meets the amber glow along the tree line.
-        float duskBelt=golden*clearFraction*(1.-towardsSun)*exp(-abs(up-.11)*9.);
-        color=mix(color,vec3(.56,.30,.39),.36*duskBelt);
-        color+=clearFraction*lowAir*(golden*(.12+.88*towardsSun)*vec3(.88,.29,.057)
+        // Long overlapping bands follow the real solar bearing. The warmest
+        // band stays low in the west; the opposite sky carries violet shade.
+        vec3 dusk=mix(horizon*vec3(1.02,.89,.94),vec3(1.18,.62,.24),towardsSun);
+        vec3 belt=mix(vec3(.35,.255,.36),vec3(.81,.324,.175),towardsSun);
+        dusk=mix(dusk,belt,smoothstep(.014,.22,up));
+        dusk=mix(dusk,zenith,smoothstep(.19,.65,up));
+        color=mix(color,dusk,golden*clearFraction*.89);
+        color+=clearFraction*lowAir*(golden*towardsSun*vec3(.48,.17,.044)
                                   +blueHour*towardsSun*vec3(.31,.094,.043));
         color+=clearFraction*(day+blueHour*.24)*sunTint*
                (pow(sunDot,11.)*.17+pow(sunDot,85.)*.24+pow(sunDot,650.)*.31);
@@ -111,7 +115,7 @@ export function createSky(scene) {
         color=mix(color,cloudTint*(.98+.26*towardsSun),layers.y*(.20+.21*cloudCover));
         color=mix(color,cloudLight,layers.x*(.88+.09*cloudCover));
         float transmission=(1.-layers.x*.985)*(1.-layers.y*.45);
-        float disc=smoothstep(.999972,.999994,sunDot);
+        float disc=smoothstep(.99991,.999956,sunDot);
         color+=transmission*clearFraction*smoothstep(-.025,.035,sunDirection.y)*sunTint*disc*5.5;
         color+=transmission*(1.-day)*vec3(.65,.75,.94)*
                (pow(moonDot,115.)*.064+smoothstep(.99990,.99997,moonDot)*1.45);

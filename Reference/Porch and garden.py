@@ -21,19 +21,33 @@ class Timberwork:
             across = Vector((-co, si, 0))
         across.normalize()
         normal = along.cross(across)
-        corners = [across*i*width/2 + normal*j*depth/2
-                   for i, j in [(-1,-1), (1,-1), (1,1), (-1,1)]]
+        # Planed cedar has eased long edges. Even a narrow bevel gives the
+        # sun a real face to catch along a rail, a deck plank or a table slat.
+        half_w, half_d = width/2, depth/2
+        bevel = min(.0032, min(width, depth)*.09)
+        section = [(-half_w+bevel,-half_d),(half_w-bevel,-half_d),
+                   (half_w,-half_d+bevel),(half_w,half_d-bevel),
+                   (half_w-bevel,half_d),(-half_w+bevel,half_d),
+                   (-half_w,half_d-bevel),(-half_w,-half_d+bevel)]
+        corners = [across*w + normal*d for w,d in section]
         first = len(self.vertices)
         self.vertices.extend(tuple(p+t) for p in (a,b) for t in corners)
         offset = (math.sin(first+1)*43758.5453) % 1
-        for face in [(3,2,1,0), (4,5,6,7), (0,1,5,4), (1,2,6,5), (2,3,7,6), (3,0,4,7)]:
+        count = len(corners)
+        for face in (tuple(reversed(range(count))), tuple(range(count,2*count))):
             self.faces.append(tuple(first+i for i in face))
-            across_face = across if face[0] in (0,2) else normal
             points = [Vector(self.vertices[first+i])-a for i in face]
-            if all(i < 4 for i in face) or all(i >= 4 for i in face):
-                self.face_uvs.append([(offset+p.dot(across)/2, p.dot(normal)/.30) for p in points])
-            else:
-                self.face_uvs.append([(offset+p.dot(along)/2.6, offset+p.dot(across_face)/.36) for p in points])
+            self.face_uvs.append([(offset+p.dot(across)/2, p.dot(normal)/.30) for p in points])
+        # Unwrap the grain continuously over each rounded corner.
+        perimeter = 0.
+        for i in range(count):
+            j = (i+1)%count
+            edge = (corners[j]-corners[i]).length
+            self.faces.append(tuple(first+k for k in (i,j,j+count,i+count)))
+            u0,u1 = offset,offset+length/2.6
+            v0,v1 = offset+perimeter/.36,offset+(perimeter+edge)/.36
+            self.face_uvs.append([(u0,v0),(u0,v1),(u1,v1),(u1,v0)])
+            perimeter += edge
 
     def finish(self):
         obj = mesh(self.name, self.vertices, self.faces, self.material, self.collection)
@@ -248,34 +262,32 @@ def hanging_pergola(timber, dark, chain, cushion, group, zone, tube, blocker, ro
                 dx=.019*math.cos(theta);z=cz+.035*math.sin(theta)
                 return pos(x+.13+(0 if j%2 else dx/ft),y-(dx/ft if j%2 else 0),z)
             wire([link(k) for k in range(13)],.0034,chain,5)
-        # In L1040572 the near basket has a padded seat folding up against
-        # its back. The seams and four button depressions catch the side light.
-        if i==0:
-            verts=[];faces=[];nr=12;ns=56
-            for layer in (0,1):
-                for ring in range(nr+1):
-                    r=ring/nr
-                    for seg in range(ns):
-                        a=math.tau*seg/ns
-                        dx=.359*r*math.cos(a)
-                        dy=.326*r*math.sin(a)+.019
-                        turn=max(0,math.sin(a))
-                        lift=r**2*(.084+.30*turn**1.3)
-                        puff=.073*(1-.73*r**3)+.011*math.cos(6*a)*r
-                        dimples=sum(.047*math.exp(-((dx-u)**2+(dy-v)**2)/.0019) for u in (-.12,.12) for v in (-.08,.12))
-                        h=.106+lift+(puff-dimples if layer else -.014)
-                        verts.append(pos(x+.13+dy/ft,y-dx/ft,bottom+h))
-            stride=(nr+1)*ns
-            for ring in range(nr):
+        # Both seats in L1040572 have canvas padding folded up against the wicker.
+        verts=[];faces=[];nr=12;ns=56
+        for layer in (0,1):
+            for ring in range(nr+1):
+                r=ring/nr
                 for seg in range(ns):
-                    v=ring*ns+seg;n=ring*ns+(seg+1)%ns
-                    faces.append((n,n+ns,v+ns,v))
-                    faces.append(tuple(k+stride for k in (v,v+ns,n+ns,n)))
+                    a=math.tau*seg/ns
+                    dx=.359*r*math.cos(a)
+                    dy=.326*r*math.sin(a)+.019
+                    turn=max(0,math.sin(a))
+                    lift=r**2*(.084+.30*turn**1.3)
+                    puff=.073*(1-.73*r**3)+.011*math.cos(6*a)*r
+                    dimples=sum(.047*math.exp(-((dx-u)**2+(dy-v)**2)/.0019) for u in (-.12,.12) for v in (-.08,.12))
+                    h=.106+lift+(puff-dimples if layer else -.014)
+                    verts.append(pos(x+.13+dy/ft,y-dx/ft,bottom+h))
+        stride=(nr+1)*ns
+        for ring in range(nr):
             for seg in range(ns):
-                v=nr*ns+seg;n=nr*ns+(seg+1)%ns
-                faces.append((v,n,n+stride,v+stride))
-            obj=mesh('Garden · tufted canvas basket cushion',verts,faces,cushion,group)
-            for face in obj.data.polygons:face.use_smooth=True
+                v=ring*ns+seg;n=ring*ns+(seg+1)%ns
+                faces.append((n,n+ns,v+ns,v))
+                faces.append(tuple(k+stride for k in (v,v+ns,n+ns,n)))
+        for seg in range(ns):
+            v=nr*ns+seg;n=nr*ns+(seg+1)%ns
+            faces.append((v,n,n+stride,v+stride))
+        obj=mesh(f'Garden · tufted canvas basket cushion {i+1}',verts,faces,cushion,group)
+        for face in obj.data.polygons:face.use_smooth=True
         round_blocker('HangingBasket'+str(i+1),pos(x+.13,y,ground-.02),.477,.516,1.72)
     # End and face attachment points on the top timber, in winding order.
     return [pos(x+dx,y,beam+.040) for dx,y in

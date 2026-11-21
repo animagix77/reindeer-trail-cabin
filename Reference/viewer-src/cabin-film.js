@@ -37,7 +37,7 @@ export function cabinFilm(renderer){
   }));
   const u={
     meterMap:{value:meterTargets[0].texture},meterInterval:{value:0},
-    daylightMeter:{value:0},
+    daylightMeter:{value:0},outdoorDay:{value:0},sunset:{value:0},
     indirectMap:{value:indirect.texture},indirectSize:{value:new THREE.Vector2(1,1)},
     depthMap:{value:image.depthTexture},imageMap:{value:image.texture},lightMap:{value:light.texture},
     pixel:{value:new THREE.Vector2(1,1)},lightPixel:{value:new THREE.Vector2(1,1)},
@@ -102,7 +102,7 @@ export function cabinFilm(renderer){
       if(dot(sunColor,vec3(1.))>.001){
         for(int i=0;i<12;i++)sum+=visibility(origin+ray*(float(i)+.5)*(reach/12.));
       }
-      float forward=.23+1.65*pow(max(0.,dot(ray,sunDir)),5.);
+      float forward=.12+1.58*pow(max(0.,dot(ray,sunDir)),8.);
       vec3 air=sunColor*(sum/12.)*reach*.00115*forward;
       gl_FragColor=vec4(glow*.16+air,1.);
     }`);
@@ -141,7 +141,7 @@ export function cabinFilm(renderer){
     varying vec2 coords;
     uniform sampler2D imageMap,lightMap,indirectMap,meterMap;
     uniform vec2 pixel,lightPixel,indirectSize;
-    uniform float exposureGain,daylightMeter;
+    uniform float exposureGain,daylightMeter,outdoorDay,sunset;
     ${projection}
     void main(){
       float z=viewDepth(coords);
@@ -170,6 +170,12 @@ export function cabinFilm(renderer){
       // A soft film shoulder preserves the warm lamp cores and cool blue hour.
       float luminance=dot(color,vec3(.2126,.7152,.0722));
       color*=mix(vec3(.97,.995,1.035),vec3(1.025,1.,.97),smoothstep(.025,.85,luminance));
+      // A cool toe keeps texture readable on the shaded cabin facade. Only
+      // sunlit values pick up amber; the clear night keeps its own exposure.
+      float shade=1.-smoothstep(.025,.26,luminance);
+      color+=vec3(.003,.008,.010)*shade*outdoorDay;
+      color*=mix(vec3(1.),vec3(1.11,.986,.83),sunset*smoothstep(.13,.82,luminance));
+      color=max(vec3(0.),mix(vec3(dot(color,vec3(.2126,.7152,.0722))),color,1.+.095*outdoorDay));
       color*=1.-.055*smoothstep(.21,.76,length(coords-.5));
       float eyeGain=daylightMeter>0.?texture2D(meterMap,vec2(.5)).g:1.;
       gl_FragColor=vec4(color*(exposureGain*eyeGain),1.);
@@ -207,6 +213,8 @@ export function cabinFilm(renderer){
       // No exposure compensation after dusk, including when using the torch.
       const dayWeight=THREE.MathUtils.smoothstep(lighting.daylight,.035,.48);
       u.daylightMeter.value=dayWeight;
+      u.outdoorDay.value=outdoors?dayWeight:0;
+      u.sunset.value=u.outdoorDay.value*lighting.goldenHour;
       const changedLight=Math.abs(lastSun-lighting.daylight)>.002 || lastSunDir.distanceToSquared(u.sunDir.value)>.0001;
       if(changedLight){lastSun=lighting.daylight;lastSunDir.copy(u.sunDir.value);}
       if(dayWeight>0 && (changedLight || lastEye.distanceToSquared(camera.position)>.008 ||

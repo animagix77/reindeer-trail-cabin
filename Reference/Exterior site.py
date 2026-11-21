@@ -799,14 +799,40 @@ def build_exterior_site():
         tail=Vector(a);tip=tail+d*length
         pts=[tail-u*width*.17,tail+u*width*.17,tip+u*width*.58,tip-u*width*.58]
         k=len(cards);cards.extend([tuple(p) for p in pts]);cardfaces.append((k,k+1,k+2,k+3));carduv.extend([(0,0),(1,0),(1,1),(0,1)])
+    trunk_uvs={}
     for i,(x,y,h) in enumerate(trees):
         root=Vector(wpos(x,y,-.07));rad=.12+h*.008*rng.uniform(.78,1.14)
         if abs(x-gate_right-.38)<.01:rad=.065
         if x==10.5:rad=.088
         skew=Vector((rng.uniform(-1.15,1.15),rng.uniform(-1.15,1.15),0))
         def stem(u):return root+skew*u*u+Vector((0,0,h*u))
-        segs=[0,.11,.32,.51,.69,.84,.97]
-        for a,b in zip(segs,segs[1:]):tube(bark,stem(a),stem(b),rad*(1-a)**.7,rad*(1-b)**.7,8)
+        # Broad furrows cast real shadows and break the lower trunk silhouette.
+        # The widest bark stays inside the original trunk radius used for walking.
+        levels=(0,.027,.071,.14,.32,.51,.69,.84,.97)
+        trunk_sides=20
+        wrap_count=max(1,round(math.tau*rad/.59))
+        verts=[];faces=[];coords=[]
+        for level in levels:
+            axis=stem(level)
+            for j in range(trunk_sides):
+                angle=math.tau*j/trunk_sides
+                drift=.085*math.sin(level*9+i)+level*.19
+                ridge=.5+.32*math.cos(5*angle+i*2.07)+.18*math.sin(3*angle+i)
+                depth=.065+.14*math.exp(-level*12)
+                radius=rad*(1-level)**.70*(1-depth*(1-ridge))
+                verts.append(axis+Vector((math.cos(angle+drift)*radius,math.sin(angle+drift)*radius,0)))
+        for row in range(len(levels)-1):
+            v0,v1=(i*.31+level*h*.58 for level in levels[row:row+2])
+            for j in range(trunk_sides):
+                a=row*trunk_sides+j;b=row*trunk_sides+(j+1)%trunk_sides
+                faces.append((a,b,b+trunk_sides,a+trunk_sides))
+                u0=wrap_count*j/trunk_sides+i*.23;u1=u0+wrap_count/trunk_sides
+                coords.append(((u0,v0),(u1,v0),(u1,v1),(u0,v1)))
+        faces.append(tuple(range(len(verts)-trunk_sides,len(verts))))
+        faces.append(tuple(reversed(range(trunk_sides))))
+        base_face=len(mats.get(bark,([],[]))[1])
+        push(bark,verts,faces)
+        trunk_uvs.update((base_face+j,uv) for j,uv in enumerate(coords))
         for j in range(12):
             a=(rng.random()+j*.62)*math.tau;lv=.41+j*.043+rng.uniform(-.033,.025)
             heading=Vector((math.cos(a),math.sin(a),0)); spread=(h*.20)*(1-max(0,lv-.68)*1.8)*rng.uniform(.67,1.1)
@@ -1068,6 +1094,9 @@ def build_exterior_site():
             ob=mesh('Hardwood trunks and primary limbs · lidar-guided crown locations',vs,faces,m,site_group)
             uv=ob.data.uv_layers.new(name='Bark grain')
             for face in ob.data.polygons:
+                if face.index in trunk_uvs:
+                    for li,coord in zip(face.loop_indices,trunk_uvs[face.index]):uv.data[li].uv=coord
+                    continue
                 for li in face.loop_indices:
                     v=ob.data.vertices[ob.data.loops[li].vertex_index].co
                     uv.data[li].uv=((v.x*.72+v.y*.91)*2,v.z*.45)

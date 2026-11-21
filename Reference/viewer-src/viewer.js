@@ -1,4 +1,5 @@
 import {installCabinSurfaces} from './cabin-surfaces.js';
+import {installWoodlandGrass} from './woodland-grass.js';
 import {cabinFilm} from './cabin-film.js';
 import {walkingGait} from './footsteps.js';
 import {installHallReflections} from './hall-reflections.js';
@@ -38,7 +39,7 @@ const woodland=installWoodlandSound();
 const flashlightButton=element('flashlight');
 let flashlight,floodlights,hallReflections,flashlightOn=false;
 let lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
-let renderer,worldActions;
+let renderer,worldActions,updateGrass;
 let activeView='outside';
 // Positions use glTF Y-up: Blender [x,y,z] maps to [x,z,-y].
 const starts={};
@@ -442,6 +443,7 @@ function render(firstFrame=false){
   const animateFire=fires?.update(camera,activeView,seconds);
   woodland.update(camera,outside,walking(),ringCenter,fires?.energy??0);
   const animateLeaves=surfaces?.update(camera,activeView,seconds,outside);
+  const animateGrass=updateGrass?.(camera,seconds,outside);
   const animateTree=treeLights?.update(camera,activeView,seconds,canvas.height);
   const animateGuests=party.update(seconds);
   const animateDoors=entryDoors?.update(camera,walking(),seconds);
@@ -452,7 +454,7 @@ function render(firstFrame=false){
   const cinematic=film && walking();
   const adapting=cinematic?film.render(world,camera,lighting,outside,seconds):false;
   if(!cinematic)renderer.render(world,camera);
-  if(!document.hidden && (adapting || animateFlood || animateSplitting || animateWood || animateLeaves || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
+  if(!document.hidden && (adapting || animateFlood || animateSplitting || animateWood || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
 }
 function updateState(button,enabled) {button.setAttribute('aria-pressed',String(enabled));}
 element('reset').addEventListener('click',reset);
@@ -584,6 +586,7 @@ async function show() {
   const ring=gltf.scene.getObjectByName('WalkBlock_FireRing');
   if(ring)ringCenter=new THREE.Box3().setFromObject(ring).getCenter(new THREE.Vector3());
   treeLights=installTreeLights(world,gltf.scene,reducedMotion);
+  updateGrass=installWoodlandGrass(world,gltf.scene,walkSpace,reducedMotion);
   surfaces=installCabinSurfaces(gltf.scene,renderer);
   await loading.preparing(3,'Lighting and drawing your first view');
   floodlights=installMotionFloodlights(world,gltf.scene,schedule);

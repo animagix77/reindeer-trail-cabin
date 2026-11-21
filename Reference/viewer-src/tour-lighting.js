@@ -11,6 +11,77 @@ import {installWeather} from './tour-weather.js';
 const reflectingSurfaces=/^(Water well · (?:cobalt enamel cap|weathered cap bolts|black conduit and gasket)|Grill ·|Front sash glass|Front basement window · glazing|Rear basement window · glazing|Fire ring · galvanized|Garden drain · galvanized|Patio stove · galvanized|Rear landing · galvanized|Propane cylinders|Suspension chains|Garden · steel|Path lights · aged pewter)/;
 const scenery=/^(Backdrop_|Light.*broadleaf|Daylight broadleaf|Hardwood bark|Oak and maple|Leaf litter|Cool-season|Paved public road|Street gate|Uphill front court|Front motor court|Blue lap siding|Midnight blue siding|Entry wing|Entry ·|Garage ·|Asphalt shingle|Porch ·|Timber$|Deck boards|Rainwater goods|Painted (?:block|fascia)|Weathered (?:fieldstone|timber|railing)|Fire circle|Firewood|Fire pit|Glacial boulder|Adirondack|Roadside masonry|Fine crushed gravel|Rear landing · weathered|Utility apron)/i;
 
+// Shape the existing surveyed woodland into broad light and shade. Nearby
+// bark and leaves retain their surface detail. Beyond them, successive stands
+// lose internal contrast and take on the color of the air between the trees.
+function woodlandPalette(model){
+  const uniforms={
+    woodDay:{value:0},woodSun:{value:new THREE.Vector3()},woodLight:{value:new THREE.Color()},
+    woodRidge:{value:new THREE.Color()},woodSkyline:{value:new THREE.Color()}
+  };
+  const done=new Set();
+  model.traverse(obj=>{
+    if(!obj.isMesh)return;
+    for(const material of Array.isArray(obj.material)?obj.material:[obj.material]){
+      if(done.has(material)||!material.isMeshStandardMaterial)continue;
+      const canopy=/^(Backdrop_Hardwood cutouts|Daylight broadleaf sprays)/.test(material.name);
+      const forestFloor=/^(Backdrop_Woodland floor|Leaf litter and low cover|Cool-season fescue)/.test(material.name);
+      if(!canopy && !forestFloor && !/^(Hardwood bark|Oak and maple branchwood)/.test(material.name))continue;
+      done.add(material);
+      const previous=material.onBeforeCompile,key=material.customProgramCacheKey();
+      material.onBeforeCompile=(shader,renderer)=>{
+        previous.call(material,shader,renderer);Object.assign(shader.uniforms,uniforms);
+        shader.fragmentShader=shader.fragmentShader.replace('#include <common>',
+          '#include <common>\nuniform float woodDay; uniform vec3 woodSun, woodLight, woodRidge, woodSkyline;');
+        if(forestFloor){
+          // Retain the traced UVs and relief at a visitor's feet. In the
+          // middle distance group the photographed litter into larger marks.
+          shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+            #ifdef USE_MAP
+              float broadFloor=woodDay*smoothstep(2.8,10.0,length(vViewPosition));
+              vec3 groundWash=diffuse*texture2D(map,vMapUv,2.8).rgb;
+              diffuseColor.rgb=mix(diffuseColor.rgb,groundWash,.86*broadFloor);
+            #endif`);
+        }
+        shader.fragmentShader=shader.fragmentShader
+          .replace('#include <opaque_fragment>',`
+            float woodsDepth=length(vViewPosition);
+            float woodsLuma=dot(outgoingLight,vec3(.2126,.7152,.0722));
+            float ink=woodsLuma/(woodsLuma+.11);
+            vec3 planes=mix(vec3(.006,.022,.025),vec3(.050,.116,.079),smoothstep(.12,.44,ink));
+            planes=mix(planes,woodLight,smoothstep(.52,.86,ink));
+            float relief=smoothstep(3.,19.,woodsDepth);
+            ${canopy?`
+            // The rounded crown normal follows the whole mass. Read a softer
+            // level of the leaf atlas for color groupings, keeping its fine
+            // alpha silhouette at the normal texture resolution.
+            float pigment=dot(texture2D(map,vMapUv,2.4).rgb,vec3(.21,.72,.07));
+            float sunPlane=dot(normal,normalize(mat3(viewMatrix)*woodSun))*.5+.5;
+            float plate=.45*ink+.33*pigment/(pigment+.10)+.22*sunPlane;
+            planes=mix(vec3(.006,.027,.035),vec3(.041,.113,.088),smoothstep(.355,.392,plate));
+            planes=mix(planes,woodLight*vec3(.50,.62,.54),smoothstep(.49,.54,plate));
+            planes=mix(planes,woodLight,smoothstep(.643,.698,plate));
+            planes*=.67+.43*smoothstep(.10,.72,ink);`:''}
+            vec3 woods=mix(outgoingLight,planes,${canopy?'.72+.18*relief':'.19+.47*relief'});
+            woods=mix(woods,woodRidge*(.56+.46*ink),.69*smoothstep(17.,40.,woodsDepth));
+            woods=mix(woods,woodSkyline*(.75+.27*ink),.84*smoothstep(46.,96.,woodsDepth));
+            outgoingLight=mix(outgoingLight,woods,woodDay);
+            #include <opaque_fragment>`);
+      };
+      material.customProgramCacheKey=()=>key+'|woodland-values-'+(canopy?'crown':forestFloor?'floor':'trunk');
+      material.needsUpdate=true;
+    }
+  });
+  return a=>{
+    const warmth=a.golden*(1-a.clouds);
+    uniforms.woodSun.value.copy(a.direction);
+    uniforms.woodLight.value.set('#b0bd72').lerp(new THREE.Color('#e39b45'),warmth);
+    uniforms.woodRidge.value.set('#417a80').lerp(new THREE.Color('#436675'),warmth);
+    uniforms.woodSkyline.value.set('#90b1a9').lerp(new THREE.Color('#c4866e'),warmth);
+    uniforms.woodDay.value=THREE.MathUtils.smoothstep(a.direction.y,-.11,.11)*(1-.24*a.clouds);
+  };
+}
+
 function yardReflection(model,renderer,point) {
   const proxy=new THREE.Scene(),swatches=new Map(),reflectors=new Set();
   const probeSky=createSky(proxy),air=atmosphere(13.5,'clear');
@@ -77,6 +148,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
   const sky=createSky(scene);
   const stars=installNightSky(scene);
   const weatherFX=installWeather(scene,model);
+  const setWoodlandPalette=woodlandPalette(model);
   const air=new THREE.FogExp2(0xd9e4e7,.0022);
   const hemisphere=new THREE.HemisphereLight(0xfff6e8,0xb3a28f,.91);
   scene.add(hemisphere);
@@ -179,10 +251,11 @@ export function installTourLighting(scene,renderer,model,arrival) {
     if(validWeather(conditions.weather))weather=conditions.weather;
     if('sunDirection' in conditions)sunDirection=conditions.sunDirection;
     const a=atmosphere(hour,weather,sunDirection);
+    setWoodlandPalette(a);
     sky.set(a);stars.set(hour,a,sunDirection?Date.now():null);
     lowSun=a.golden*(1-a.clouds);
-    air.color.copy(a.horizon).lerp(a.sunTint,.42*lowSun);
-    air.density=a.fog+.004*lowSun;
+    air.color.copy(a.horizon).lerp(a.cloudTint,.28);
+    air.density=a.fog+.0026*lowSun;
     renderer.toneMappingExposure=1.05+.16*lowSun;
     const availableLight=a.day*a.light;
     daylight=a.direction.y>0?availableLight:0;

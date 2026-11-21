@@ -17,6 +17,7 @@ if([...(manifest.images||[]),...(manifest.buffers||[])].some(item=>item.uri && !
 const js=(await build({entryPoints:[path.join(base,'viewer.js')],bundle:true,format:'iife',minify:true,legalComments:'inline',write:false,target:'es2022'})).outputFiles[0].text;
 const licenseFiles=['three/LICENSE','cannon-es/LICENSE','peerjs/LICENSE','peerjs-js-binarypack/LICENSE','eventemitter3/LICENSE','sdp/LICENSE','webrtc-adapter/LICENSE.md','@msgpack/msgpack/LICENSE'];
 const licenses=await Promise.all(licenseFiles.map(async file=>file.split('/LICENSE')[0]+'\n'+await fs.readFile(path.join(base,'node_modules',file),'utf8')));
+licenses.push(await fs.readFile(path.join(base,'Barlow-OFL.txt'),'utf8'));
 const license=licenses.join('\n\n').replaceAll('*/','* /');
 const refs=referencePath||path.join(base,'..');
 const [aerialPhoto,satellitePhoto,mapVectors]=await Promise.all([
@@ -37,7 +38,8 @@ const mapJSON=JSON.stringify({images:{
   satellite:'data:image/jpeg;base64,'+satellitePhoto.toString('base64')
 },lines}).replaceAll('<','\\u003c');
 const welcomePhoto=(await fs.readFile(path.join(base,'welcome-yard.webp'))).toString('base64');
-let template=await fs.readFile(path.join(base,'template.html'),'utf8');
+const displayFont=await fs.readFile(path.join(base,'BarlowCondensed-SemiBold.ttf'));
+let template=(await fs.readFile(path.join(base,'template.html'),'utf8')).replace('%%FIELD_FONT%%',displayFont.toString('base64'));
 for(const avatar of ['man','woman']){
   const portrait=await fs.readFile(path.join(base,'hiker-'+avatar+'.png'));
   template=template.replace('%%HIKER_'+avatar.toUpperCase()+'%%','data:image/png;base64,'+portrait.toString('base64'));
