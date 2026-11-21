@@ -51,9 +51,10 @@ let bob=0;
 const velocity=new THREE.Vector2();
 const finishMeshes=[],finishRay=new THREE.Raycaster(),down=new THREE.Vector3(0,-1,0);
 function footSurface(){
+  if(/^WalkSurface_Basement/.test(body.label))return /Wood|Bathroom/.test(body.label)?'wood':'pavement';
   if(/Bathroom/.test(body.label))return 'tile';
   if(/Gravel/.test(body.label))return 'gravel';
-  if(/Flagstone|WellFloor/.test(body.label))return 'pavement';
+  if(/Flagstone|WellFloor|ServiceDriveStep|LowerServiceStep|ExteriorServiceLanding/.test(body.label))return 'pavement';
   if(/ParcelGround|MainFloor/.test(body.label)){
     finishRay.ray.origin.set(body.x,body.y+.24,body.z);finishRay.ray.direction.copy(down);finishRay.far=.48;
     const hits=finishRay.intersectObjects(finishMeshes,false);
@@ -433,7 +434,7 @@ function render(firstFrame=false){
   if(!sceneCanRender || (firstFrame!==true && (propertyMap.open || welcome.open || waterNotes.open || tourInterface.open)))return;
   const seconds=performance.now()/1000;
   const outside=outdoorsFloor(body?.label);
-  lighting?.update(camera.position,activeView,seconds,camera,outside);
+  lighting?.update(camera.position,activeView,seconds,camera,outside,body?.label);
   flashlight?.update(camera,walking(),outside,flashlightOn);
   const animateFlood=floodlights?.update(camera.position,walking() && outside,lighting?.daylight??1,seconds,walking());
   const animateSplitting=woodSplit?.update(activeView,seconds,velocity.lengthSq()>.0025);

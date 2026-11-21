@@ -1,9 +1,8 @@
 """Furnished main-floor bedrooms, bathroom, kitchen and dining reconstructed from the appraisal sketch and owner photography.
-The interior partitions and exact openings are estimates. Appraisal page 16 documents lower-level services; the by-arrangement laundry entrance position is unverified.
+The interior partitions and exact openings are estimates. Appraisal page 16 documents lower-level services. Interior partitions and the exterior threshold are estimated.
 Local plan X/Y feet, relative Z metres. UI collision geometry is separately identified by name.
 """
 rooms_extra=coll('13 · Kitchen, bedrooms, bath and circulation')
-private_extra=coll('14 · Owner reference only · basement and service spaces')
 def _furnish_remaining():
     from math import sin,cos,pi,exp,sqrt
     from mathutils import Matrix,Vector,Euler
@@ -917,84 +916,10 @@ def _furnish_remaining():
     finish(rack);finish(foyer)
     tree_script=work/'Christmas tree.py'
     exec(compile(tree_script.read_text(),str(tree_script),'exec'),{**globals(),**locals()})
-    # Private reference fit-out. No connection to the published camera route. The source documents establish these facilities,
-    # but do not resolve the laundry room's exact location or a separate outdoor threshold.
-    basement=group('Private lower level | two garage bays, den posts and laundry service equipment',collection=private_extra)
     base=low-main
-    bx(basement,19.97,20.26,3.28,27.72,base+.02,base+2.35,terr)
-    for yy in (9.5,17.5,23.5):cyl(basement,28.0,yy,base+.025,base+2.38,.077,whitewood)
-    # Listing photos 087/088 identify the newer graphite all-in-one unit.
-    # Keep its plan position provisional within the private lower-level study.
-    flats=group('Private lower level | front-load wash and dry combo, holding tank and water heater',collection=private_extra)
-    case=material('Laundry · brushed graphite cabinet','#625e5d',.49,.32)
-    hatch=material('Laundry · smoked drum glazing','#302e2e',.37,.18)
-    bezel=material('Laundry · soft silver rim','#aaa5a1',.69,.29)
-    wx,wy=33.56,21.99
-    bx(flats,wx-1.13,wx+1.13,wy,wy+2.53,base+.026,base+1.036,case)
-    def round_control(x,z,depth,r,material,sides):
-        line(flats,(x,wy-.004,z),(x,wy-depth,z),r,material,sides)
-    round_control(wx,base+.554,.034,.310,bezel,56)
-    round_control(wx,base+.554,.049,.298,rail,56)
-    round_control(wx,base+.555,.058,.240,hatch,56)
-    bx(flats,wx-.98,wx-.31,wy-.02,wy-.004,base+.883,base+.998,case)
-    bx(flats,wx-.92,wx-.35,wy-.023,wy-.019,base+.901,base+.916,rail)
-    round_control(wx,base+.960,.043,.044,bezel,28)
-    round_control(wx,base+.960,.048,.037,rail,28)
-    bx(flats,wx+.35,wx+.99,wy-.023,wy-.004,base+.927,base+.976,hatch)
-    bx(flats,wx-1.032,wx-.48,wy-.016,wy-.004,base+.055,base+.168,case)
-    cyl(flats,38.33,22.67,base+.03,base+1.35,.27,material('Pressure vessel · blue','#38618b'),18)
-    cyl(flats,38.42,20.01,base+.035,base+1.43,.26,steel,18)
-    # Owner confirms an enclosed WC downstairs, reached from outside. Photos do not establish its location or which
-    # outside door serves it. Keep the following movable, editable layout as an owner reference and off the renter route.
-    powder=group('Private lower level | enclosed half bath · layout estimated',collection=private_extra)
-    ax,bxw,ay,by=31.10,36.24,15.52,20.73
-    for xx in (ax,bxw):bx(powder,xx-.09,xx+.09,ay,by,base+.01,base+2.06,whitewood)
-    bx(powder,ax,bxw,by-.09,by+.09,base+.01,base+2.06,whitewood)
-    bx(powder,ax,ax+.58,ay-.09,ay+.09,base+.01,base+2.06,whitewood)
-    bx(powder,ax+3.15,bxw,ay-.09,ay+.09,base+.01,base+2.06,whitewood)
-    bx(powder,ax+.58,ax+3.15,ay-.09,ay+.09,base+1.94,base+2.06,whitewood)
-    bx(powder,ax+.63,ax+3.10,ay-.065,ay+.061,base+.018,base+1.923,cream)
-    # IMG_4398 looks through the door at two facing fixtures on the side walls.
-    # Their relationship is photographed; the exterior entrance position is inferred.
-    wc_y=18.79
-    bx(powder,31.23,31.77,wc_y-.65,wc_y+.65,base+.32,base+.754,ivory,6)
-    bx(powder,31.21,31.80,wc_y-.675,wc_y+.675,base+.750,base+.784,ivory,8)
-    cyl(powder,31.52,wc_y,base+.783,base+.788,.023,steel,18)
-    bx(powder,31.47,32.78,wc_y-.38,wc_y+.38,base+.023,base+.32,ivory,6)
-    rings=[]
-    for rx,ry,h in ((.59,.42,.224),(.84,.59,.295),(.88,.62,.42),(.70,.44,.421),(.49,.32,.31)):
-        rings.append([powder.vert(((32.37+rx*cos(pi*j/20))*ft,(wc_y+ry*sin(pi*j/20))*ft,base+h)) for j in range(40)])
-    for row,nxt in zip(rings,rings[1:]):
-        for j in range(40):powder.face([row[j],row[(j+1)%40],nxt[(j+1)%40],nxt[j]],ivory,smooth=True)
-    powder.face(rings[-1],mirror)
-    # A white two-door vanity supports an integral oval basin and arched mixer.
-    vx,vy=35.42,18.37
-    bx(powder,34.71,36.10,16.97,19.78,base+.05,base+.77,whitewood,5)
-    for y0,y1 in ((17.03,18.36),(18.38,19.71)):
-        bx(powder,34.67,34.73,y0,y1,base+.12,base+.73,cream,3)
-        bx(powder,34.65,34.681,y0+.12,y1-.12,base+.18,base+.65,whitewood)
-    for yy in (18.20,18.52):line(powder,(34.67,yy,base+.61),(34.59,yy,base+.61),.012,steel,10)
-    outer=[];rim=[];well=[]
-    for j in range(40):
-        t=2*pi*(j+.5)/40;c=cos(t);sn=sin(t)
-        mul=1/max(abs(c),abs(sn))
-        outer.append(powder.vert(((vx+.779*c*mul)*ft,(vy+1.436*sn*mul)*ft,base+.800)))
-        rim.append(powder.vert(((vx+.511*c)*ft,(vy+.855*sn)*ft,base+.798)))
-        well.append(powder.vert(((vx+.180*c)*ft,(vy+.267*sn)*ft,base+.704)))
-    for j in range(40):
-        k=(j+1)%40
-        powder.face([outer[j],outer[k],rim[k],rim[j]],ivory)
-        powder.face([rim[j],rim[k],well[k],well[j]],ivory,smooth=True)
-    powder.face(well,ivory);cyl(powder,vx,vy,base+.705,base+.708,.018,steel,16)
-    bx(powder,36.125,36.196,16.93,19.81,base+.792,base+.867,ivory,3)
-    for a,b in zip(((36.00,vy,base+.799),(35.99,vy,base+.926),(35.82,vy,base+.967)),
-                   ((35.99,vy,base+.926),(35.82,vy,base+.967),(35.69,vy,base+.909))):
-        line(powder,a,b,.013,steel,12)
-    for yy in (vy-.21,vy+.21):cyl(powder,36.0,yy,base+.798,base+.865,.021,steel,12)
-    privwc=finish(powder);privwc['evidence']='Owner-confirmed enclosed basement half bath accessed outdoors. IMG_4398 shows opposite-facing toilet and white vanity. Placement of the room within the basement is inferred.'
-    finish(basement);finish(flats)
-    flat('Private · den floor',20.32,40.76,3.28,25.80,base+.027,flank,4.7,private_extra)
-    private_extra['visibility_note']='Owner reference only; not included in renter walk. Exact basement partition and appliance locations inferred.'
+    for name in ('Basement interior.py','Basement fixtures.py','Basement utilities.py'):
+        script=work/name
+        exec(compile(script.read_text(),str(script),'exec'),{**globals(),**locals()})
     # Views and local fill lights for Blender. The same room stations are available to the browser in the route specification.
     for tag,p,t,power,radius in [('Kitchen',(33,20.2,2.30),(36,20.2,.8),105,1.6),('Dining',(26.4,23.4,2.02),(25,22,.65),55,1.15),('Queen room',(16.3,10,2.23),(15.6,11.5,.52),57,1.45),('Bunk room',(4.1,9.2,1.99),(4.0,5.6,.8),33,.95),('Double room',(36.6,8.4,2.13),(35.8,8.5,.57),40,1.0),('Bathroom',(27.3,5.1,2.06),(25.7,4.7,.99),35,.72),('Front hall',(31.0,5.2,2.06),(31.0,3.0,.60),37,.98)]:
         area_light('Room daylight · '+tag,p,t,power,radius,(1,.91,.80))

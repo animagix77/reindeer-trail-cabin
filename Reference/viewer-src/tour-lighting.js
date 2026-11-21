@@ -132,6 +132,17 @@ export function installTourLighting(scene,renderer,model,arrival) {
   const stepBounce={p:new THREE.Box3().setFromObject(middleStep).getCenter(new THREE.Vector3())
     .add(new THREE.Vector3(1.1,1.25,.65)),color:0xffc88e,power:0,range:3.7};
   zones.push(stepBounce);
+  // A practical light follows its modeled diffuser if the basement layout changes.
+  model.traverse(fixture=>{
+    if(!fixture.name.startsWith('BasementLamp_') || fixture.parent?.name.startsWith('BasementLamp_'))return;
+    const p=new THREE.Box3().setFromObject(fixture).getCenter(new THREE.Vector3());
+    const threshold=fixture.name==='BasementLamp_Areaway';
+    if(threshold)p.add(new THREE.Vector3(-.016,0,.17)); // Put the bulb's pool in front of its wall mount.
+    p.y-=.10;
+    const bathroom=fixture.name==='BasementLamp_Bathroom';
+    zones.push({p,color:threshold?0xffdfb7:0xfff1df,power:threshold?2.8:bathroom?5:11,
+      range:threshold||bathroom?3.3:5.4,basement:true,threshold});
+  });
   const cafeLights=installCafeLights(scene,model);
   const lamps=Array.from({length:3},()=>{const l=new THREE.PointLight(0xffffff,0,4,2);scene.add(l);return l;});
   let zoneKey=null,stateKey='',lampGain=1,daylight=1,lowSun=0;
@@ -208,7 +219,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
     get daylight(){return daylight;},
     get goldenHour(){return lowSun;},
     get animated(){return weatherFX.animated || stars.animated;},
-    update(eye,mode,seconds=performance.now()/1000,camera,outdoors=false){
+    update(eye,mode,seconds=performance.now()/1000,camera,outdoors=false,floor=''){
       const walking=mode!=='property';
       if((walking && outdoors)!==outdoor){outdoor=walking && outdoors;applyEnvironment();}
       sky.place(eye,walking);
@@ -219,7 +230,11 @@ export function installTourLighting(scene,renderer,model,arrival) {
       weatherFX.update(eye,!walking,seconds,renderer.domElement.height);
       const k=mode+'|'+(model.userData.lightRevision||0);
       if(k!==stateKey){renderer.shadowMap.needsUpdate=true;stateKey=k;}
-      const nearest=walking?zones.map((z,i)=>[i,z.p.distanceToSquared(eye)]).filter(([i,d])=>d<58 && zones[i].power>.01)
+      const downstairs=/^WalkSurface_Basement/.test(floor);
+      const nearest=walking?zones.map((z,i)=>[i,z.p.distanceToSquared(eye)]).filter(([i,d])=>{
+        const z=zones[i];
+        return d<58 && z.power>.01 && (Boolean(z.basement)===downstairs || (z.threshold && outdoors));
+      })
         .sort((a,b)=>a[1]-b[1]).slice(0,3).map(pair=>pair[0]):[];
       const key=nearest.join('/');
       if(key!==zoneKey) {

@@ -81,10 +81,15 @@ def build_exterior_site():
     # counterviews of the two flights, the tanks and the retaining wall.
     service_toe,service_head=7.50,13.20
     service_front,service_rail,service_back=29.05,32.65,38.85
-    service_end=26.09
+    service_end=27.72
     service_z=366.56
-    well_x0,well_x1=21.47,24.62
-    well_y0,well_y1=27.04,34.45
+    # Descend across the apron before turning beneath the low deck edge.
+    well_start,well_foot,well_end=16.12,24.24,service_end
+    well_south,well_north=31.75,35.15
+    well_door_y=26.
+    well_bottom=low+.025
+    lower_cutouts=((well_start,well_end,well_south,well_north),
+                   (well_foot,well_end,well_door_y,well_south))
     start_x,turn_x=4.8,28.55
     well_head=(4.45,-4.70)
     def center_y(x):
@@ -139,9 +144,11 @@ def build_exterior_site():
         z=mix(z,flight-.018,fade(d,1.3))
         apron=extents(x,y,service_head,service_end,service_front,service_back)
         z=mix(z,service_z-.095,fade(apron,2.1))
-        d=extents(x,y,well_x0,well_x1,well_y0,well_y1)
-        basement_cut=service_z-.20-.98*sclip((well_y1-y)/(well_y1-well_y0-1.20))
-        z=mix(z,basement_cut,fade(d,.55))
+        # The visible terrain is clipped away inside the stair and landing.
+        # Only the retained soil exists here: dropping its boundary vertices
+        # to tread height left upright leaf-textured triangles above the walls.
+        shoulder=extents(x,y,well_start-.6,well_end+2.4,well_door_y-1.7,well_north+1.8)
+        z=mix(z,service_z-.085,fade(shoulder,4.8))
         # Outer side of porch steps, modest cut into the uphill grade.
         d=extents(x,y,40.1,48.65,deck_stair_y0-.40,deck_stair_y1+3.05)
         z=mix(z,dp-.87,fade(d,3.5))
@@ -233,7 +240,7 @@ def build_exterior_site():
         for rect in ((0,21,3,29),(21,22,3,26),(22,41,0,26),
                      (service_toe,service_head,service_front,service_rail),
                      (service_head,service_end,service_front,service_back),
-                     (well_x0,well_x1,well_y0,well_y1)):
+                     *lower_cutouts):
             rem=[]
             for piece in parts:rem.extend(cut_rect(piece,rect))
             parts=rem
@@ -298,8 +305,8 @@ def build_exterior_site():
     lower_stair_end=deck_stair_y1+2*1.14
     lower_stair_side=46.76
     landing_end=48.29
-    X=sorted(set([-40+i*2 for i in range(52)]+[0,21,22,23,29,33,41,stair_toe,lower_stair_side,landing_end,4.8,-2.4,1.8,11.15,19.25,service_toe,service_head,service_end,well_x0,well_x1]))
-    Y=sorted(set([-22+i*2 for i in range(52)]+[0,3,26,29,36,-5,-5-entry_steps,-9.7,-5.7,26.15,deck_stair_y0,deck_stair_y1,lower_stair_end,service_front,service_rail,service_back,well_y0,well_y1]))
+    X=sorted(set([-40+i*2 for i in range(52)]+[0,21,22,23,29,33,41,stair_toe,lower_stair_side,landing_end,4.8,-2.4,1.8,11.15,19.25,service_toe,service_head,service_end,well_start,well_foot]))
+    Y=sorted(set([-22+i*2 for i in range(52)]+[0,3,26,29,36,-5,-5-entry_steps,-9.7,-5.7,26.15,deck_stair_y0,deck_stair_y1,lower_stair_end,service_front,service_rail,service_back,well_south,well_north]))
     v=[];fs=[]
     for j,y in enumerate(Y):
         for i,x in enumerate(X):
@@ -310,7 +317,7 @@ def build_exterior_site():
             if not contained(midx,midy):continue
             if (service_toe<=midx<=service_head and service_front<=midy<=service_rail or
                 service_head<=midx<=service_end and service_front<=midy<=service_back or
-                well_x0<=midx<=well_x1 and well_y0<=midy<=well_y1):
+                any(a<=midx<=b and c<=midy<=d for a,b,c,d in lower_cutouts)):
                 continue
             omit=(0<=midx<=22 and 3<=midy<=26 or 22<=midx<=41 and 0<=midy<=26 or 0<=midx<=21 and 26<=midy<=29 or 23<=midx<=41 and 26<=midy<=36 or 41<=midx<=landing_end and deck_stair_y0<=midy<=deck_stair_y1 or stair_toe<=midx<=lower_stair_side and deck_stair_y1<=midy<=lower_stair_end or 29<=midx<=33 and -5-entry_steps<=midy<=0 or -2.4<=midx<=4.8 and -9.7<=midy<=-5.7)
             if omit:continue
@@ -456,25 +463,59 @@ def build_exterior_site():
                 push(flag_rng.choice(flags),top+bottom,faces)
                 x=end
         rectsurf('UtilityFlagstoneApron',x0,x1,y0,y1,service_z+.003)
-    flagstone_region(service_head,well_x0,service_front,well_y1)
-    flagstone_region(well_x1,service_end,service_front,well_y1)
-    flagstone_region(service_head,service_end,well_y1,service_back)
-    # The separate areaway descends toward the wall beneath the porch. The
-    # bottom is a closed exterior well; no basement interior is inferred.
-    well_step=.99
-    for j in range(6):
-        yb=well_y1-j*well_step;ya=yb-well_step;h=service_z-(j+1)*.157
-        concrete_slab('Apron · lower concrete service tread',well_x0,well_x1,ya,yb,h,service_z-1.19,service_finish)
-        rectsurf('LowerServiceStep'+str(j),well_x0,well_x1,ya,yb,h+.003)
-    bottom=service_z-1.099
-    foot_y=well_y1-6*well_step
-    concrete_slab('Apron · base of service well',well_x0,well_x1,well_y0,foot_y,bottom,bottom-.12,service_finish)
-    rectsurf('UtilityWellFloor',well_x0,well_x1,well_y0,foot_y,bottom+.003)
-    for xx in (well_x0-.11,well_x1):
-        plank(riser,xx,xx+.11,well_y0,well_y1,bottom-.06,service_z-.014)
-        blocker('UtilityWellCheek',pos(xx+.05,well_y0,bottom-.03),pos(xx+.05,well_y1,bottom-.03),.032,1.105)
-    plank(riser,well_x0,well_x1,well_y0-.12,well_y0,bottom-.06,service_z-.01)
-    blocker('UtilityWellEnd',pos(well_x0,well_y0,bottom-.03),pos(well_x1,well_y0,bottom-.03),.05,1.10)
+    flagstone_region(service_head,well_foot,service_front,well_south)
+    flagstone_region(service_head,well_start,well_south,well_north)
+    flagstone_region(service_head,service_end,well_north,service_back)
+
+    # Seven treads and an eighth equal rise to the drained lower landing.
+    run=(well_foot-well_start)/7
+    rise=(service_z-well_bottom)/8
+    tread_finish=mapped('Areaway · gray poured concrete','Front court concrete.jpg')
+    groove=mat('Areaway · scored tread grooves','#77736c',0,.92)
+    for j in range(7):
+        xa=well_start+j*run
+        h=service_z-rise*(j+1)
+        concrete_slab('Areaway · concrete tread',xa,xa+run,well_south,well_north,h,well_bottom-.12,tread_finish)
+        # Scored lines and a slight overhanging nose reveal the change of level
+        # when the stair is seen from above in the shadow of the deck.
+        plank(riser,xa+run-.025,xa+run+.046,well_south+.012,well_north-.012,h-.032,h-.004)
+        for inset in (.13,.20):
+            x=xa+run-inset
+            plank(groove,x,x+.019,well_south+.055,well_north-.055,h+.0006,h+.0012)
+        rectsurf('LowerServiceStep'+str(j),xa,xa+run,well_south,well_north,h+.003)
+    concrete_slab('Areaway · lower landing',well_foot,well_end,well_door_y,well_north,well_bottom,well_bottom-.12,tread_finish)
+    rectsurf('ExteriorServiceLanding',well_foot,well_end,well_door_y,well_north,well_bottom+.003)
+    # The side cheeks continue around the corner without crossing either opening.
+    top=service_z+.025
+    cheeks=[(well_start,well_north+.08,well_end+.08,well_north+.08),
+            (well_start,well_south-.08,well_foot-.08,well_south-.08),
+            (well_foot-.08,well_door_y,well_foot-.08,well_south),
+            (well_end+.08,well_door_y,well_end+.08,well_north+.16)]
+    for i,(x0,y0,x1,y1) in enumerate(cheeks):
+        mid=(top+well_bottom-.12)/2
+        prism(riser,pos(x0,y0,mid),pos(x1,y1,mid),.055,top-well_bottom+.12)
+        # Cast caps conceal the joint at the grade. The slight overhang is
+        # above the cheek and outside the walking line.
+        prism(riser,pos(x0,y0,top+.008),pos(x1,y1,top+.008),.085,.020)
+        blocker('AreawayRetainer'+str(i),pos(x0,y0,well_bottom-.12),pos(x1,y1,well_bottom-.12),.055,top-well_bottom+.12)
+    rail_y=well_north-.12
+    for j in (0,3,6):
+        x=well_start+(j+.44)*run;z=service_z-rise*(j+1)
+        tube(rail_paint,pos(x,rail_y,z),pos(x,rail_y,z+.84),.015,.015,12)
+        tube(rail_paint,pos(x,rail_y,z),pos(x,rail_y,z+.023),.049,.049,14)
+    tube(rail_paint,pos(well_start-.14,rail_y,service_z+.736),
+         pos(well_foot+.14,rail_y,well_bottom+.884),.022,.022,14)
+    for yy in (well_south-.11,well_north+.10):
+        for j in range(4):
+            x=well_start+1.05+j*1.8
+            tube(rail_paint,pos(x,yy,top),pos(x,yy,top+.86),.015,.015,10)
+        for h in (.45,.86):
+            tube(rail_paint,pos(well_start+1.05,yy,top+h),pos(well_start+6.45,yy,top+h),.017,.017,10)
+        blocker('AreawayGuard',pos(well_start+1.05,yy,top-.03),pos(well_start+6.45,yy,top-.03),.05,.92)
+    plank(drain_metal,well_foot+.14,well_end-.14,26.48,26.80,well_bottom+.0008,well_bottom+.003)
+    for j in range(26):
+        x=well_foot+.20+j*(well_end-well_foot-.45)/25
+        plank(graphite,x,x+.038,26.51,26.77,well_bottom+.003,well_bottom+.0045)
     for desc,p,q in [('DeckSouth',(23,35.85),(41,35.85)),('DeckEast',(23.15,26.1),(23.15,35.8)),('DeckWestReturn',(40.75,26.15),(40.75,deck_stair_y0)),('EntryWestRail',(33,-4.8),(33,-.1)),('EntryEastRail',(29,-4.8),(29,-.1))]:
         blocker(desc,pos(*p,dp),pos(*q,dp),.08,.93)
     # Timber retaining wall crossing the entry approach. Leave a stair break in it.

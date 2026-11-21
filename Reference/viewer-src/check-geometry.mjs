@@ -249,6 +249,156 @@ const stairRoute=[[25.35,20.16],[19.9,19.56],[16.94,19.35],[16.94,16.83],[15.65,
 assert.equal(traverseRoute('Tree nook to loft',stairRoute).label,'WalkSurface_LoftLanding');
 assert.equal(traverseRoute('Loft down to tree nook',[...stairRoute].reverse(),2.21).label,'WalkSurface_MainFloor_west');
 traverseRoute('Woodpile to the fire ring between the chairs',[[34.65,46.92],[32.,46.2],[30.4,47.6],[30.1,50.6],[29.1,52.5]],-1.11);
+// A visitor reaches the lower level from the two actual outdoor starts, walks
+// to each fixture at standing height, and retraces the same steps to daylight.
+function checkBasement(){
+  const solid=[];
+  scene.traverse(mesh=>{
+    if(mesh.isMesh && !/^Walk(Surface|Block)_/.test(mesh.userData.part)){
+      solid.push({mesh,bounds:new T.Box3().setFromObject(mesh)});
+    }
+  });
+  const probe=new T.Raycaster(),bounds=new T.Box3();
+  function firstVisible(a,b){
+    const length=a.distanceTo(b);
+    if(length<1e-7)return;
+    bounds.setFromPoints([a,b]).expandByScalar(.001);
+    probe.set(a,b.clone().sub(a).divideScalar(length));
+    probe.far=length;
+    return probe.intersectObjects(solid.filter(part=>part.bounds.intersectsBox(bounds)).map(part=>part.mesh),false)[0];
+  }
+  function assertClear(a,b,label){
+    const hit=firstVisible(a,b);
+    if(hit)assert.fail(label+' crosses '+hit.object.userData.part+' at '+hit.point.toArray().map(v=>v.toFixed(2)));
+  }
+  function clearance(start,end){
+    const dx=end.x-start.x,dz=end.z-start.z,length=Math.hypot(dx,dz);
+    if(length<1e-6)return;
+    // Sweep both shoulders, the shins, torso and eye line. The upward cast
+    // also catches an invisible crouch beneath a beam or a stair crossing a deck.
+    for(const side of [-.145,0,.145]){
+      const x=side*dz/length,z=-side*dx/length;
+      for(const h of [.29,1.05,1.60]){
+        assertClear(new T.Vector3(start.x+x,start.y+h,start.z+z),
+          new T.Vector3(end.x+x,end.y+h,end.z+z),'Basement approach');
+      }
+      assertClear(new T.Vector3(end.x+x,end.y+.19,end.z+z),
+        new T.Vector3(end.x+x,end.y+1.75,end.z+z),'Basement standing clearance');
+    }
+  }
+  const lowerFloor=-2.72+.027;
+  const destinations=points=>points.map(([x,y])=>at(x,y,0));
+  const apronAndDoor=destinations([[6.9,30.8],[14.8,30.8],[14.8,33.4],[25.86,33.4],[25.86,24.7]]);
+  const drivewayApproach=destinations([[-8.8,-8.2],[-8.8,30.8]]);
+  const gardenApproach=destinations([[10.2,48],[10,41],[9.5,35.1],[5.7,34.7],[5.7,30.8]]);
+  // Approach the panel from the tank aisle, angling away from the end of the
+  // den wall. Test left and right tracking through the bend; a line within
+  // millimetres of the corner passes scripted tests but snags human walkers.
+  function panelApproach(side){
+    return [[37.75+side*.20,13.1],[37.82+side*.12,12.1],[38.125+side*.34,11.4],[38.125+side*.34,6.9]];
+  }
+  const lowerVisit=destinations([
+    [25.86,19.35],[29.68,19.35],[29.68,18], // see the washer head-on across its floor space
+    [29.68,19.35],[26.15,19.35],[26.15,13.95],[33.86,13.95],[33.86,18.55],[33.86,13.95], // both bathroom fixtures
+    [37.60,13.95],[37.60,14.3],[37.60,17.5],[37.60,20.85],[37.75,14.0], // water system
+    ...panelApproach(-1),...panelApproach(1).reverse(),
+    [25.86,13.95],[25.86,6.8],[25.86,21.4],[16.5,21.4] // den and garage
+  ]);
+  function follow(body,points){
+    const floors=new Set();
+    for(const target of points){
+      const dx=target.x-body.x,dz=target.z-body.z,n=Math.ceil(Math.hypot(dx,dz)/.04);
+      let last=body;
+      for(let i=0;i<n;i++){
+        body=walks.move(body,dx/n,dz/n);
+        assert(body.eye>=1.58,'Unexpected crouch on '+body.label);
+        floors.add(body.label);
+        if(Math.hypot(body.x-last.x,body.z-last.z)>.43 || i===n-1){
+          clearance(last,body);
+          last=body;
+        }
+      }
+      assert(Math.hypot(body.x-target.x,body.z-target.z)<.025,
+        'Basement route stopped on '+body.label+' before '+target.toArray());
+    }
+    return {body,floors};
+  }
+  const serviceFlight=Array.from({length:5},(_,i)=>'WalkSurface_ServiceDriveStep'+i);
+  const lowerFlight=Array.from({length:7},(_,i)=>'WalkSurface_LowerServiceStep'+i);
+  const required=[...serviceFlight,...lowerFlight,'WalkSurface_ExteriorServiceLanding','WalkSurface_BasementServiceSlab'];
+  for(const [name,eyeHeight,approach,visit] of [
+    ['WalkSpawn_Outside',0,drivewayApproach,lowerVisit],
+    ['TourEye_yard',1.59,gardenApproach,[]]
+  ]){
+    const anchor=scene.getObjectByName(name).getWorldPosition(new T.Vector3());
+    const floor=anchor.y-eyeHeight;
+    const start=walks.spawn(anchor.x,anchor.z,floor+1.59,floor);
+    assert(start,'Missing walking start for '+name);
+    const path=[anchor,...approach,...apronAndDoor,...visit];
+    const there=follow(start,path.slice(1));
+    const back=follow(there.body,path.slice(0,-1).reverse());
+    const expected=visit.length?[...required,'WalkSurface_BasementBathroomFloor','WalkSurface_BasementDenWood','WalkSurface_BasementGarageSlab']:required;
+    for(const label of expected){
+      assert(there.floors.has(label) && back.floors.has(label),'Round trip from '+name+' bypassed '+label);
+    }
+    assert(Math.abs(back.body.y-start.y)<.025,'Returned to a different floor at '+name);
+  }
+
+  // Stair helpers must coincide with the actual tread tops at the center and
+  // both sides. Headroom and collision alone don't reveal a hovering avatar.
+  function topCheck(x,y,helper,visible){
+    const world=at(x,y,0),surface=walks.heights(world.x,world.z).find(f=>f.label===helper);
+    assert(surface,'Missing support '+helper);
+    const above=new T.Vector3(world.x,surface.y+.06,world.z);
+    const hit=firstVisible(above,above.clone().addScaledVector(down,.13));
+    assert(hit?.object.userData.part.startsWith(visible) && Math.abs(hit.point.y-surface.y)<.012,
+      helper+' does not meet its visible finish ('+hit?.object.userData.part+')');
+  }
+  for(const [index,x] of [8.07,9.21,10.35,11.49,12.63].entries()){
+    for(const y of [30.17,30.86,31.52])topCheck(x,y,serviceFlight[index],'Garage wing · concrete service tread');
+  }
+  for(const [index,x] of [16.70,17.86,19.02,20.18,21.34,22.50,23.66].entries()){
+    for(const y of [32.60,33.45,34.30])topCheck(x,y,lowerFlight[index],'Areaway · concrete tread');
+  }
+  topCheck(25.86,27.3,'WalkSurface_ExteriorServiceLanding','Areaway · lower landing');
+  topCheck(25.86,24.7,'WalkSurface_BasementServiceSlab','Basement · ServiceSlab');
+  topCheck(33.86,18.55,'WalkSurface_BasementBathroomFloor','Basement powder room | wood-look plank floor');
+
+  // Visible architectural faces, trim or soil must never occupy the clear
+  // doorway even if its collision opening still passes a centerline walk.
+  const local=(x,y,h)=>at(x,y,lowerFloor+h);
+  for(const x of [24.94,25.98,27.01]){
+    for(const h of [.15,.95,1.80])assertClear(local(x,27,h),local(x,24.8,h),'Basement threshold');
+  }
+  for(const [who,eye,look] of [
+    ...[-.35,0,.35].flatMap(drift=>[[-.74,.19],[0,.58],[.72,.94]].map(([offset,height])=>[
+      'Basement laundry | graphite front-loading wash and dry combo',[29.68+drift,18],[29.68+offset,22.80,height]
+    ])),
+    ['Basement powder room | dual-flush toilet with raised seat',[33.86,18.55],[31.6,18.65,.64]],
+    ['Basement powder room | vanity, molded basin and chrome mixer',[33.86,18.55],[35.77,18.55,.78]],
+    ['Basement | well pressure tank 1',[37.5,14.3],[39.64,14.3,1.00]],
+    ['Basement | well pressure tank 2',[37.5,17.5],[39.64,17.5,1.00]],
+    ['Basement | well manifold, gauge and distribution pipes',[37.5,15.88],[39.07,15.88,.59]],
+    ['Basement | 40 gallon electric water heater',[37.5,20.85],[39.64,20.85,1.00]],
+    ...[-1,1].map(side=>['Basement | electrical panel, open schedule door and protected breakers',
+      panelApproach(side).at(-1),[40.52,6.9,1.47]])
+  ]){
+    const hit=firstVisible(local(...eye,1.59),local(...look));
+    assert.equal(hit?.object.userData.part,who,'Obstructed view of '+who);
+  }
+  assert.equal(names.filter(n=>/^Basement \| well pressure tank \d+$/.test(n)).length,2);
+  const lamps=['Areaway','Bathroom','Den','Entry','Garage','PanelAisle','Service'].map(s=>'BasementLamp_'+s);
+  assert.deepEqual(names.filter(n=>n.startsWith('BasementLamp_')).sort(),lamps.sort());
+  for(const name of lamps){
+    const lamp=scene.getObjectByName(name).getWorldPosition(new T.Vector3());
+    const diffuser=name==='BasementLamp_Areaway'
+      ?firstVisible(lamp.clone().addScaledVector(inward,.30),lamp)
+      :firstVisible(lamp.clone().addScaledVector(down,.30),lamp.clone().addScaledVector(down,-.09));
+    assert.equal(diffuser?.object.userData.part,name,'Occluded ceiling diffuser '+name);
+  }
+}
+checkBasement();
+
 checkFirewood(scene,walks);
 checkWorldActions(scene,walks);
 const survey=JSON.parse(await fs.readFile(new URL('../model-geometry.json',import.meta.url),'utf8'));
@@ -316,5 +466,5 @@ assert(paved>.63,'Paving should cover roughly two-thirds of the developed fronta
 for(const [x,y,expected] of [[21.38,-20.7,hardFinishes[1]],[21.38,-17,hardFinishes[1]],[28,-15.9,hardFinishes[2]]]){
   assert.equal(hits(land,at(x,y,10),down)[0]?.object.material.name,expected,'Frontage finish at '+[x,y]);
 }
-console.log(`Checked ${primitives} mesh primitives, ${triangles.toLocaleString()} triangles and ${spawns} authored walk starts. Straight front hall, kitchen counter backing, side doorways, entry, front ground, well casing and stair access, pergola and deck lighting, tree nook closure, primary passage and loft stair checks passed.`);
+console.log(`Checked ${primitives} mesh primitives, ${triangles.toLocaleString()} triangles and ${spawns} authored walk starts. Straight front hall, kitchen counter backing, side doorways, entry, front ground, well casing and stair access, pergola and deck lighting, tree nook closure, primary passage, loft stairs and basement round trips passed.`);
 console.log('Developed frontage paving',Math.round(paved*1000)/10+'%',counts);

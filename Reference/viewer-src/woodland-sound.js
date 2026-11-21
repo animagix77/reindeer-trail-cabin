@@ -4,7 +4,7 @@ import {soleSound} from './footsteps.js';
 import {atmosphere} from './tour-sky.js';
 
 const tau=2*Math.PI;
-export const outdoorsFloor=label=>!!label && !/^WalkSurface_(MainFloor|Loft|Bathroom)/i.test(label);
+export const outdoorsFloor=label=>!!label && !/^WalkSurface_(MainFloor|Loft|Bathroom|Basement)/i.test(label);
 function random(seed){
   return ()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 }
