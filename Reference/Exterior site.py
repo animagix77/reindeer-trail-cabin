@@ -81,15 +81,35 @@ def build_exterior_site():
     # counterviews of the two flights, the tanks and the retaining wall.
     service_toe,service_head=7.50,13.20
     service_front,service_rail,service_back=29.05,32.65,38.85
-    service_end=27.72
-    service_z=366.56
-    # Descend across the apron before turning beneath the low deck edge.
-    well_start,well_foot,well_end=16.12,24.24,service_end
-    well_south,well_north=31.75,35.15
-    well_door_y=26.
+    # IMG_7621 looks straight out between the propane tanks and the porch edge.
+    # Two 170 mm risers tie the flagstones to the existing basement slab.
+    well_x0,well_x1=21.20,24.90
+    service_end=well_x1
+    well_door_y,well_head_y=26.,30.50
+    well_run=1.15
     well_bottom=low+.025
-    lower_cutouts=((well_start,well_end,well_south,well_north),
-                   (well_foot,well_end,well_door_y,well_south))
+    well_rise=.17
+    service_z=well_bottom+2*well_rise
+    lower_cutouts=((well_x0,well_x1,well_door_y,well_head_y),)
+    yard_z=365.85
+    # The gravel path swings around the downhill deck stair and enters
+    # the clearing before the near end of the photographed wood stack.
+    garden_path=[(44.96,deck_stair_y1+2*1.14),(45.65,38.86),(47.42,39.10),
+                 (49.56,38.57),(51.40,38.55),(52.80,39.45),(53.23,40.80),
+                 (52.70,42.10),(51.36,43.08),(49.02,43.64),(45.81,43.86),
+                 (42.75,43.74),(40.28,43.92),(38.26,44.55),(36.80,45.70)]
+    garden_length=sum(math.dist(a,b) for a,b in zip(garden_path,garden_path[1:]))
+    def garden_offset(x,y):
+        best=(float('inf'),0.)
+        along=0.
+        for (ax,ay),(bx,by) in zip(garden_path,garden_path[1:]):
+            dx,dy=bx-ax,by-ay;length=math.hypot(dx,dy)
+            t=sclip(((x-ax)*dx+(y-ay)*dy)/(length*length))
+            best=min(best,(math.hypot(x-ax-t*dx,y-ay-t*dy),along+t*length))
+            along+=length
+        return best
+    def apron_grade(y):
+        return mix(service_z,yard_z,sclip((y-33.4)/9.0))
     start_x,turn_x=4.8,28.55
     well_head=(4.45,-4.70)
     def center_y(x):
@@ -139,23 +159,35 @@ def build_exterior_site():
         driveDist=extents(x,y,-30.85,west_edge,-25,32)
         track=drive_grade(x,y)
         z=mix(z,track,fade(driveDist,4))
+        # Spread the fall to the garage stair foot along the outer driveway.
+        d=extents(x,y,-27.,service_toe,service_front,service_rail)
+        toe_z=service_z-.96
+        driveway_entry=mix(track,toe_z,sclip((x+27)/(service_toe+27)))
+        z=mix(z,driveway_entry,fade(d,8.0))
+        # The flags, the two-step threshold and the gently rising garden share
+        # one grade profile. Only the ground inside the actual treads is cut.
+        shoulder=extents(x,y,service_head,well_x1+2,well_door_y,43.)
+        z=mix(z,apron_grade(y)-.016,fade(shoulder,9.))
         d=extents(x,y,service_toe-2.0,service_head,service_front,service_rail)
-        flight=(service_z-.96)+.96*sclip((x-service_toe)/(service_head-service_toe))
-        z=mix(z,flight-.018,fade(d,1.3))
+        flight=toe_z+.96*sclip((x-service_toe)/(service_head-service_toe))
+        z=mix(z,flight-.018,fade(d,1.5))
         apron=extents(x,y,service_head,service_end,service_front,service_back)
-        z=mix(z,service_z-.095,fade(apron,2.1))
-        # The visible terrain is clipped away inside the stair and landing.
-        # Only the retained soil exists here: dropping its boundary vertices
-        # to tread height left upright leaf-textured triangles above the walls.
-        shoulder=extents(x,y,well_start-.6,well_end+2.4,well_door_y-1.7,well_north+1.8)
-        z=mix(z,service_z-.085,fade(shoulder,4.8))
+        z=mix(z,apron_grade(y)-.016,fade(apron,2.))
         # Outer side of porch steps, modest cut into the uphill grade.
         d=extents(x,y,40.1,48.65,deck_stair_y0-.40,deck_stair_y1+3.05)
         z=mix(z,dp-.87,fade(d,3.5))
         # Flatten the pictured gravel fire circle and feather the edges into the slope.
         r=math.hypot((x-24.85)/9.65,(y-55.4)/13.0)
         pad_edge=min(max(0,r-1)*9.65,extents(x,y,29.3,38.55,45.35,63.65))
-        z=mix(z,366.75+.0015*(x-25),fade(pad_edge,4.5))
+        # Give the clearing a broad shoulder where the stacked logs meet the
+        # drain. Tight interpolation to the DEM makes the two wood rows sit
+        # on different levels and exposes the gravel bed as a raised platform.
+        shoulder_width=4.5+13.5*sclip((y-service_back)/6.5)
+        z=mix(z,yard_z+.0015*(x-25),fade(pad_edge,shoulder_width))
+        if 30<x<60 and 32<y<53 and pad_edge>0:
+            offset,along=garden_offset(x,y)
+            path_z=mix(dp-.87,yard_z+.020,along/garden_length)
+            z=mix(z,path_z,fade(max(0.,offset-1.85),5.5)*sclip(pad_edge/1.7))
         return terrace_grade(x,y,z+retained_bank(x,y))
     build_photo_facades(zone)
     def wpos(x,y,extra=0):return pos(x,y,zone(x,y)+extra)
@@ -305,8 +337,8 @@ def build_exterior_site():
     lower_stair_end=deck_stair_y1+2*1.14
     lower_stair_side=46.76
     landing_end=48.29
-    X=sorted(set([-40+i*2 for i in range(52)]+[0,21,22,23,29,33,41,stair_toe,lower_stair_side,landing_end,4.8,-2.4,1.8,11.15,19.25,service_toe,service_head,service_end,well_start,well_foot]))
-    Y=sorted(set([-22+i*2 for i in range(52)]+[0,3,26,29,36,-5,-5-entry_steps,-9.7,-5.7,26.15,deck_stair_y0,deck_stair_y1,lower_stair_end,service_front,service_rail,service_back,well_south,well_north]))
+    X=sorted(set([-40+i*2 for i in range(52)]+[0,21,22,23,29,33,41,stair_toe,lower_stair_side,landing_end,4.8,-2.4,1.8,11.15,19.25,service_toe,service_head,service_end,well_x0,well_x1]))
+    Y=sorted(set([-22+i*2 for i in range(52)]+[0,3,26,29,36,-5,-5-entry_steps,-9.7,-5.7,26.15,deck_stair_y0,deck_stair_y1,lower_stair_end,service_front,service_rail,service_back,well_door_y,well_head_y,33.4,42.4]))
     v=[];fs=[]
     for j,y in enumerate(Y):
         for i,x in enumerate(X):
@@ -427,15 +459,16 @@ def build_exterior_site():
     for height in (.14,.83):
         tube(rail_paint,pos(service_toe,service_rail,service_z-.96+height),
              pos(service_head,service_rail,service_z+height),.014,.014,10)
-        tube(rail_paint,pos(service_head,service_rail,service_z+height),
-             pos(service_head,service_back,service_z+height),.014,.014,10)
+        for a,b in ((service_rail,33.4),(33.4,service_back)):
+            tube(rail_paint,pos(service_head,a,apron_grade(a)+height),
+                 pos(service_head,b,apron_grade(b)+height),.014,.014,10)
     for i in range(10):
         xx=service_toe+(service_head-service_toe)*i/9
         h=service_z-.96+.96*i/9
         tube(rail_paint,pos(xx,service_rail,h+.03),pos(xx,service_rail,h+.84),.010,.010,8)
     for i in range(11):
         yy=service_rail+(service_back-service_rail)*i/10
-        tube(rail_paint,pos(service_head,yy,service_z+.025),pos(service_head,yy,service_z+.85),.009,.009,8)
+        tube(rail_paint,pos(service_head,yy,apron_grade(yy)+.025),pos(service_head,yy,apron_grade(yy)+.85),.009,.009,8)
     blocker('ServiceDriveRail',pos(service_toe,service_rail,service_z-.98),
             pos(service_head,service_rail,service_z-.02),.043,.90)
     blocker('ServiceApronGuard',pos(service_head,service_rail,service_z-.90),
@@ -445,7 +478,9 @@ def build_exterior_site():
     flag_rng=random.Random(7620)
     def flagstone_region(x0,x1,y0,y1):
         # Irregular broken corners, staggered across each course, match IMG_7620.
-        plank(riser,x0,x1,y0,y1,service_z-.24,service_z-.013)
+        corners=[(x0,y0),(x1,y0),(x1,y1),(x0,y1)]
+        bed=[pos(x,y,apron_grade(y)+h) for h in (-.24,-.013) for x,y in corners]
+        push(riser,bed,[(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)])
         rows=max(1,round((y1-y0)/1.45))
         for row in range(rows):
             a=y0+(y1-y0)*row/rows+.012;b=y0+(y1-y0)*(row+1)/rows-.012
@@ -456,66 +491,46 @@ def build_exterior_site():
                 l=x+.012;r=end-.012
                 corners=[(l+.08,a),(r-.13,a+.025),(r,a+.14),(r-.008,b-.11),
                          (r-.12,b),(l+.15,b),(l,b-.18),(l+.005,a+.14)]
-                zz=service_z+flag_rng.uniform(-.003,.002)
-                top=[pos(xx,yy,zz) for xx,yy in corners]
-                bottom=[pos(xx,yy,zz-.023) for xx,yy in corners]
+                jitter=flag_rng.uniform(-.003,.002)
+                top=[pos(xx,yy,apron_grade(yy)+jitter) for xx,yy in corners]
+                bottom=[pos(xx,yy,apron_grade(yy)+jitter-.023) for xx,yy in corners]
                 faces=[tuple(range(8))]+[(i,(i+1)%8,8+(i+1)%8,8+i) for i in range(8)]
                 push(flag_rng.choice(flags),top+bottom,faces)
                 x=end
-        rectsurf('UtilityFlagstoneApron',x0,x1,y0,y1,service_z+.003)
-    flagstone_region(service_head,well_foot,service_front,well_south)
-    flagstone_region(service_head,well_start,well_south,well_north)
-    flagstone_region(service_head,service_end,well_north,service_back)
+        outline=[(x0,y0),(x1,y0),(x1,y1),(x0,y1)]
+        surface('UtilityFlagstoneApron',outline,[apron_grade(y)+.003 for x,y in outline])
+    flagstone_region(service_head,well_x0,service_front,well_head_y)
+    flagstone_region(service_head,service_end,well_head_y,33.4)
+    flagstone_region(service_head,service_end,33.4,service_back)
 
-    # Seven treads and an eighth equal rise to the drained lower landing.
-    run=(well_foot-well_start)/7
-    rise=(service_z-well_bottom)/8
     tread_finish=mapped('Areaway · gray poured concrete','Front court concrete.jpg')
     groove=mat('Areaway · scored tread grooves','#77736c',0,.92)
-    for j in range(7):
-        xa=well_start+j*run
-        h=service_z-rise*(j+1)
-        concrete_slab('Areaway · concrete tread',xa,xa+run,well_south,well_north,h,well_bottom-.12,tread_finish)
-        # Scored lines and a slight overhanging nose reveal the change of level
-        # when the stair is seen from above in the shadow of the deck.
-        plank(riser,xa+run-.025,xa+run+.046,well_south+.012,well_north-.012,h-.032,h-.004)
+    for j in range(2):
+        y1=well_head_y-j*well_run
+        y0=y1-well_run
+        h=service_z-(j+1)*well_rise
+        concrete_slab('Areaway · concrete tread',well_x0,well_x1,y0,y1,h,well_bottom-.12,tread_finish)
         for inset in (.13,.20):
-            x=xa+run-inset
-            plank(groove,x,x+.019,well_south+.055,well_north-.055,h+.0006,h+.0012)
-        rectsurf('LowerServiceStep'+str(j),xa,xa+run,well_south,well_north,h+.003)
-    concrete_slab('Areaway · lower landing',well_foot,well_end,well_door_y,well_north,well_bottom,well_bottom-.12,tread_finish)
-    rectsurf('ExteriorServiceLanding',well_foot,well_end,well_door_y,well_north,well_bottom+.003)
-    # The side cheeks continue around the corner without crossing either opening.
-    top=service_z+.025
-    cheeks=[(well_start,well_north+.08,well_end+.08,well_north+.08),
-            (well_start,well_south-.08,well_foot-.08,well_south-.08),
-            (well_foot-.08,well_door_y,well_foot-.08,well_south),
-            (well_end+.08,well_door_y,well_end+.08,well_north+.16)]
-    for i,(x0,y0,x1,y1) in enumerate(cheeks):
-        mid=(top+well_bottom-.12)/2
-        prism(riser,pos(x0,y0,mid),pos(x1,y1,mid),.055,top-well_bottom+.12)
-        # Cast caps conceal the joint at the grade. The slight overhang is
-        # above the cheek and outside the walking line.
-        prism(riser,pos(x0,y0,top+.008),pos(x1,y1,top+.008),.085,.020)
-        blocker('AreawayRetainer'+str(i),pos(x0,y0,well_bottom-.12),pos(x1,y1,well_bottom-.12),.055,top-well_bottom+.12)
-    rail_y=well_north-.12
-    for j in (0,3,6):
-        x=well_start+(j+.44)*run;z=service_z-rise*(j+1)
-        tube(rail_paint,pos(x,rail_y,z),pos(x,rail_y,z+.84),.015,.015,12)
-        tube(rail_paint,pos(x,rail_y,z),pos(x,rail_y,z+.023),.049,.049,14)
-    tube(rail_paint,pos(well_start-.14,rail_y,service_z+.736),
-         pos(well_foot+.14,rail_y,well_bottom+.884),.022,.022,14)
-    for yy in (well_south-.11,well_north+.10):
-        for j in range(4):
-            x=well_start+1.05+j*1.8
-            tube(rail_paint,pos(x,yy,top),pos(x,yy,top+.86),.015,.015,10)
-        for h in (.45,.86):
-            tube(rail_paint,pos(well_start+1.05,yy,top+h),pos(well_start+6.45,yy,top+h),.017,.017,10)
-        blocker('AreawayGuard',pos(well_start+1.05,yy,top-.03),pos(well_start+6.45,yy,top-.03),.05,.92)
-    plank(drain_metal,well_foot+.14,well_end-.14,26.48,26.80,well_bottom+.0008,well_bottom+.003)
+            plank(groove,well_x0+.055,well_x1-.055,y0+inset,y0+inset+.019,h+.0006,h+.0012)
+        rectsurf('LowerServiceStep'+str(j),well_x0,well_x1,y0,y1,h+.003)
+    landing_y=well_head_y-2*well_run
+    concrete_slab('Areaway · lower landing',well_x0,well_x1,well_door_y,landing_y,well_bottom,well_bottom-.12,tread_finish)
+    rectsurf('ExteriorServiceLanding',well_x0,well_x1,well_door_y,landing_y,well_bottom+.003)
+    # Low block cheeks in IMG_7621, with mortar joints and thin coping.
+    # The taller iron guard belongs to the separate garage-side flight.
+    for i,x in enumerate((well_x0-.12,well_x1+.12)):
+        top=service_z+.045
+        plank(riser,x-.12,x+.12,well_door_y,well_head_y,well_bottom-.12,top)
+        for y in (27.52,29.02):
+            plank(groove,x-.121,x+.121,y,y+.015,well_bottom+.01,top)
+        plank(riser,x-.15,x+.15,well_door_y,well_head_y,top,top+.025)
+        blocker('AreawayRetainer'+str(i),pos(x,well_door_y,well_bottom-.12),pos(x,well_head_y,well_bottom-.12),.084,top+.025-(well_bottom-.12))
+    plank(drain_metal,well_x0+.14,well_x1-.14,26.48,26.80,well_bottom+.0008,well_bottom+.003)
     for j in range(26):
-        x=well_foot+.20+j*(well_end-well_foot-.45)/25
+        x=well_x0+.20+j*(well_x1-well_x0-.45)/25
         plank(graphite,x,x+.038,26.51,26.77,well_bottom+.003,well_bottom+.0045)
+    for i,y in enumerate((26.27,35.73)):
+        blocker('DeckServicePost'+str(i),pos(25.44,y-.18,low-.20),pos(25.44,y+.18,low-.20),.36*ft,dp-(low-.20))
     for desc,p,q in [('DeckSouth',(23,35.85),(41,35.85)),('DeckEast',(23.15,26.1),(23.15,35.8)),('DeckWestReturn',(40.75,26.15),(40.75,deck_stair_y0)),('EntryWestRail',(33,-4.8),(33,-.1)),('EntryEastRail',(29,-4.8),(29,-.1))]:
         blocker(desc,pos(*p,dp),pos(*q,dp),.08,.93)
     # Timber retaining wall crossing the entry approach. Leave a stair break in it.
@@ -638,7 +653,7 @@ def build_exterior_site():
     for name,location in [('TourEye_path',pos(5.48,center_y(5.48),walk_grade(5.48)+1.59)),
                           ('TourLook_path',pos(30.7,-5.10,dp+.36))]:
         ob=bpy.data.objects.new(name,None);site_group.objects.link(ob);ob.location=location;ob.empty_display_size=.04
-    ribbon('Rear garden path',[(44.96,lower_stair_end-.015),(44.94,38.31),(44.50,38.98),(43.3,39.4),(38.5,42.1),(34,45.2),(31,46.5)],3.65,crushed)
+    ribbon('Rear garden path',garden_path,3.65,crushed)
     # Outdoor seating follows the autumn and summer yard photos: a gravel circle,
     # Adirondack chairs, pergola on the far side when viewed from the driveway,
     # and picnic table beyond the ring when viewed from the deck.
@@ -1007,6 +1022,7 @@ def build_exterior_site():
         # Keep both beds, the deck exit, timber stack and clear travel lanes open.
         if math.hypot((x-pad_x)/(pad_rx+3.8),(y-pad_y)/(pad_ry+3.8))<1:continue
         if 27<x<44.3 and y<66:continue
+        if 33<x<57 and 35<y<49 and garden_offset(x,y)[0]<2.8:continue
         if -12<x<19 and y<55:continue
         if understory.random()>.10+.73*summer_cover(x,y)**2:continue
         probe=Vector(wpos(x,y,2.0))

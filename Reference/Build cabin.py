@@ -123,12 +123,17 @@ for a,b in zip(sorted([ar,br,26.8]), sorted([ar,br,26.8])[1:]):
 def timberline(name,p,q,r=.044,m=wood,c=deck):
  return curve(name,[pos(*p),pos(*q)],r,m,c)
 def post(name,x,y,z0,z1,w=.36):box(name,x-w/2,x+w/2,y-w/2,y+w/2,z0,z1,wood,deck)
-def platform(name,x1,x2,y1,y2,z):
+def platform(name,x1,x2,y1,y2,z,first_support=None):
  box(name,x1,x2,y1,y2,z-.20,z,timber,deck)
- for x in (x1+.27,x2-.27):
-  for y in (y1+.27,y2-.27):post(name+' · support',x,y,min(terrainZ(*eastnorth(x,y))-.15,z-.5),z)
+ for x in (first_support if first_support is not None else x1+.27,x2-.27):
+  for y in (y1+.27,y2-.27):
+   footing=min(terrainZ(*eastnorth(x,y))-.15,z-.5)
+   if first_support is not None:footing=min(footing,low-.20)
+   post(name+' · support',x,y,footing,z-.20)
 dp=main-.085
-platform('Rear covered deck · appraisal 18 × 10 ft',23,41,26,36,dp)
+# The lower posts sit inboard of the porch edge beside the service door.
+platform('Rear covered deck · appraisal 18 × 10 ft',23,41,26,36,dp,first_support=25.44)
+box('Covered deck · inset support beam',25.25,25.63,26,36,dp-.34,dp-.20,wood,deck)
 exec(compile((work/'Porch and garden.py').read_text(),'Porch and garden.py','exec'),globals())
 v=[pos(x,y,dp+h) for x,y,h in [(22.4,25.6,2.64),(41.6,25.6,2.64),(41.6,36.6,2.27),(22.4,36.6,2.27)]]
 mesh('Roof · covered deck canopy',v,[(0,1,2,3)],shingle,roof)

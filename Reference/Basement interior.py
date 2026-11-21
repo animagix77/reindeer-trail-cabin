@@ -30,7 +30,8 @@ def build_basement_shell():
     joint=material('Den · plank seams','#655444')
     # Structural opening through the outer rear foundation. Reproject clipped
     # polygons because clipping necessarily rebuilds their loops and UVs.
-    jamb_l,jamb_r=24.36,27.60
+    jamb_l,jamb_r=21.43,24.67
+    entry_x=(jamb_l+jamb_r)*.5
     head_z=base+2.085
     for obj in structure.objects:
         if obj.name.startswith('Foundation · wall 5.'):
@@ -187,7 +188,7 @@ def build_basement_shell():
 
     # Individual diffuser origins are also real-time light attachment points.
     for tag,x,y,h in [('Service',25.7,21.7,2.34),('PanelAisle',37.7,10.7,2.34),
-                       ('Garage',12,18,2.34),('Den',27.7,6.3,2.25),('Entry',25.98,25.1,2.34)]:
+                       ('Garage',12,18,2.34),('Den',27.7,6.3,2.25),('Entry',entry_x,25.1,2.34)]:
         anchor_h=base+h
         diffuser=group('BasementLamp_'+tag,origin=(x,y,anchor_h))
         cyl(diffuser,0,0,-.005,.012,.118,lamp,32,.134)
@@ -195,41 +196,14 @@ def build_basement_shell():
         cyl(diffuser,0,0,.044,.053,.133,steel,32)
         cyl(diffuser,0,0,.053,ceiling_z-anchor_h,.127,cream,32)
         finish(diffuser)
-    # Wet-location light over the exterior threshold. The cheek sign is
-    # deliberately legible from the head of the stairs, before the turn.
-    weatherlight=group('BasementLamp_Areaway',origin=(25.98,26.14,base+2.24))
+    # Wet-location light centered over the doorway at the foot of the straight stair.
+    weatherlight=group('BasementLamp_Areaway',origin=(entry_x,26.14,base+2.24))
     bx(weatherlight,-.53,.53,0,.115,-.084,.084,rail,3)
     bx(weatherlight,-.45,.45,.114,.22,-.060,.058,lamp,3)
     for u in (-.44,-.22,0,.22,.44):
         bx(weatherlight,u-.014,u+.014,.216,.244,-.060,.063,steel_gray)
     finish(weatherlight)
-    area_light('Areaway · threshold light',(25.98,26.4,base+2.17),(25.98,31.6,base+.64),58,.72,(1,.80,.53))
-    plate=group('Areaway · stair direction plaque')
-    cx,cy=27.66,33.45;hz=base+1.22
-    green=material('Basement plaque · deep green enamel','#314b40',.12,.51)
-    bx(plate,cx,cx+.068,cy-1.04,cy+1.04,hz-.117,hz+.117,green,4)
-    for yy in (cy-.96,cy+.96):
-        for zz in (hz-.086,hz+.086):
-            line(plate,(cx-.019,yy,zz),(cx,yy,zz),.004,steel,8)
-    for end in ((cy-.70,hz),(cy-.52,hz+.045),(cy-.52,hz-.045)):
-        start=(cy-.37,hz) if end[0]==cy-.70 else (cy-.70,hz)
-        line(plate,(cx-.010,*start),(cx-.010,*end),.006,cream,8)
-    finish(plate)
-    font=bpy.data.curves.new('Basement sign lettering','FONT')
-    font.body='Basement';font.align_x='CENTER';font.align_y='CENTER';font.size=.100;font.resolution_u=4
-    label=bpy.data.objects.new('Areaway · basement wayfinding',font)
-    rooms_extra.objects.link(label);label.location=point(cx-.016,cy+.17,hz)
-    right=(point(0,-1,0)-point(0,0,0)).normalized();up=Vector((0,0,1))
-    label.rotation_euler=Matrix((right,up,right.cross(up))).transposed().to_euler()
-    font.materials.append(cream)
-    # Export flattened lettering as mesh, using the same orientation as the
-    # enamel plaque. Blender's GLB exporter only selects mesh primitives.
-    deps=bpy.context.evaluated_depsgraph_get()
-    lettering=bpy.data.meshes.new_from_object(label.evaluated_get(deps))
-    transform=label.matrix_world.copy()
-    bpy.data.objects.remove(label,do_unlink=True)
-    label=bpy.data.objects.new('Areaway · basement lettering',lettering)
-    rooms_extra.objects.link(label);label.matrix_world=transform
+    area_light('Areaway · threshold light',(entry_x,26.4,base+2.17),(entry_x,31.6,base+.64),58,.72,(1,.80,.53))
     area_light('Basement · family room',(27.7,6.3,base+2.19),(28.2,8.2,base+.7),68,1.25,(1,.82,.64))
     area_light('Basement · utility',(37.7,10.7,base+2.27),(39.5,15,base+.79),90,1.3,(1,.89,.75))
     area_light('Basement · laundry',(25.7,21.7,base+2.27),(32.8,22,base+.8),88,1.5,(1,.87,.73))
