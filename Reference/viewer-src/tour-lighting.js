@@ -5,6 +5,7 @@ import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 import {atmosphere,createSky,validWeather} from './tour-sky.js';
 import {installNightSky} from './night-sky.js';
 import {installWeather} from './tour-weather.js';
+import {seasonalLeafCover} from './seasonal-foliage.js';
 
 // Capture the property's photo-textured roof, timber, tree crowns and ground once.
 // Use albedo and a sky fill for the capture, so the probe cannot sample itself.
@@ -17,9 +18,10 @@ const scenery=/^(Backdrop_|Light.*broadleaf|Daylight broadleaf|Hardwood bark|Oak
 function woodlandPalette(model){
   const uniforms={
     woodDay:{value:0},woodSun:{value:new THREE.Vector3()},woodLight:{value:new THREE.Color()},
-    woodRidge:{value:new THREE.Color()},woodSkyline:{value:new THREE.Color()}
+    woodRidge:{value:new THREE.Color()},woodSkyline:{value:new THREE.Color()},
+    woodSeason:{value:new THREE.Vector3()}
   };
-  const done=new Set();
+  const done=new Set(),leafCover=[];
   model.traverse(obj=>{
     if(!obj.isMesh)return;
     for(const material of Array.isArray(obj.material)?obj.material:[obj.material]){
@@ -28,11 +30,35 @@ function woodlandPalette(model){
       const forestFloor=/^(Backdrop_Woodland floor|Leaf litter and low cover|Cool-season fescue)/.test(material.name);
       if(!canopy && !forestFloor && !/^(Hardwood bark|Oak and maple branchwood)/.test(material.name))continue;
       done.add(material);
+      if(canopy)leafCover.push(seasonalLeafCover(material,material.name==='Backdrop_Hardwood cutouts'));
       const previous=material.onBeforeCompile,key=material.customProgramCacheKey();
       material.onBeforeCompile=(shader,renderer)=>{
         previous.call(material,shader,renderer);Object.assign(shader.uniforms,uniforms);
         shader.fragmentShader=shader.fragmentShader.replace('#include <common>',
-          '#include <common>\nuniform float woodDay; uniform vec3 woodSun, woodLight, woodRidge, woodSkyline;');
+          '#include <common>\nuniform float woodDay; uniform vec3 woodSun, woodLight, woodRidge, woodSkyline, woodSeason;');
+        if(canopy){
+          // The pigment varies in world space. Camera turns, time, and wind
+          // can change the light without changing which stand is maple-gold.
+          shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying float standTint;')
+            .replace('#include <project_vertex>',`#include <project_vertex>
+              vec3 woodlandPoint=(modelMatrix*vec4(position,1.)).xyz;
+              standTint=.5+.29*sin(dot(woodlandPoint.xz,vec2(.128,.207)))
+                            +.21*cos(dot(woodlandPoint,vec3(-.209,.11,.086)));
+            `);
+          shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying float standTint;')
+            .replace('#include <color_fragment>',`#include <color_fragment>
+              vec3 paint=sampledDiffuseColor.rgb;
+              float leaf=smoothstep(-.025,.025,(paint.g-paint.r)/max(.02,paint.g))*
+                         smoothstep(.10,.33,(paint.g-paint.b)/max(.02,paint.g));
+              float leafValue=dot(paint,vec3(.21,.72,.07));
+              float copper=smoothstep(.43,.83,standTint+.10*(.5-leafValue));
+              vec3 honey=mix(vec3(.35,.30,.080),vec3(.74,.42,.068),smoothstep(.04,.29,standTint));
+              vec3 fallColor=mix(honey,vec3(.59,.19,.045),copper);
+              diffuseColor.rgb=mix(diffuseColor.rgb,fallColor*(.21+1.8*leafValue),leaf*woodSeason.y);
+              diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.39,.58,.105)*(.24+1.5*leafValue),leaf*woodSeason.x*.72);
+              diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.27,.18,.10)*(.36+leafValue),leaf*woodSeason.z);
+            `);
+        }
         if(forestFloor){
           // Retain the traced UVs and relief at a visitor's feet. In the
           // middle distance group the photographed litter into larger marks.
@@ -41,6 +67,8 @@ function woodlandPalette(model){
               float broadFloor=woodDay*smoothstep(2.8,10.0,length(vViewPosition));
               vec3 groundWash=diffuse*texture2D(map,vMapUv,2.8).rgb;
               diffuseColor.rgb=mix(diffuseColor.rgb,groundWash,.86*broadFloor);
+              diffuseColor.rgb*=mix(vec3(1.),vec3(1.19,.91,.73),woodSeason.y);
+              diffuseColor.rgb*=mix(vec3(1.),vec3(.84,.84,.89),woodSeason.z);
             #endif`);
         }
         shader.fragmentShader=shader.fragmentShader
@@ -61,9 +89,18 @@ function woodlandPalette(model){
             planes=mix(vec3(.006,.027,.035),vec3(.041,.113,.088),smoothstep(.355,.392,plate));
             planes=mix(planes,woodLight*vec3(.50,.62,.54),smoothstep(.49,.54,plate));
             planes=mix(planes,woodLight,smoothstep(.643,.698,plate));
+            vec3 fallShadow=mix(vec3(.035,.031,.016),vec3(.14,.075,.025),smoothstep(.34,.46,plate));
+            vec3 fallPlanes=mix(fallShadow,fallColor*.52,smoothstep(.45,.55,plate));
+            fallPlanes=mix(fallPlanes,fallColor*(1.+.25*woodLight.r),smoothstep(.61,.73,plate));
+            planes=mix(planes,fallPlanes,leaf*woodSeason.y);
+            planes=mix(planes,planes*vec3(.94,1.15,.77),leaf*woodSeason.x);
+            // In winter the exposed limbs keep their bark value even far away.
+            planes=mix(planes,outgoingLight,woodSeason.z*.88);
             planes*=.67+.43*smoothstep(.10,.72,ink);`:''}
             vec3 woods=mix(outgoingLight,planes,${canopy?'.72+.18*relief':'.19+.47*relief'});
-            woods=mix(woods,woodRidge*(.56+.46*ink),.69*smoothstep(17.,40.,woodsDepth));
+            vec3 ridge=mix(woodRidge,vec3(.16,.137,.097),.44*woodSeason.y);
+            ${canopy?'ridge=mix(ridge,vec3(.25,.19,.12),.35*woodSeason.y*leaf);':''}
+            woods=mix(woods,ridge*(.56+.46*ink),.69*smoothstep(17.,40.,woodsDepth));
             woods=mix(woods,woodSkyline*(.75+.27*ink),.84*smoothstep(46.,96.,woodsDepth));
             outgoingLight=mix(outgoingLight,woods,woodDay);
             #include <opaque_fragment>`);
@@ -72,7 +109,11 @@ function woodlandPalette(model){
       material.needsUpdate=true;
     }
   });
-  return a=>{
+  return (a,season)=>{
+    if(season){
+      uniforms.woodSeason.value.set(season.spring,season.autumn,season.winter);
+      for(const apply of leafCover)apply(season);
+    }
     const warmth=a.golden*(1-a.clouds);
     uniforms.woodSun.value.copy(a.direction);
     uniforms.woodLight.value.set('#b0bd72').lerp(new THREE.Color('#e39b45'),warmth);
@@ -82,7 +123,7 @@ function woodlandPalette(model){
   };
 }
 
-function yardReflection(model,renderer,point) {
+function yardReflection(model,renderer,point,season) {
   const proxy=new THREE.Scene(),swatches=new Map(),reflectors=new Set();
   const probeSky=createSky(proxy),air=atmosphere(13.5,'clear');
   // Put no second solar image in the polished grill. Actual direct light supplies the moving glint.
@@ -99,6 +140,15 @@ function yardReflection(model,renderer,point) {
         side:source.side,vertexColors:source.vertexColors,
         alphaTest:Math.max(source.alphaTest||0,source.transparent?.32:0)
       });
+      if(season && /^(Backdrop_Hardwood cutouts|Daylight broadleaf sprays)$/.test(source.name)){
+        // This low-resolution probe uses unstyled Lambert swatches. Match its
+        // broad reflected color to the surrounding canopy before filtering it.
+        material.color.multiply(new THREE.Color(
+          1+1.65*season.autumn+.13*season.spring,
+          1+.09*season.autumn+.24*season.spring,
+          1-.38*season.autumn
+        ));
+      }
       swatches.set(source,material);
     }
     return swatches.get(source);
@@ -225,7 +275,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
   const cafeLights=installCafeLights(scene,model);
   const lamps=Array.from({length:3},()=>{const l=new THREE.PointLight(0xffffff,0,4,2);scene.add(l);return l;});
   let zoneKey=null,stateKey='',lampGain=1,daylight=1,lowSun=0;
-  let {hour,weather,sunDirection}=arrival;
+  let {hour,weather,sunDirection,season}=arrival;
   let yard=null,outdoor=false,roomGain=.34,skyGain=.62,metalGain=1;
   const reflectedSky={value:new THREE.Color(1,1,1)};
   function applyEnvironment(){
@@ -234,7 +284,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
   }
   function captureExterior(){
     if(yard)return;
-    yard=yardReflection(model,renderer,fromPlan(34.9,39.2,.70));
+    yard=yardReflection(model,renderer,fromPlan(34.9,39.2,.70),season);
     for(const m of yard.reflectors){
       m.envMap=yard.target.texture;
       m.envMapIntensity=metalGain;
@@ -257,8 +307,9 @@ export function installTourLighting(scene,renderer,model,arrival) {
     if(Number.isFinite(conditions.hour))hour=(conditions.hour%24+24)%24;
     if(validWeather(conditions.weather))weather=conditions.weather;
     if('sunDirection' in conditions)sunDirection=conditions.sunDirection;
+    if(conditions.season)season=conditions.season;
     const a=atmosphere(hour,weather,sunDirection);
-    setWoodlandPalette(a);
+    setWoodlandPalette(a,season);
     sky.set(a);stars.set(hour,a,sunDirection?Date.now():null);
     lowSun=a.golden*(1-a.clouds);
     air.color.copy(a.horizon).lerp(a.cloudTint,.28);

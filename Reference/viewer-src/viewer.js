@@ -1,6 +1,8 @@
 import {installEggSwings} from './egg-swings.js';
 import {installCabinSurfaces} from './cabin-surfaces.js';
 import {installWoodlandGrass} from './woodland-grass.js';
+import {installFallingLeaves} from './falling-leaves.js';
+import {watchSmallwoodSeason} from './smallwood-season.js';
 import {cabinFilm} from './cabin-film.js';
 import {walkingGait} from './footsteps.js';
 import {installHallReflections} from './hall-reflections.js';
@@ -69,7 +71,8 @@ const woodland=installWoodlandSound();
 const flashlightButton=element('flashlight');
 let flashlight,floodlights,hallReflections,flashlightOn=false;
 let lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
-let renderer,worldActions,updateGrass;
+let renderer,worldActions,updateGrass,updateFallingLeaves;
+let season,sceneWeather;
 let activeView='outside';
 // Positions use glTF Y-up: Blender [x,y,z] maps to [x,z,-y].
 const starts={};
@@ -359,7 +362,11 @@ function resized() {
   if (sceneCanRender) render();
 }
 const sceneControls=installSceneControls({
-  setConditions(settings){lighting?.setConditions(settings);surfaces?.setWeather(settings.weather);woodland.conditions(settings);fires?.setWeather(settings.weather);render();},
+  setConditions(settings){
+    sceneWeather=settings.weather;
+    lighting?.setConditions({...settings,season});
+    surfaces?.setWeather(sceneWeather);woodland.conditions(settings);fires?.setWeather(sceneWeather);render();
+  },
   share(){party.conditions();},
   async setSound(on){const enabled=await woodland.enable(on);if(sceneCanRender)schedule();return enabled;},
   setFurnace(on){fires.setFurnaceOn(on);party.conditions();render();},
@@ -469,7 +476,8 @@ function render(firstFrame=false){
   const animateWood=firewood?.update(body,activeView,seconds,activities.offeringFood);
   const animateFire=fires?.update(camera,activeView,seconds);
   woodland.update(camera,outside,walking(),ringCenter,fires?.energy??0);
-  const animateLeaves=surfaces?.update(camera,activeView,seconds,outside);
+  const animateFoliage=surfaces?.update(camera,activeView,seconds,outside);
+  const animateLeaves=updateFallingLeaves?.(camera,seconds,outside,season.leafFall,sceneWeather);
   const animateSwings=updateEggSwings?.(camera,seconds,walking());
   const animateGrass=updateGrass?.(camera,seconds,outside);
   const animateTree=treeLights?.update(camera,activeView,seconds,canvas.height);
@@ -482,7 +490,7 @@ function render(firstFrame=false){
   const cinematic=film && walking();
   const adapting=cinematic?film.render(world,camera,lighting,outside,seconds):false;
   if(!cinematic)renderer.render(world,camera);
-  if(!document.hidden && (adapting || animateSwings || animateFlood || animateSplitting || animateWood || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
+  if(!document.hidden && (adapting || animateSwings || animateFlood || animateSplitting || animateWood || animateFoliage || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
 }
 function updateState(button,enabled) {button.setAttribute('aria-pressed',String(enabled));}
 element('reset').addEventListener('click',reset);
@@ -607,7 +615,15 @@ async function show() {
     locationPicker.add(new Option(area.label,key));
   }
   const arrival=sceneControls.conditions();
-  lighting=installTourLighting(world,renderer,gltf.scene,arrival);
+  sceneWeather=arrival.weather;
+  watchSmallwoodSeason(current=>{
+    season=current;
+    if(lighting){
+      lighting.setConditions({...sceneControls.conditions(),season});
+      render();
+    }
+  });
+  lighting=installTourLighting(world,renderer,gltf.scene,{...arrival,season});
   woodland.conditions(arrival);
   gltf.scene.traverse(object=>{
     if(/^(Tax[ _]parcel|Site[ _]section|Canopy)/i.test(object.name))object.visible=false;
@@ -617,6 +633,7 @@ async function show() {
   if(ring)ringCenter=new THREE.Box3().setFromObject(ring).getCenter(new THREE.Vector3());
   treeLights=installTreeLights(world,gltf.scene,reducedMotion);
   updateGrass=installWoodlandGrass(world,gltf.scene,walkSpace,reducedMotion);
+  updateFallingLeaves=installFallingLeaves(world,gltf.scene,walkSpace,reducedMotion,schedule);
   surfaces=installCabinSurfaces(gltf.scene,renderer);
   await loading.preparing(3,'Lighting and drawing your first view');
   floodlights=installMotionFloodlights(world,gltf.scene,schedule);
