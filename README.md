@@ -23,6 +23,12 @@ Choose the 3D walkthrough on the website to arrive on the driveway at golden hou
 - For the basement, follow the driveway past the garage to the paved area beside the back deck. Walk straight down two steps to enter. The half bath sits beside the high windows. The graphite washer-dryer and black-and-yellow shelving are to its right, with the breaker panel by the washer. The doorway beyond the shelf leads to the blue and olive-gray pressure tanks, cartridge filter and separate electric water heater.
 - Walk to the driveway steps to see the blue-capped well casing. Open **Guide → Water notes** to read about the cabin’s private well. With an internet connection you can also see the latest dated groundwater observation from Woodbourne, about 12 miles northeast. The cabin’s own groundwater depth would require an on-site reading. [USGS Woodbourne well](https://waterdata.usgs.gov/monitoring-location/USGS-414525074360601/)
 
+## Winter at the cabin
+
+Select **Snow** to watch it build up outdoors. Pick up the shovel by the garage and click or tap nearby snow to clear a path. Walking sounds follow the ground underfoot, including cleared pavement and fresh snow. Each visitor clears their own path.
+
+Select the red or blue sled at the garage to visit Lake Superior State Park in Bethel. Choose **Push off**, drag or use A and D to steer, then choose **Ride again** or **Return to garage**. The downhill grade, beach building and far shore are based on local elevation data, aerial imagery and the owner’s winter photographs. [Lake Superior model sources](Reference/Lake%20Superior.md)
+
 ## Open house
 
 Once the 3D walkthrough has loaded, enter a first name or nickname, choose a hiker, and select **Start 3D walkthrough**. You can meet up to seven other visitors on the driveway. Share the public cabin link to meet friends in the same space. **Cabin chat** shows who is here. Select a name to walk over to that visitor, or send a message to the room. Messages also appear above the speaker’s avatar. New arrivals see messages sent during their visit.

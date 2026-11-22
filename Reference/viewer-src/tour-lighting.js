@@ -181,7 +181,7 @@ function yardReflection(model,renderer,point,season) {
 }
 
 // The room environment supplies close indoor reflections, with a separate outdoor probe.
-export function installTourLighting(scene,renderer,model,arrival) {
+export function installTourLighting(scene,renderer,model,arrival,walkSpace) {
   const textureGenerator=new THREE.PMREMGenerator(renderer);
   const studio=new RoomEnvironment();
   const environment=textureGenerator.fromScene(studio,.045);
@@ -197,7 +197,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
   renderer.shadowMap.autoUpdate=false;
   const sky=createSky(scene);
   const stars=installNightSky(scene);
-  const weatherFX=installWeather(scene,model);
+  const weatherFX=installWeather(scene,model,walkSpace);
   const setWoodlandPalette=woodlandPalette(model);
   const air=new THREE.FogExp2(0xd9e4e7,.0022);
   const hemisphere=new THREE.HemisphereLight(0xfff6e8,0xb3a28f,.91);
@@ -353,7 +353,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
   }
   setConditions();
   return {
-    sun,setConditions,captureExterior,
+    sun,setConditions,captureExterior,snowpack:weatherFX.pack,
     get daylight(){return daylight;},
     get goldenHour(){return lowSun;},
     get animated(){return weatherFX.animated || stars.animated;},

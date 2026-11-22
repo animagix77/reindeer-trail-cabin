@@ -5,7 +5,9 @@ import {installWoodlandGrass} from './woodland-grass.js';
 import {installFallingLeaves} from './falling-leaves.js';
 import {watchSmallwoodSeason} from './smallwood-season.js';
 import {cabinFilm} from './cabin-film.js';
-import {walkingGait} from './footsteps.js';
+import {garageGear} from './winter-gear.js';
+import {installSledHill} from './sled-hill.js';
+import {walkingGait,groundFinish} from './footsteps.js';
 import {installHallReflections} from './hall-reflections.js';
 import {addFloodlightFixtures} from './motion-floodlights.js';
 import {installWalkingFlashlight} from './walking-flashlight.js';
@@ -75,6 +77,7 @@ const woodland=installWoodlandSound();
 const flashlightButton=element('flashlight');
 let flashlight,hallReflections,flashlightOn=false;
 let television,lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
+let winterGear,sledHill;
 let renderer,worldActions,updateGrass,updateFallingLeaves;
 let season,sceneWeather;
 let activeView='outside';
@@ -89,18 +92,18 @@ let bob=0;
 const velocity=new THREE.Vector2();
 const finishMeshes=[],finishRay=new THREE.Raycaster(),down=new THREE.Vector3(0,-1,0);
 function footSurface(){
+  if(lighting?.snowpack.at(body.x,body.z,body.y)>=.006)return 'snow';
   if(/^WalkSurface_Basement/.test(body.label))return /Wood|Bathroom/.test(body.label)?'wood':'pavement';
   if(/Bathroom/.test(body.label))return 'tile';
   if(/Gravel/.test(body.label))return 'gravel';
-  if(/Flagstone|WellFloor|ServiceDriveStep|LowerServiceStep|ExteriorServiceLanding|DeckStairLanding|RearStoneStep|DrivewayFieldstone/.test(body.label))return 'pavement';
+  if(/Flagstone|WellFloor|ServiceDriveStep|LowerServiceStep|ExteriorServiceLanding|DeckStairLanding|RearStoneStep|(?:Driveway|Woodland)Fieldstone/.test(body.label))return 'pavement';
   if(/ParcelGround|MainFloor/.test(body.label)){
     finishRay.ray.origin.set(body.x,body.y+.24,body.z);finishRay.ray.direction.copy(down);finishRay.far=.48;
     const hits=finishRay.intersectObjects(finishMeshes,false);
     if(hits.length){
       const name=hits[0].object.material.name;
-      if(/porcelain|charcoal.gray tile/i.test(name))return 'tile';
-      if(/asphalt|pavement|concrete/i.test(name))return 'pavement';
-      if(/gravel|crushed stone|aggregate/i.test(name))return 'gravel';
+      const finish=groundFinish(name);
+      if(finish)return finish;
     }
     return /MainFloor/.test(body.label)?'wood':'leaves';
   }
@@ -183,7 +186,7 @@ function usableTarget(target) {
   return target===document.body || target===canvas || target.matches?.('button');
 }
 window.addEventListener('keydown',e=>{
-  if(sceneControls.contains(e.target) || party.open || propertyMap.open || welcome.open || waterNotes.open || tourInterface.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
+  if(sledHill?.open || sceneControls.contains(e.target) || party.open || propertyMap.open || welcome.open || waterNotes.open || tourInterface.open || !walking() || !usableTarget(e.target) || e.metaKey||e.ctrlKey||e.altKey || !walkKeys.has(e.code)) return;
   e.preventDefault();
   if(worldActions?.seated && e.code!=='ArrowLeft' && e.code!=='ArrowRight')return;
   held.add(e.code);
@@ -329,6 +332,7 @@ window.addEventListener('hashchange',()=>{
   if(sceneCanRender) changeView(viewFromAddress());
 });
 function reset() {
+  if(winterGear?.equipped)winterGear.putBack();
   worldActions?.leave();
   const preset=starts[activeView];
   stopWalking();
@@ -495,7 +499,7 @@ const tourInterface=installTourInterface({
   isOutside:()=>outdoorsFloor(body?.label)
 });
 function render(firstFrame=false){
-  if(!sceneCanRender || (firstFrame!==true && (propertyMap.open || welcome.open || waterNotes.open || tourInterface.open)))return;
+  if(!sceneCanRender || sledHill?.open || (firstFrame!==true && (propertyMap.open || welcome.open || waterNotes.open || tourInterface.open)))return;
   const seconds=performance.now()/1000;
   const outside=outdoorsFloor(body?.label);
   lighting?.update(camera.position,activeView,seconds,camera,outside,body?.label);
@@ -508,6 +512,7 @@ function render(firstFrame=false){
   const animateFoliage=surfaces?.update(camera,activeView,seconds,outside);
   const animateLeaves=updateFallingLeaves?.(camera,seconds,outside,season.leafFall,sceneWeather);
   const animateSwings=updateEggSwings?.(camera,seconds,walking());
+  const animateShovel=winterGear?.update(seconds,outside);
   const animateGrass=updateGrass?.(camera,seconds,outside);
   const animateTree=treeLights?.update(camera,activeView,seconds,canvas.height);
   const animateGuests=party.update(seconds);
@@ -519,7 +524,7 @@ function render(firstFrame=false){
   const cinematic=film && walking();
   const adapting=cinematic?film.render(world,camera,lighting,outside,seconds):false;
   if(!cinematic)renderer.render(world,camera);
-  if(!document.hidden && (adapting || animateTV || animateSwings || animateSplitting || animateWood || animateFoliage || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
+  if(!document.hidden && (adapting || animateTV || animateShovel || animateSwings || animateSplitting || animateWood || animateFoliage || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
 }
 function updateState(button,enabled) {button.setAttribute('aria-pressed',String(enabled));}
 element('reset').addEventListener('click',reset);
@@ -590,7 +595,7 @@ async function show() {
       object.visible=false;
     }
     if(!object.isMesh) return;
-    if(/asphalt|pavement|poured concrete|fescue|leaf litter|brushed greige floor porcelain|charcoal.gray tile|blue-gray crushed stone|Driveway end · gravel/i.test(object.material.name) && !/shingle/i.test(object.material.name))finishMeshes.push(object);
+    if(groundFinish(object.material.name??''))finishMeshes.push(object);
     let helper=object;
     while(helper && !/^Walk(Surface|Block)_/i.test(helper.name)) helper=helper.parent;
     if(!helper) return;
@@ -629,14 +634,20 @@ async function show() {
   woodSplit=installWoodSplitting(world,gltf.scene,walkSpace,{
     camera,schedule,takeSplitLog:firewood.takeSplitLog,
     onStockWood:count=>party.restock(count),stockTotal:()=>party.stockTotal,
-    handsBusy(){const wood=firewood.snapshot();return wood.held || wood.inFlight || activities.offeringFood;},
+    handsBusy(){const wood=firewood.snapshot();return wood.held || wood.inFlight || activities.offeringFood || winterGear?.equipped;},
     onSwing:duration=>woodland.swing(duration),onStrike:woodland.strike,
     onContact:speed=>woodland.woodImpact(speed)
   });
   walkSpace.dynamicBlocker=woodSplit.blocksStep;
   grill=installGrill(world,gltf.scene,activities.setGrill);
   television=installSmartTV(gltf.scene,schedule);
-  worldActions=installWorldActions({television,
+  sledHill=installSledHill(renderer,()=>{
+    stopWalking();woodland.update(camera,false,false,null,0);
+  },()=>{canvas.focus({preventScroll:true});schedule();});
+  winterGear=garageGear(world,walkSpace,camera,{
+    pack:()=>lighting?.snowpack,visit:sledHill.visit,schedule,reduced:reducedMotion
+  });
+  worldActions=installWorldActions({television,winterGear,
     model:gltf.scene,canvas,camera,space:walkSpace,firewood,woodSplit,activities,sceneControls,
     getBody:()=>body,neighbors:party.neighbors,seatOccupied:party.seatOccupied,schedule,
     seat(next,heading){
@@ -659,7 +670,7 @@ async function show() {
       render();
     }
   });
-  lighting=installTourLighting(world,renderer,gltf.scene,{...arrival,season});
+  lighting=installTourLighting(world,renderer,gltf.scene,{...arrival,season},walkSpace);
   woodland.conditions(arrival);
   gltf.scene.traverse(object=>{
     if(/^(Tax[ _]parcel|Site[ _]section|Canopy)/i.test(object.name))object.visible=false;

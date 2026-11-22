@@ -46,7 +46,7 @@ function fixtures(model,wood){
   return {targets,occluders};
 }
 
-export function installWorldActions({model,canvas,camera,firewood,woodSplit,television,activities,sceneControls,
+export function installWorldActions({model,canvas,camera,firewood,woodSplit,television,winterGear,activities,sceneControls,
   space,getBody,neighbors,seatOccupied,seat,schedule}){
   const button=document.getElementById('world-action'),label=document.getElementById('world-action-label');
   const {targets,occluders}=fixtures(model,firewood);
@@ -103,6 +103,12 @@ export function installWorldActions({model,canvas,camera,firewood,woodSplit,tele
     if(!body || !available())return null;
     if(seated)return {target:seated,caption:'Stand up'};
     if(!setRay(pixel))return null;
+    if(winterGear && outdoorsFloor(body.label) && !woodSplit?.equipped &&
+       !firewood.state?.held && !firewood.state?.inFlight && !activities.offeringFood){
+      const gear=winterGear.aim(cast);
+      if(gear && !blocked(gear,gear.contact.distance))return {target:gear,caption:gear.caption};
+      if(winterGear.equipped)return null;
+    }
     let best=null,closest=Infinity;
     for(const t of targets){
       const range=t.id==='pit' && firewood.state?.held?5.5:t.range;
@@ -135,8 +141,8 @@ export function installWorldActions({model,canvas,camera,firewood,woodSplit,tele
   }
   function show(item){
     displayed=item?.target??null;
-    document.documentElement.toggleAttribute('data-direct-focus',!!displayed?.contact);
-    document.documentElement.toggleAttribute('data-grabbable',displayed?.id==='wood');
+    document.documentElement.toggleAttribute('data-direct-focus',!!displayed?.contact && !['sled','scoop','shovel'].includes(displayed.id));
+    document.documentElement.toggleAttribute('data-grabbable',displayed?.id==='wood'||displayed?.id==='shovel');
     document.documentElement.toggleAttribute('data-direct-aim',!!displayed?.contact && (!hover || document.pointerLockElement===canvas));
     const next=item?.caption??'';
     if(next===caption)return;
@@ -171,6 +177,9 @@ export function installWorldActions({model,canvas,camera,firewood,woodSplit,tele
     if(!item || !available())return false;
     if(seated){leave();return true;}
     const t=item.target;
+    if(t.id==='sled'||t.id==='scoop'||t.id==='shovel'){
+      const used=winterGear.use(t,cast.ray.direction);schedule();return used;
+    }
     if(t.contact){
       const used=t.id==='tv'?t.source.select(t.contact.uv):t.source.pickUpHit(t.contact);
       schedule();return used!==false;
@@ -220,7 +229,7 @@ export function installWorldActions({model,canvas,camera,firewood,woodSplit,tele
     if(!tapped || seated || e.defaultPrevented)return;
     const pixel=document.pointerLockElement===canvas?null:{x:e.clientX,y:e.clientY};
     const result=aim(pixel);
-    if((result?use(result):throwAt(pixel)) && !activities.open)canvas.focus({preventScroll:true});
+    if((result?use(result):throwAt(pixel)) && !activities.open && !document.querySelector('dialog[open]'))canvas.focus({preventScroll:true});
   });
   canvas.addEventListener('pointerleave',e=>{
     if(!button.contains(e.relatedTarget)){hover=null;schedule();}
@@ -238,7 +247,7 @@ export function installWorldActions({model,canvas,camera,firewood,woodSplit,tele
     const target=aimed?.target;
     const same=target===displayed || target?.contact && target.contact.object===displayed?.contact?.object &&
       target.contact.instanceId===displayed.contact.instanceId;
-    if(displayed && same && use(aimed) && !activities.open)canvas.focus({preventScroll:true});
+    if(displayed && same && use(aimed) && !activities.open && !document.querySelector('dialog[open]'))canvas.focus({preventScroll:true});
   });
   document.addEventListener('keydown',e=>{
     if(e.target!==document.body && e.target!==canvas)return;

@@ -48,6 +48,8 @@
 !/.github/
 !/.github/workflows/
 !/.github/workflows/pages.yml
+!/Reference/Lake Superior.md
+!/Reference/viewer-src/lake-superior.json
 !/Reference/viewer-src/hipparcos-bright.json
 
 !/Website/

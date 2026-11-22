@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {installSnowpack} from './snowpack.js';
 
 // Project the actual roof, skylight glazing and porch canopies onto a small height
 // field. This keeps weather outside at doorways while letting guests see it through glass.
@@ -71,6 +72,7 @@ export function coatOutdoorMaterial(model,material){
   if(!uniforms || coated.has(material))return;
   coated.add(material);
   const previous=material.onBeforeCompile,key=material.customProgramCacheKey();
+  const ground=/fescue|leaf litter|gravel|asphalt(?! shingle)|pavement|paved|poured concrete|flagstone|aggregate|timber ties|rear landing|crushed stone|deck boards|patio steps/i.test(material.name);
   material.onBeforeCompile=(shader,renderer)=>{
     previous.call(material,shader,renderer);
     Object.assign(shader.uniforms,uniforms);
@@ -79,7 +81,7 @@ export function coatOutdoorMaterial(model,material){
       .replace('#include <worldpos_vertex>',
         '#include <worldpos_vertex>\nweatherWorldPosition=(modelMatrix*vec4(transformed,1.)).xyz;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>',
-      '#include <common>\nvarying vec3 weatherWorldPosition;\nuniform float wetness;\nuniform float snowCover;\n'+shelterGLSL)
+      '#include <common>\nvarying vec3 weatherWorldPosition;\nuniform float wetness;\nuniform float snowCover;\nuniform sampler2D snowGround; uniform vec4 snowUV;\n'+shelterGLSL)
       .replace('#include <roughnessmap_fragment>',`
         #include <roughnessmap_fragment>
         if ((snowCover+wetness)>0. && !sheltered(weatherWorldPosition,-.09)) {
@@ -89,17 +91,23 @@ export function coatOutdoorMaterial(model,material){
           diffuseColor.rgb*=1.-water*.32;
           roughnessFactor=mix(roughnessFactor,.25,water*.84);
           float texturePattern=dot(diffuseColor.rgb,vec3(.24,.57,.19));
+          vec2 snowCell=(weatherWorldPosition.xz-snowUV.xy)*snowUV.zw;
+          float layer=1.;
+          ${ground?'if(all(greaterThanEqual(snowCell,vec2(0.))) && all(lessThan(snowCell,vec2(1.))))layer-=texture2D(snowGround,snowCell).r;':''}
           diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.73,.79,.83),
-            snowCover*coverage*(.42+.49*smoothstep(.005,.28,texturePattern)));
+            layer*snowCover*coverage*(.42+.49*smoothstep(.005,.28,texturePattern)));
         }`);
   };
-  material.customProgramCacheKey=()=>key+'|exterior-weather-v2';
+  material.customProgramCacheKey=()=>key+'|exterior-weather-v3-'+Number(ground);
   material.needsUpdate=true;
 }
 
-export function installWeather(scene,model) {
+export function installWeather(scene,model,space) {
+  const cover=roofCover(model);
+  const pack=installSnowpack(scene,model,space,cover);
+  let current='clear';
   const weatherSurface={
-    ...roofCover(model),
+    ...cover, snowGround:{value:pack.mask}, snowUV:{value:pack.uv},
     wetness:{value:0},
     snowCover:{value:0}
   };
@@ -182,14 +190,17 @@ export function installWeather(scene,model) {
   particles.visible=false;particles.frustumCulled=false;
   scene.add(particles);
   return {
+    pack,
     set(weather,brightness) {
+      current=weather;
       uniforms.wetness.value=weather==='rain'?1:0;
-      uniforms.snowCover.value=weather==='snow'?1:0;
+
       uniforms.skyBrightness.value=brightness;
       uniforms.snow.value=weather==='snow'?1:0;
       particles.visible=weather==='rain'||weather==='snow';
     },
     update(eye,overview,seconds,bufferHeight) {
+      pack.update(current,seconds);uniforms.snowCover.value=pack.coverage;
       if(!particles.visible) return;
       uniforms.time.value=seconds%86400;
       uniforms.pixelHeight.value=Math.max(1,bufferHeight);
@@ -197,6 +208,6 @@ export function installWeather(scene,model) {
       else uniforms.anchor.value.copy(eye);
       uniforms.extent.value=overview?40:23;
     },
-    get animated(){return particles.visible;}
+    get animated(){return particles.visible||pack.melting;}
   };
 }

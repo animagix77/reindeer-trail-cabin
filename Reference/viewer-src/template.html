@@ -198,6 +198,16 @@ main{
 #views,#scene-panel,.dock nav,#activity,#woodwork{background:var(--hud);border:1px solid var(--hud-line);border-radius:5px;color:var(--ink);box-shadow:0 3px 16px #0a161b38}
 #tour-controls #views{grid-area:nav;justify-self:end;display:flex;flex-wrap:nowrap;gap:1px;padding:1px 3px;pointer-events:auto}
 .view-picker{display:flex;align-items:center;gap:5px;min-width:0;padding-left:6px;color:var(--sub);font-size:.78rem}
+html.shoveling #scene-deer{display:none}
+html.sledding main>:not(canvas){display:none!important}
+#sled-trip[open]{--hud:#21382ff5;--ink:#fff4dc;--hud-line:#e4d6b457;display:flex;align-items:flex-start;justify-content:flex-start;position:fixed;inset:0;background:transparent;color:var(--ink);margin:0;padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));box-sizing:border-box;width:100%;height:100%;max-height:none;max-width:none;border:0;touch-action:none;overflow:hidden}
+#sled-trip::backdrop{background:transparent;backdrop-filter:none}
+.sled-card{background:var(--hud);border:1px solid var(--hud-line);border-radius:8px;padding:12px 16px;text-align:left;box-shadow:0 3px 16px #15251d33}
+.sled-card h2{font:400 1.65rem/1.1 var(--serif);margin:0}
+.sled-card p{margin:4px 0;font-size:.84rem}
+.sled-buttons{display:flex;justify-content:flex-start;gap:8px;margin-top:6px}
+.sled-buttons button{background:var(--hud);color:var(--ink);border:1px solid var(--hud-line);padding:8px 12px;border-radius:5px;min-height:44px}
+.sled-buttons #sled-ride{background:var(--ink);color:#25352b}
 .site-return{display:inline-flex;align-items:center;justify-content:center;align-self:stretch;padding:4px 9px;border-left:1px solid var(--hud-line);color:var(--ink);font:600 .84rem/1.1 var(--sans);text-align:center;text-underline-offset:.18em}
 .site-return:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
 #tour-controls select{font-family:inherit;line-height:1.1;font-weight:650;font-size:.83rem;background:transparent;color:var(--ink);border:0;cursor:pointer}
@@ -375,6 +385,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 <p id="sky-cue" role="status" aria-atomic="true"></p>
 <div id="world-tools">
   <button type="button" id="world-action" aria-keyshortcuts="E" hidden><span id="world-action-label"></span><kbd aria-hidden="true">E</kbd></button>
+  <button type="button" id="return-shovel" hidden>Put shovel back</button>
   <button type="button" id="scene-deer" aria-controls="activity" aria-expanded="false" hidden>Feed deer</button>
 </div>
 <span id="split-reticle" aria-hidden="true" hidden></span>
@@ -425,9 +436,18 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
   <p id="stay-note">Listings open in a new tab.</p>
   %%CABIN_HOME%%
 </dialog>
+<dialog id="sled-trip" tabindex="-1" aria-labelledby="sled-title">
+  <div class="sled-card">
+    <div><h2 id="sled-title">Lake Superior</h2><p>Bethel, NY · Virtual sledding hill</p></div>
+    <p id="sled-status" role="status"></p>
+    <div class="sled-buttons"><button id="sled-ride" type="button">Push off</button>
+    <button id="sled-return" type="button">Return to garage</button></div>
+  </div>
+</dialog>
 <dialog id="tour-guide" aria-labelledby="guide-title">
   <div class="guide-heading"><h2 id="guide-title">Cabin guide</h2><button type="button" id="guide-close" aria-label="Close cabin guide">×</button></div>
   <h3>Getting around</h3>
+  <p>Find the shovel and sleds by the garage doors. When snow settles, pick up the shovel and aim at nearby snow to clear it. Choose a sled to visit the virtual hill at Lake Superior in Bethel.</p>
   <p class="guide-keys">W and S walk forward and back. A and D sidestep. Drag to look around, or turn with the left and right arrows. Page Up and Page Down look up and down. Click nearby wood to pick it up, then click where you want to throw it. You can also aim and press E to use an object or T to throw.</p>
   <p class="guide-touch">Move with the left pad and drag the scene to look around. Tap nearby wood to pick it up, then tap in the direction you want to throw it.</p>
   <p>To find the basement, follow the driveway past the garage to the paved area beside the back deck. Face the basement door and walk straight down two steps to enter.</p>
