@@ -13,13 +13,16 @@
   <meta property="og:image" content="https://reindeertrail.com/photos/cabin-in-autumn.webp">
   <link rel="preload" href="./fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./styles.css">
+  <script src="./hero-film.js" defer></script>
   <script src="./photos/gallery.js" defer></script>
   <script src="./gallery.js" defer></script>
+  <script src="./guest-message.js" defer></script>
 </head>
 <body>
   <a class="skip" href="#the-cabin">Skip to cabin details</a>
   <header id="top" class="hero">
-    <img class="hero-photo" src="./photos/cabin-in-autumn.webp" srcset="./photos/cabin-in-autumn-1000.webp 1000w, ./photos/cabin-in-autumn.webp 2240w" sizes="100vw" fetchpriority="high" alt="The dark timber cabin among golden trees and moss-covered boulders in Smallwood.">
+    <img class="hero-photo" src="./media/smallwood-spring-poster.webp" fetchpriority="high" width="1280" height="720" alt="">
+    <video id="hero-film" class="hero-film" muted loop playsinline preload="none" aria-hidden="true" data-src="./media/smallwood-spring.mp4" data-portrait-src="./media/smallwood-spring-mobile.mp4"></video>
     <div class="hero-shade"></div>
     <div class="masthead">
       <a class="wordmark" href="#top">The Reindeer Trail</a>
@@ -34,6 +37,7 @@
       <h1>A cabin in<br>the <em>Catskills.</em></h1>
       <a class="pill hero-cta" href="./tour/"><span class="play" aria-hidden="true"></span>Explore in 3D</a>
     </div>
+    <button type="button" class="film-toggle" aria-label="Play background video" title="Play background video" aria-controls="hero-film" hidden><span aria-hidden="true"></span></button>
   </header>
   <main>
     <section class="intro page-width" id="the-cabin" aria-labelledby="intro-title">
@@ -67,6 +71,26 @@
       <div class="section-top"><div><p class="eyebrow">Reservations</p><h2 id="stay-title">Make yourself <em>at home.</em></h2></div></div>
       <div class="stay-options"><article><h3>Short stays</h3><p>Spend a few nights in the woods. See available dates, nightly rates and guest reviews on Airbnb.</p><a class="pill" href="https://www.airbnb.com/rooms/1124495370358897568">Book on Airbnb</a></article>
       <article><h3>Monthly stays</h3><p>Settle into a furnished home for 30 nights or more. Ask us about your dates on Furnished Finder.</p><a class="pill" href="https://www.furnishedfinder.com/property/1070164_1">Inquire on Furnished Finder</a></article></div>
+    </section>
+    <section class="contact" id="contact" aria-labelledby="contact-title">
+      <div class="contact-inner page-width">
+        <div class="contact-intro">
+          <h2 id="contact-title">Ask <em>the hosts.</em></h2>
+          <p>Wondering if the cabin is right for your stay? We’re happy to answer questions about the house or share a favorite spot around Smallwood.</p>
+          <p class="contact-signature">Binh &amp; Rose</p>
+        </div>
+        <div>
+          <form id="guest-message" hidden>
+            <label for="guest-note">Your message</label>
+            <textarea id="guest-note" rows="4" required maxlength="4000" aria-describedby="message-hint"></textarea>
+            <p id="message-hint">Write your note here, then paste it into Airbnb to send it privately to us.</p>
+            <button class="pill" type="submit">Copy message</button>
+            <a class="text-link" id="open-host-inbox" href="https://www.airbnb.com/contact_host/1124495370358897568/send_message" target="_blank" rel="noopener">Open Airbnb to send</a>
+            <p id="message-status" role="status"></p>
+          </form>
+          <noscript><a class="text-link" href="https://www.airbnb.com/contact_host/1124495370358897568/send_message">Message Binh &amp; Rose on Airbnb</a></noscript>
+        </div>
+      </div>
     </section>
   </main>
   <footer><div class="footer-inner page-width"><a class="wordmark" href="#top">The Reindeer Trail</a><p>Smallwood, New York</p><a href="#top">Back to top</a></div></footer>
