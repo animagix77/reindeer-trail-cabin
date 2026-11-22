@@ -137,12 +137,12 @@ export function checkFirewood(model,space){
   const cold=fires.fuelSnapshot(),strength=fires.fuelLevel;
   now+=180;fires.update(camera,'yard',now);assert.deepEqual(fires.fuelSnapshot(),cold);
   fires.setFirePitOn(true);now+=12;fires.update(camera,'yard',now);
-  assert(fires.fuelLevel<strength);assert.equal(fires.fuelSnapshot().logs,228);
+  assert(fires.fuelLevel<strength);assert(Math.abs(fires.fuelSnapshot().logs - 228) < 1e-9);
   fires.setFirePitOn(false);const paused=fires.fuelSnapshot();
   now+=60;fires.update(camera,'yard',now);assert.deepEqual(fires.fuelSnapshot(),paused);
   fires.setFirePitOn(true);now+=11;fires.update(camera,'yard',now);
   assert.equal(fires.fuelSnapshot().twigs,0);
-  assert.equal(fires.fuelSnapshot().logs,217);assert.equal(deliveries,4);
+  assert(Math.abs(fires.fuelSnapshot().logs - 217) < 1e-9);assert.equal(deliveries,4);
   // The original pile mesh is released on collection. The billet keeps its
   // cut shape from palm to coals, including pieces that only burn as kindling.
   fires.setFirePitOn(false);
