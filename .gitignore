@@ -49,3 +49,8 @@
 !/.github/workflows/
 !/.github/workflows/pages.yml
 !/Reference/viewer-src/hipparcos-bright.json
+
+!/Website/
+!/Website/**
+.DS_Store
+!/CNAME

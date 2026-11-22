@@ -1,4 +1,4 @@
-name: Publish cabin tour
+name: Publish cabin website
 on:
   push:
     branches: [main]
@@ -21,7 +21,7 @@ jobs:
       - run: node Reference/viewer-src/check-geometry.mjs "Reindeer Trail.glb"
       - run: node Reference/viewer-src/check-wildlife.mjs "Reindeer Trail.glb"
       - run: mkdir -p public
-      - run: node Reference/viewer-src/build.mjs "Reindeer Trail.glb" public/index.html Reference --web
+      - run: node Reference/viewer-src/build.mjs "Reindeer Trail.glb" public/index.html Reference --website
       - uses: actions/upload-pages-artifact@v4
         with:
           path: public

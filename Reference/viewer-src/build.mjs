@@ -3,12 +3,15 @@ import {build} from 'esbuild';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {modelPartBytes} from './model-loading.js';
+import {tourAreas} from './tour-areas.js';
 import path from 'node:path';
 const args=process.argv.slice(2);
-const web=args.at(-1)==='--web';
+const website=args.at(-1)==='--website';
+const web=website || args.at(-1)==='--web';
 if(web) args.pop();
-const [glbPath,outPath,referencePath]=args;
-if(!glbPath || !outPath || args.length>3) {console.error('Usage: node build.mjs MODEL.glb OUTPUT.html [REFERENCE_DIRECTORY] [--web]');process.exit(1);}
+const [glbPath,requestedOut,referencePath]=args;
+const outPath=website && requestedOut?path.join(path.dirname(requestedOut),'tour','index.html'):requestedOut;
+if(!glbPath || !outPath || args.length>3) {console.error('Usage: node build.mjs MODEL.glb OUTPUT.html [REFERENCE_DIRECTORY] [--web | --website]');process.exit(1);}
 const base=path.dirname(fileURLToPath(import.meta.url));
 const glb=await fs.readFile(glbPath);
 if(glb.length<20 || glb.readUInt32LE(0)!==0x46546c67 || glb.readUInt32LE(4)!==2 || glb.readUInt32LE(8)!==glb.length) throw Error('Expected a complete GLB v2 file');
@@ -43,14 +46,33 @@ const mobileStyles=await Promise.all(['mobile-walk.css','mobile-welcome.css','mo
 let template=(await fs.readFile(path.join(base,'template.html'),'utf8'))
   .replace('%%FIELD_FONT%%',displayFont.toString('base64'))
   .replace('%%MOBILE_STYLES%%',()=>mobileStyles.join('\n'));
+const homeAnchor=(label)=>'<a class="cabin-site-link" href="../">'+label+'</a>';
+template=template.replaceAll('%%CABIN_NAME%%',website?homeAnchor('The Reindeer Trail'):'The Reindeer Trail')
+  .replace('%%CABIN_HOME%%',website?homeAnchor('Return to the cabin website'):'');
+const modelDir=website?path.dirname(requestedOut):path.dirname(outPath);
+if(website){
+  const siteDir=path.resolve(base,'../../Website');
+  await fs.access(path.join(siteDir,'index.html'));
+  await fs.cp(siteDir,modelDir,{recursive:true,filter:file=>!path.basename(file).startsWith('.')});
+  await fs.copyFile(path.resolve(base,'../../CNAME'),path.join(modelDir,'CNAME'));
+  const aliases=Object.entries(tourAreas).flatMap(([key,area])=>[key,area.slug,...area.aliases]);
+  const router=`(() => {
+    const [scene, query] = location.hash.slice(1).split('?');
+    if (${JSON.stringify(aliases)}.includes(scene) || new URLSearchParams(query).has('room')) {
+      location.replace('./tour/' + location.search + location.hash);
+    }
+  })();`;
+  await fs.writeFile(path.join(modelDir,'tour-links.js'),router);
+  await fs.mkdir(path.dirname(outPath),{recursive:true});
+}
 if(web){
   const parts=[];
   for(let start=0;start<glb.length;start+=modelPartBytes){
     const chunk=glb.subarray(start,start+modelPartBytes);
     const digest=createHash('sha256').update(chunk).digest('hex');
     const name='scene-'+digest+'.bin';
-    await fs.writeFile(path.join(path.dirname(outPath),name),chunk);
-    parts.push(name);
+    await fs.writeFile(path.join(modelDir,name),chunk);
+    parts.push(website?'../'+name:name);
   }
   template=template.replace('id="model">%%GLB%%','id="model" data-parts="'+parts.join(' ')+'" data-bytes="'+glb.length+'">');
 }

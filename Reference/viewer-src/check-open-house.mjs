@@ -80,6 +80,9 @@ test('every view of one deployment uses one public address',()=>{
   const address=path=>publicRoomId(new URL(path,'https://cabin.example/'));
   assert.equal(address('/cabin/'),address('/cabin/index.html?campaign=a#patio'));
   assert.equal(address('/cabin/'),address('/cabin#driveway'));
+  const original=address('https://animagix77.github.io/reindeer-trail-cabin/');
+  assert.equal(original,address('https://animagix77.github.io/reindeer-trail-cabin/tour/#inside'));
+  assert.equal(original,address('https://reindeertrail.com/tour/index.html'));
   assert.notEqual(address('/cabin/'),address('/preview/'));
   assert.notEqual(address('/cabin/'),address('https://other.example/cabin/'));
 });

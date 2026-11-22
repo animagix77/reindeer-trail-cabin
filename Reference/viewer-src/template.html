@@ -144,6 +144,7 @@
 #split-reticle::after{content:"";width:3px;height:3px;border-radius:50%;background:#fff4cf;box-shadow:0 0 0 1px #33251480}
 #split-reticle[data-ready=false]{border-style:dashed;opacity:.58}
 #status{position:absolute;inset:0;z-index:8;isolation:isolate;display:flex;align-items:flex-end;padding:clamp(24px,9vh,92px) max(7vw,env(safe-area-inset-right)) max(8vh,env(safe-area-inset-bottom)) max(7vw,env(safe-area-inset-left));overflow:auto;color:#fffaf0;background:radial-gradient(ellipse at 76% 12%,#384838,#162a22 72%)}
+.cabin-site-link{color:inherit;text-underline-offset:.18em}
 #load-photo{position:absolute;z-index:-2;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:54% 58%;pointer-events:none}
 #status::before{content:"";position:absolute;z-index:-1;inset:0;pointer-events:none;background:linear-gradient(0deg,#0b1712f2 0%,#0b1712b0 30%,#0b17121f 74%),linear-gradient(90deg,#0a171194,transparent 72%)}
 main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activity,#woodwork,#world-tools){visibility:hidden}
@@ -329,7 +330,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 %%MOBILE_STYLES%%
 </style></head><body><main><canvas id="view" class="view" tabindex="0" aria-label="Walk the cabin and grounds. Drag to look around."></canvas><section id="status" aria-labelledby="load-title">
     <img id="load-photo" alt="" decoding="async">
-    <div class="load-arrival"><p class="load-location">The Reindeer Trail · Smallwood, NY</p>
+    <div class="load-arrival"><p class="load-location">%%CABIN_NAME%% · Smallwood, NY</p>
       <h2 id="load-title">3D cabin walkthrough</h2>
       <div class="load-progress">
       <div class="load-line"><span data-load-stage role="status">Loading the 3D walkthrough…</span><span data-load-percent aria-hidden="true"></span></div>
@@ -419,6 +420,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
     <strong>Inquire about a longer stay</strong><span>Furnished Finder · 30 days or more</span>
   </a>
   <p id="stay-note">Listings open in a new tab.</p>
+  %%CABIN_HOME%%
 </dialog>
 <dialog id="tour-guide" aria-labelledby="guide-title">
   <div class="guide-heading"><h2 id="guide-title">Cabin guide</h2><button type="button" id="guide-close" aria-label="Close cabin guide">×</button></div>
@@ -447,7 +449,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 <dialog id="welcome" closedby="none" aria-labelledby="welcome-title" aria-describedby="welcome-intro">
   <div class="welcome-layout">
     <div class="welcome-copy">
-      <p class="welcome-location">The Reindeer Trail · Smallwood, NY</p>
+      <p class="welcome-location">%%CABIN_NAME%% · Smallwood, NY</p>
       <h2 id="welcome-title" tabindex="-1">3D cabin walkthrough</h2>
       <p id="welcome-intro">The Reindeer Trail is our quiet place in the mountains. Take your coffee to the deck and watch the morning light move through the trees. In the evening, linger over dinner with friends, then step outside to see the stars.</p>
       <div id="welcome-loading" class="load-progress">

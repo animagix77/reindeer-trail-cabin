@@ -52,7 +52,13 @@ export function readRoom(){
 // All views of one published tour meet at one signaling address. Different
 // deployments (including local previews) get their own room.
 export function publicRoomId(url=new URL(location.href)){
-  const address=url.origin+url.pathname.replace(/\/(?:index\.html)?$/i,'');
+  const path=url.pathname.replace(/\/(?:index\.html)?$/i,'');
+  let address=url.origin+path;
+  // Existing and new public URLs share the same live open house.
+  const original='https://animagix77.github.io/reindeer-trail-cabin';
+  if(address===original+'/tour' || (['reindeertrail.com','www.reindeertrail.com'].includes(url.hostname) && path==='/tour')){
+    address=original;
+  }
   let hash=2166136261;
   for(const letter of address)hash=Math.imul(hash^letter.charCodeAt(0),16777619);
   return 'reindeer-trail-open-v1-'+(hash>>>0).toString(36);
