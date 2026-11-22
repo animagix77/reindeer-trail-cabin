@@ -14,7 +14,10 @@ assert.equal(bytes.readUInt32LE(8),bytes.length,'GLB is incomplete');
 const length=bytes.readUInt32LE(12);
 const manifest=JSON.parse(bytes.subarray(20,20+length));
 const names=manifest.nodes.map(node=>node.name);
-const materials=manifest.materials.map(m=>({name:m.name,doubleSided:true}));
+const materials=manifest.materials.map(m=>({
+  name:m.name,doubleSided:true,
+  pbrMetallicRoughness:{baseColorFactor:m.pbrMetallicRoughness?.baseColorFactor??[1,1,1,1]}
+}));
 const sceneDescription={...manifest,materials};
 delete sceneDescription.images;
 delete sceneDescription.textures;

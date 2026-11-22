@@ -33,7 +33,7 @@ def build_exterior_site():
     if hasattr(leaves,'alpha_threshold'): leaves.alpha_threshold=.45
     porch_wood=mapped('Porch · natural sawn timber','Porch timber.jpg')
     porch_structure(porch_wood)
-    oak=mat('Weathered railing timber','#98764e'); pale=mat('Adirondack slat timber','#b58b56')
+    oak=mat('Weathered railing timber','#98764e')
     ties=mapped('Weathered timber ties','Weathered ties.jpg')
     entrance_stone=mapped('Entry · blue-gray crushed stone','Front walk stone.jpg')
     entry_wood=mapped('Entry · weathered cedar','Weathered ties.jpg')
@@ -766,33 +766,7 @@ def build_exterior_site():
         side=Vector((-axis.y,axis.x,0))
         mid=Vector((center.x,center.y,zpat+lift))+side*offset
         tube(material,mid-axis*.254,mid+axis*.265+Vector((0,0,.024)),.056,.048,6)
-    for j,deg in enumerate((25,107,194,269)):
-        t=math.radians(deg);cx=center.x+1.62*math.cos(t);cy=center.y+1.62*math.sin(t)
-        forward=Vector((-math.cos(t),-math.sin(t),0));side=Vector((-forward.y,forward.x,0));origin=Vector((cx,cy,zpat))
-        def chair(a,b,h):return origin+side*a+forward*b+Vector((0,0,h))
-        # Sink both pairs of feet into the gravel's slight crossfall.
-        for a in (-.27,.27):
-            prism(pale,chair(a,.28,-.009),chair(a,.23,.57),.065)
-            prism(oak,chair(a,-.35,-.009),chair(a,.22,.38),.069)
-            prism(pale,chair(a,-.37,.55),chair(a,.34,.57),.092,.045)
-        for b,h in ((-.34,.065),(.22,.33),(-.33,.56)):
-            prism(oak,chair(-.27,b,h),chair(.27,b,h),.055,.052)
-        for i in range(6):
-            yp=-.25+i*.104
-            prism(pale,chair(-.25,yp,.31+i*.013),chair(.25,yp,.31+i*.013),.089,.031)
-        for i in range(6):
-            a=-.23+i*.092
-            # The fan back has individually rounded slat tops (IMG_0773).
-            top=.84+.08*(1-(a/.255)**2)
-            outline=[(-.039,.31),(.039,.31),(.039,top-.022),(.031,top-.007),(.016,top),(0,top+.003),(-.021,top-.002),(-.034,top-.011),(-.039,top-.022)]
-            verts=[]
-            for depth in (-.015,.015):
-                for edge,h in outline:
-                    t=(h-.31)/(top-.31)
-                    verts.append(chair(a*(1+.17*t)+edge,-.22-.23*t+depth,h))
-            n=len(outline)
-            push(pale,verts,[tuple(reversed(range(n))),tuple(range(n,2*n))]+[(k,(k+1)%n,(k+1)%n+n,k+n) for k in range(n)])
-        blocker('YardChair%02d'%j,chair(0,-.47,.01),chair(0,.34,.01),.64,.92)
+    build_fire_circle_chairs(site_group,center,zpat,blocker)
     picnic_table(ties,site_group,zone,blocker)
     # Horizontal crown centers are local maxima of nearby high unclassified lidar
     # returns, separated by 14 feet. Trunk paths and species are illustrative.

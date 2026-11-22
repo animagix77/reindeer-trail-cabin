@@ -25,7 +25,9 @@ function fixtures(model,wood){
     const chair=add('chair',boxOf(helper),2.1,[helper]);
     chair.number=i;
     chair.floor=chair.bounds.min.y-.01;
-    chair.yaw=Math.atan2(chair.center.x-ring.center.x,chair.center.z-ring.center.z);
+    const anchor=model.getObjectByName('YardChairSeat0'+i);
+    chair.seatPoint=anchor?anchor.getWorldPosition(vec()):new T.Vector3(chair.center.x,chair.floor+.32,chair.center.z);
+    chair.yaw=Math.atan2(chair.seatPoint.x-ring.center.x,chair.seatPoint.z-ring.center.z);
   }
   // A generous volume around the grate also includes the handle on a closed lid.
   const grate=model.getObjectByName('GrillSurface').getWorldPosition(vec());
@@ -135,7 +137,8 @@ export function installWorldActions({model,canvas,camera,firewood,activities,sce
     if(seatOccupied(chair.number))return;
     standing={...getBody()};seated=chair;
     document.documentElement.classList.add('is-seated');
-    seat({x:chair.center.x,y:chair.floor,z:chair.center.z,eye:1.14,label:'WalkSurface_FireCircleGravel'},chair.yaw);
+    const p=chair.seatPoint;
+    seat({x:p.x,y:chair.floor,z:p.z,eye:p.y-chair.floor+.82,label:'WalkSurface_FireCircleGravel'},chair.yaw);
   }
   function use(item){
     if(!item || !available())return false;

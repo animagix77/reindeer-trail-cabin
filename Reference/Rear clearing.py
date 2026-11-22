@@ -52,9 +52,9 @@ def garden_gravel(group, gravel, pad, height, drain_x, center, surrounds):
         across=Vector((outward.y,-outward.x,0))
         seat=center+outward*1.62
         contacts.append((seat,.32,.22))
-        for side in (-.27,.27):
-            for forward in (.28,-.35):
-                contacts.append((seat+across*side-outward*forward,.105,.46))
+        for side in (-1,1):
+            for half_width,forward in ((.274,.222),(.243,-.504)):
+                contacts.append((seat+across*(side*half_width)-outward*forward,.105,.46))
     for x,y,radius,strength in surrounds:
         contacts.append((Vector(pos(x,y,height(x))),radius,strength))
 

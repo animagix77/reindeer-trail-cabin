@@ -48,19 +48,46 @@ export function checkWorldActions(model,space){
       }
       assert.fail('No usable approach to '+expected+' at '+target.toArray());
     }
-    // All chairs are physical blockers. Sit at the blocker, stand on a valid floor.
+    const ring=center('WalkBlock_FireRing'),chairBoards=[],finishes=[];
+    model.traverse(o=>{if(o.isMesh && /^Adirondack slat timber/.test(o.material.name))chairBoards.push(o);});
+    const ray=new T.Raycaster(),down=new T.Vector3(0,-1,0);
+    // Exercise the visible seat and fan back of each chair, its facing and its walk blocker.
     for(let i=0;i<4;i++){
       const chair=center('WalkBlock_YardChair0'+i);approach(chair,'Sit by the fire');
+      const anchor=model.getObjectByName('YardChairSeat0'+i);
+      assert(anchor,'Missing seat pan anchor for chair '+i);
+      const pan=anchor.getWorldPosition(new T.Vector3());
+      const forward=ring.clone().sub(pan);forward.y=0;forward.normalize();
+      const origin=pan.clone();origin.y+=.12;
+      ray.set(origin,down);
+      const slat=ray.intersectObjects(chairBoards,false)[0];
+      assert(slat && Math.abs(slat.point.y-pan.y)<.025,'Seated position must meet the slats on chair '+i);
+      const finish=slat.object.material.name.includes('burgundy')?'burgundy':'wood';
+      if(finish==='burgundy'){
+        const {r,g,b}=slat.object.material.color.clone().convertLinearToSRGB();
+        assert(r>g*1.6 && b>g && r>b*1.25 && r<.68,'Expected a dark wine-red finish on chair '+i);
+      }
+      finishes.push(finish);
+      origin.copy(pan).addScaledVector(forward,.35);origin.y+=.42;
+      ray.set(origin,forward.clone().negate());
+      const back=ray.intersectObjects(chairBoards,false)[0];
+      assert(back && back.distance<1.02,'Expected a backrest behind the seated hiker on chair '+i);
+      assert.equal(back.object.material.name.includes('burgundy'),finish==='burgundy','The back and seat finishes must match');
       const before={...body};pointer('pointerdown');pointer('pointermove',440,330);pointer('pointerup',440,330);update();
       assert(!controls.seated,'A look gesture cannot sit');
       tap();assert.equal(controls.seatId,i);assert(body.eye<before.eye-.35);
-      assert(Math.hypot(body.x-chair.x,body.z-chair.z)<.001);
+      assert(Math.hypot(body.x-pan.x,body.z-pan.z)<.001);
+      assert(Math.abs(camera.position.y-pan.y-.82)<.001,'Eye height must follow the authored seat pan');
+      assert(!space.spawn(pan.x,pan.z,body.y+1.59,body.y),'A visitor cannot stand inside a chair');
+      const gaze=camera.getWorldDirection(new T.Vector3());gaze.y=0;gaze.normalize();
+      assert(gaze.dot(forward)>.999,'The seated hiker must face the ring');
       assert.equal(label.textContent,'Stand up');
       tap();assert(controls.seated,'Free look while seated stays seated');
       if(i===1){taken=i;tie=true;controls.update();taken=-1;tie=false;}
       else key('KeyE');
       assert(!controls.seated);assert.deepEqual(body,before);
     }
+    assert.deepEqual(finishes.sort(),['burgundy','burgundy','wood','wood']);
     const chair=center('WalkBlock_YardChair00');approach(chair,'Sit by the fire');
     taken=0;update();assert.notEqual(label.textContent,'Sit by the fire');
     taken=-1;update();const departure={...body};tap();
@@ -70,7 +97,6 @@ export function checkWorldActions(model,space){
       approach(wood.targets[k],'Pick up '+singular);tap();assert.equal(wood.state.held,k);
       assert.equal(label.textContent,'Put back '+singular);key('KeyE');assert.equal(wood.state.held,null);
     }
-    const ring=center('WalkBlock_FireRing');
     approach(wood.targets.sticks,'Pick up stick');key('KeyE');
     approach(ring,'Toss stick into fire');tap();assert(wood.state.inFlight);assert.equal(fires.fuelSnapshot().sticks,0);
     clock+=2;update();assert(fires.fuelSnapshot().sticks>0);assert(!fire);
@@ -90,5 +116,5 @@ export function checkWorldActions(model,space){
       hiker.pose(0,0,false);assert(!hiker.seated && hiker.height===standingHeight);hiker.dispose();
     }
   }finally{globalThis.document=previousDocument;globalThis.window=previousWindow;}
-  console.log('All four fire-circle seats, standing clearance, occupied chairs, loose wood, fire, grill and furnace passed direct interaction checks.');
+  console.log('Two burgundy and two natural chairs passed seat-pan, backrest, eye height, fire-facing and standing clearance checks. Occupancy, loose wood, fire, grill and furnace interactions passed.');
 }
