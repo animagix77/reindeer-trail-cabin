@@ -76,17 +76,25 @@ export function installWorldActions({model,canvas,camera,firewood,woodSplit,tele
         return '';
     }
   }
-  function blocked(t,distance){
-    cast.far=distance-.025;
+  function blocked(t,distance,ray=cast){
+    ray.far=distance-.025;
     for(const block of occluders){
-      if(t.ignore?.includes(block.owner) || !cast.ray.intersectBox(block.bounds,broadHit))continue;
+      if(t.ignore?.includes(block.owner) || !ray.ray.intersectBox(block.bounds,broadHit))continue;
       // Rotated walls have large world-aligned bounds. Test their actual faces
       // before rejecting a reachable stove or grill on this side of the wall.
       obstructions.length=0;
-      cast.intersectObject(block.mesh,false,obstructions);
+      ray.intersectObject(block.mesh,false,obstructions);
       if(obstructions.length)return true;
     }
     return false;
+  }
+  const sight=new T.Raycaster();
+  function visibleFromCamera(point){
+    sight.ray.origin.copy(camera.position);
+    sight.ray.direction.subVectors(point,camera.position);
+    const distance=sight.ray.direction.length();
+    sight.ray.direction.normalize();
+    return !blocked({},distance,sight);
   }
   function setRay(pixel){
     if(pixel){
@@ -264,5 +272,5 @@ export function installWorldActions({model,canvas,camera,firewood,woodSplit,tele
     if(!aimed || (e.code==='KeyG' && aimed.target.id!=='wood' && !Object.hasOwn(woodNames,aimed.target.id)))return;
     if(use(aimed))e.preventDefault();
   });
-  return {update,leave,get seated(){return !!seated;},get seatHeading(){return seated?.yaw;},get seatId(){return seated?.number;}};
+  return {update,leave,visibleFromCamera,get seated(){return !!seated;},get seatHeading(){return seated?.yaw;},get seatId(){return seated?.number;}};
 }

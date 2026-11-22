@@ -6,6 +6,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {STANDING_EYE_HEIGHT,WalkSpace,walkIntent} from './walking.js';
 import {walkingGait} from './footsteps.js';
 import {checkSmartTV} from './check-smart-tv.mjs';
+import {checkRoomZones} from './check-room-zones.mjs';
 import {checkFirewood} from './check-firewood.mjs';
 import {checkThrowColliders} from './check-throw-colliders.mjs';
 import {checkWorldActions} from './check-world-actions.mjs';
@@ -71,6 +72,7 @@ const angle=5.4*Math.PI/180, c=Math.cos(angle),s=Math.sin(angle),feet=.3048;
 function at(x,y,h){
   return new T.Vector3(4.65+feet*(-c*x-s*y),2.88+h,-8.5+feet*(-s*x+c*y));
 }
+checkRoomZones(walks,at);
 const down=new T.Vector3(0,-1,0), inward=at(0,1,0).sub(at(0,0,0)).normalize();
 const ray=new T.Raycaster();
 function hits(objects,from,direction){

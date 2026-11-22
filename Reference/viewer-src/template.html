@@ -339,6 +339,31 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 #stay-dialog :is(a,button):focus-visible{outline:3px solid var(--rust);outline-offset:2px}
 @media(forced-colors:active){#tour-controls nav,#scene-panel,.dock nav,#world-action{background:Canvas;color:CanvasText}#scene-hour{appearance:auto}}
 
+#room-ui{
+  position:absolute;z-index:3;pointer-events:none;
+  inset:max(114px,calc(var(--hud-top,0px) + var(--settings-height,80px) + 32px))
+    max(15px,env(safe-area-inset-right)) calc(var(--pad-bottom) + var(--pad-size) + 9px) max(15px,env(safe-area-inset-left));
+}
+#room-marker,#room-card{pointer-events:auto}
+#room-marker{
+  position:absolute;transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:8px;min-height:44px;max-width:100%;
+  border:1px solid #e6d6b191;border-radius:24px;padding:6px 14px 6px 9px;background:var(--hud);color:var(--ink);
+  font:600 .86rem/1.2 var(--sans);white-space:nowrap;box-shadow:0 2px 8px #14241c40;
+}
+#room-marker i{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;color:#283e30;background:#efe5cb;font:italic 400 1.14rem/1 var(--serif)}
+#room-marker kbd{display:none;padding:2px 4px;border:1px solid #faf4d66b;border-radius:3px;font:650 .7rem/1 system-ui}
+#room-marker[data-locked] kbd{display:inline-block}
+#room-marker[data-anchored]::after{content:"";position:absolute;top:100%;left:50%;height:7px;border-left:2px solid #f9eccf}
+#room-card{
+  position:absolute;top:0;left:0;width:min(310px,100%);max-height:100%;overflow:auto;overscroll-behavior:contain;
+  padding:19px 19px 17px;border-radius:9px;border:1px solid #bfc8b6;background:#f9f6ec;color:var(--pine);box-shadow:0 5px 22px #14261e40;
+}
+#room-card h2{font:400 1.9rem/1.06 var(--serif);letter-spacing:-.025em;margin:0 34px 8px 0}
+#room-card p{margin:0;font:.92rem/1.48 var(--sans)}
+#room-close{position:absolute;right:6px;top:5px;min-width:44px;min-height:44px;padding:0;color:var(--pine);font:400 1.5rem/1 var(--sans)}
+#room-marker:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+#room-close:focus-visible{outline:2px solid var(--pine);outline-offset:-4px}
+@media(max-height:500px) and (min-width:550px){#room-ui{top:76px;bottom:94px}}
 %%MOBILE_STYLES%%
 </style></head><body><main><canvas id="view" class="view" tabindex="0" aria-label="Walk the cabin and grounds. Drag to look around."></canvas><section id="status" aria-labelledby="load-title">
     <img id="load-photo" alt="" decoding="async">
@@ -383,6 +408,14 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
   </section>
 </div>
 <p id="sky-cue" role="status" aria-atomic="true"></p>
+<div id="room-ui">
+  <button id="room-marker" type="button" aria-controls="room-card" aria-expanded="false" aria-haspopup="dialog" aria-keyshortcuts="I" hidden><i aria-hidden="true">i</i><span id="room-label"></span><kbd aria-hidden="true">I</kbd></button>
+  <section id="room-card" role="dialog" aria-labelledby="room-title" aria-describedby="room-description" hidden>
+    <h2 id="room-title"></h2>
+    <button id="room-close" type="button" aria-label="Close room details">×</button>
+    <p id="room-description"></p>
+  </section>
+</div>
 <div id="world-tools">
   <button type="button" id="world-action" aria-keyshortcuts="E" hidden><span id="world-action-label"></span><kbd aria-hidden="true">E</kbd></button>
   <button type="button" id="return-shovel" hidden>Put shovel back</button>
@@ -447,6 +480,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 <dialog id="tour-guide" aria-labelledby="guide-title">
   <div class="guide-heading"><h2 id="guide-title">Cabin guide</h2><button type="button" id="guide-close" aria-label="Close cabin guide">×</button></div>
   <h3>Getting around</h3>
+  <p>Inside, select a room’s info marker to see its furnishings and amenities. You can also press I for room details. The card closes when you leave the room.</p>
   <p>Find the shovel and sleds by the garage doors. When snow settles, pick up the shovel and aim at nearby snow to clear it. Choose a sled to visit the virtual hill at Lake Superior in Bethel.</p>
   <p class="guide-keys">W and S walk forward and back. A and D sidestep. Drag to look around, or turn with the left and right arrows. Page Up and Page Down look up and down. Click nearby wood to pick it up, then click where you want to throw it. You can also aim and press E to use an object or T to throw.</p>
   <p class="guide-touch">Move with the left pad and drag the scene to look around. Tap nearby wood to pick it up, then tap in the direction you want to throw it.</p>

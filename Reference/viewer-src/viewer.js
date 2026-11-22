@@ -18,6 +18,7 @@ import {installEntryDoors} from './entry-doors.js';
 import {installWildlife} from './wildlife.js';
 import {activityControls} from './activity-controls.js';
 import {installWoodSplitting} from './wood-splitting.js';
+import {installRoomHotspots} from './room-hotspots.js';
 import {installWorldActions} from './world-actions.js';
 import {installTourInterface} from './tour-interface.js';
 import {installSmartTV} from './smart-tv.js';
@@ -77,7 +78,7 @@ const woodland=installWoodlandSound();
 const flashlightButton=element('flashlight');
 let flashlight,hallReflections,flashlightOn=false;
 let television,lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
-let winterGear,sledHill;
+let winterGear,sledHill,roomHotspots;
 let renderer,worldActions,updateGrass,updateFallingLeaves;
 let season,sceneWeather;
 let activeView='outside';
@@ -332,6 +333,7 @@ window.addEventListener('hashchange',()=>{
   if(sceneCanRender) changeView(viewFromAddress());
 });
 function reset() {
+  roomHotspots?.reset();
   if(winterGear?.equipped)winterGear.putBack();
   worldActions?.leave();
   const preset=starts[activeView];
@@ -520,6 +522,7 @@ function render(firstFrame=false){
   const animateGrill=grill?.update(camera,activeView,seconds);
   const animateDeer=wildlife?.update(camera,activeView,seconds);
   worldActions?.update();
+  roomHotspots?.update();
   hallReflections?.update(camera,walking(),seconds,lighting?.daylight??1);
   const cinematic=film && walking();
   const adapting=cinematic?film.render(world,camera,lighting,outside,seconds):false;
@@ -656,6 +659,7 @@ async function show() {
       updateLookControls();look();
     }
   });
+  roomHotspots=installRoomHotspots({canvas,camera,getBody:()=>body,visibleFromCamera:worldActions.visibleFromCamera,schedule});
   entryDoors=installEntryDoors(gltf.scene,()=>{renderer.shadowMap.needsUpdate=true;});
   for(const [key,area] of Object.entries(tourAreas)){
     if(!starts[key])throw Error('Missing walking start for '+area.label);
