@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {addLakeWater} from './lake-water.js';
 import survey from './lake-superior.json' with {type:'json'};
 
 const xs=survey.x,ds=survey.d;
@@ -146,6 +147,7 @@ export function makeHill(tracks){
   const scene=new T.Scene();scene.background=new T.Color(0xc6ccd1);scene.fog=new T.FogExp2(0xb9c2c7,.0019);
   scene.onBeforeRender=tracks.flush;
   winterSky(scene);drawTerrain(scene,tracks);woodland(scene);beachBuilding(scene);
+  addLakeWater(scene,xs,ds);
   scene.add(new T.HemisphereLight(0xe4edff,0xa9b3c2,1.7));
   const sun=new T.DirectionalLight(0xffe4b9,1.6);sun.position.set(-56,30,-92);sun.target.position.set(0,0,-27);
   sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);

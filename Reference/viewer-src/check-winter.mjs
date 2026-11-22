@@ -33,7 +33,7 @@ test('walking finishes reflect the visible material',()=>{
     ['Entry · blue-gray crushed stone','gravel'],['Front motor court · weathered asphalt','pavement'],
     ['Charcoal gray tile','tile']])assert.equal(groundFinish(name),kind);
 });
-test('run follows measured grade to the beach with a flat frozen lake and rising far shore',()=>{
+test('run follows measured grade to the beach with a level lake basin and rising far shore',()=>{
   assert.ok(Math.abs(surface(0,0)-9.29)<.05);
   assert.ok(Math.abs(surface(0,50)-2.23)<.05);
   for(const d of [90,120,180,220])assert.equal(surface(0,d),0);
