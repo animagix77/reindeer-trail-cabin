@@ -4,7 +4,8 @@ export const STANDING_EYE_HEIGHT=1.49;
 
 // Collision geometry is exported with the house and uses glTF Y-up metres.
 // A 2 m grid limits movement queries to faces and convex blockers near the visitor.
-const CELL=2, RADIUS=.19, STEP=.32, DROP=.36;
+export const WALK_CELL_SIZE=2;
+const CELL=WALK_CELL_SIZE, RADIUS=.19, STEP=.32, DROP=.36;
 const key=(x,z)=>Math.floor(x/CELL)+','+Math.floor(z/CELL);
 function index(grid,item,bounds) {
   for(let x=Math.floor(bounds.min.x/CELL); x<=Math.floor(bounds.max.x/CELL);x++){

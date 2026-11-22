@@ -1,6 +1,7 @@
 // Locally synthesized woodland ambience and close-up footfalls.
 import * as THREE from 'three';
 import {soleSound} from './footsteps.js';
+import {cabinCarol} from './cabin-carol.js';
 import {atmosphere} from './tour-sky.js';
 
 const tau=2*Math.PI;
@@ -213,6 +214,14 @@ export function installWoodlandSound() {
     },
     update(camera,outside,walking,ring,fire){
       if(!enabled||!audio||!tracks.fire)return;
+      const indoors=walking && !outside;
+      if(indoors && !tracks.carol){
+        const source=audio.createBufferSource(),gain=audio.createGain();
+        source.loop=true;gain.gain.value=0;
+        source.connect(gain);gain.connect(bus);tracks.carol=gain.gain;
+        cabinCarol(audio).then(buffer=>{source.buffer=buffer;source.start();});
+      }
+      if(tracks.carol)aim('carol',tracks.carol,indoors?.13:0,indoors?.7:.32);
       const wet=weather==='rain',snow=weather==='snow';
       const room=outside?1:.095;
       aim('wind',tracks.wind,walking?room*(snow?.28:wet?.63:.34):0);

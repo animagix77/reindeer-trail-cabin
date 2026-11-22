@@ -17,6 +17,8 @@ import {activityControls} from './activity-controls.js';
 import {installWoodSplitting} from './wood-splitting.js';
 import {installWorldActions} from './world-actions.js';
 import {installTourInterface} from './tour-interface.js';
+import {installSmartTV} from './smart-tv.js';
+import {createThrowColliders} from './throw-colliders.js';
 import {installFirewood} from './firewood.js';
 import {installTourFires} from './fires.js';
 import {installWelcome} from './welcome.js';
@@ -71,7 +73,7 @@ const world = new THREE.Scene();
 const woodland=installWoodlandSound();
 const flashlightButton=element('flashlight');
 let flashlight,floodlights,hallReflections,flashlightOn=false;
-let lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
+let television,lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
 let renderer,worldActions,updateGrass,updateFallingLeaves;
 let season,sceneWeather;
 let activeView='outside';
@@ -506,6 +508,7 @@ function render(firstFrame=false){
   lighting?.update(camera.position,activeView,seconds,camera,outside,body?.label);
   flashlight?.update(camera,walking(),outside,flashlightOn);
   const animateFlood=floodlights?.update(camera.position,walking() && outside,lighting?.daylight??1,seconds,walking());
+  const animateTV=television?.update(camera.position,body?.label,seconds);
   const animateSplitting=woodSplit?.update(activeView,seconds,velocity.lengthSq()>.0025);
   const animateWood=firewood?.update(body,activeView,seconds,activities.offeringFood);
   const animateFire=fires?.update(camera,activeView,seconds);
@@ -524,7 +527,7 @@ function render(firstFrame=false){
   const cinematic=film && walking();
   const adapting=cinematic?film.render(world,camera,lighting,outside,seconds):false;
   if(!cinematic)renderer.render(world,camera);
-  if(!document.hidden && (adapting || animateSwings || animateFlood || animateSplitting || animateWood || animateFoliage || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
+  if(!document.hidden && (adapting || animateTV || animateSwings || animateFlood || animateSplitting || animateWood || animateFoliage || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
 }
 function updateState(button,enabled) {button.setAttribute('aria-pressed',String(enabled));}
 element('reset').addEventListener('click',reset);
@@ -626,9 +629,10 @@ async function show() {
       };
     }
   }
-  wildlife=installWildlife(world,walkSpace,camera,{onChange:activities.setDeer});
+  const colliders=createThrowColliders(walkSpace,gltf.scene);
+  wildlife=installWildlife(world,walkSpace,camera,{onChange:activities.setDeer,colliders});
   fires=installTourFires(world,gltf.scene);
-  firewood=installFirewood(world,gltf.scene,walkSpace,camera,fires,undefined,kind=>party.fuel(kind));
+  firewood=installFirewood(world,gltf.scene,walkSpace,camera,fires,undefined,kind=>party.fuel(kind),colliders);
   firewood.setRestocked(party.stockTotal);
   woodSplit=installWoodSplitting(world,gltf.scene,walkSpace,{
     camera,schedule,takeSplitLog:firewood.takeSplitLog,
@@ -639,8 +643,9 @@ async function show() {
   });
   walkSpace.dynamicBlocker=woodSplit.blocksStep;
   grill=installGrill(world,gltf.scene,activities.setGrill);
-  worldActions=installWorldActions({
-    model:gltf.scene,canvas,camera,space:walkSpace,firewood,activities,sceneControls,
+  television=installSmartTV(gltf.scene,schedule);
+  worldActions=installWorldActions({television,
+    model:gltf.scene,canvas,camera,space:walkSpace,firewood,woodSplit,activities,sceneControls,
     getBody:()=>body,neighbors:party.neighbors,seatOccupied:party.seatOccupied,schedule,
     seat(next,heading){
       stopWalking();body=next;camera.position.set(body.x,body.y+body.eye,body.z);

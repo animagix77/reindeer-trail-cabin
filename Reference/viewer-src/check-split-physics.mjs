@@ -60,7 +60,18 @@ test('split halves fall, collide with the ground and one another and become a pe
   assert(all.some(({mesh})=>mesh.position.y-groundAt(mesh.position.x,mesh.position.z)>.21),'At least one half rests on other splits');
   const frozen=all[0].mesh.position.clone();
   assert.equal(physics.step(2),false);assert(all[0].mesh.position.equals(frozen));
-  for(let i=0;i<all.length;i++)assert(physics.take());
+  const ray=new T.Raycaster(),down=new T.Vector3(0,-1,0);
+  const selectable=all.find(({mesh})=>{
+    if(mesh.visible)return false;
+    ray.set(mesh.position.clone().addScaledVector(down,-1.5),down);
+    return physics.hitPiece(ray)?.object===mesh;
+  });
+  assert(selectable,'Visible surfaces on the merged pile can be selected individually');
+  let lifted=null;
+  assert(physics.take((mass,mesh)=>{lifted=mesh;return true;},selectable.mesh));
+  assert.equal(lifted,selectable.mesh);
+  assert(!physics.take(null,selectable.mesh),'A second tap cannot collect another piece using a stale selection');
+  for(let i=1;i<all.length;i++)assert(physics.take());
   assert.equal(physics.take(),false);assert.equal(physics.count,0);
 });
 test('heavy rounds accelerate less under a strike and the solver advances in fixed steps',()=>{

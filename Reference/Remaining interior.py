@@ -303,15 +303,21 @@ def _furnish_remaining():
         coll_line('outer'+str(i),ax,p[1-k],a,b,gaps)
     # The owner's TV-wall doorway is the bunk room. Photographs DSC01557 and
     # DSC01704 establish its connection to the sofa and the full bed's front-hall entrance.
-    bunk_partition=9.63
+    # Keep the standard 78-inch steel bunk and leave just enough space for
+    # the gathered window curtain at its foot and the skirting at its head.
+    bunk_foot=.60
+    bunk_head=bunk_foot+6.52
+    bunk_partition=bunk_head+.125
     def primary_ceiling(y):
         # L1040619 shows the ceiling rising from the window side to the headboard.
         return 2.075+.085*(y-3.12)
     wall('Bunk and primary common wall','x',bunk_partition,3.12,15.25,mint,(),None,True)
     # The master side of the bunk partition is mushroom plaster in L1040619.
-    face('Master bedroom · warm plaster behind hanging rail',
-         [(bunk_partition+.008,3.12,.083),(bunk_partition+.008,15.11,.083),
-          (bunk_partition+.008,15.11,primary_ceiling(15.11)),(bunk_partition+.008,3.12,primary_ceiling(3.12))],pale)
+    for a,b,ha,hb in [(3.12,7,primary_ceiling(3.12),primary_ceiling(7)),
+                       (7,15.11,loftdeck-.125,loftdeck-.125)]:
+        face('Master bedroom · warm plaster behind hanging rail',
+             [(bunk_partition+.008,a,.083),(bunk_partition+.008,b,.083),
+              (bunk_partition+.008,b,hb),(bunk_partition+.008,a,ha)],pale)
     wall('Primary bedroom barn door wall','x',23.45,10.25,15.48,pale,[(11.15,14.35,0,2.04)],None,True)
     wall('Primary bedroom rear return','y',15.27,20.75,23.45,pale,(),2.35,True)
     # The two faces follow the same jambs all the way in from the street
@@ -418,9 +424,17 @@ def _furnish_remaining():
         ('gable',(40.835,12.495),(40.835,10.20))]:
         face('Front bedroom · upper plaster at '+label,
              [(*a,2.17),(*b,2.17),(*b,2.302),(*a,2.302)],pale)
-    for y0,y1,edge in [(3.12,10.25,21.38),(10.25,15.27,23.45)]:
-        corners=[(bunk_partition,y0),(bunk_partition,y1),(edge,y1),(edge,y0)]
+    for y0,y1,left_edge,edge in [(3.12,7,bunk_partition,21.38),(7,10.25,front,21.38),(10.25,15.27,front,23.45)]:
+        corners=[(left_edge,y0),(left_edge,y1),(edge,y1),(edge,y0)]
         face('Primary bedroom · sloping plaster',[(x,y,primary_ceiling(y)) for x,y in corners],ceilingmat)
+    # The adjusted room line now passes below the edge of the existing loft.
+    loft_soffit=loftdeck-.125
+    face('Primary bedroom · plaster soffit below loft',[(bunk_partition,7,loft_soffit),(bunk_partition,15.27,loft_soffit),
+         (front,15.27,loft_soffit),(front,7,loft_soffit)],ceilingmat)
+    face('Primary bedroom · loft fascia',[(front,7,loft_soffit),(front,15.27,loft_soffit),
+         (front,15.27,primary_ceiling(15.27)),(front,7,primary_ceiling(7))],pale)
+    face('Primary bedroom · loft soffit return',[(bunk_partition,7,loft_soffit),(front,7,loft_soffit),
+         (front,7,primary_ceiling(7)),(bunk_partition,7,primary_ceiling(7))],pale)
     # The primary ceiling rises higher than the adjacent hallway. A separate
     # bedroom-facing lining closes the wall above the door and its two returns.
     # All three infills start above the exposed doorway trim and rail.
@@ -622,7 +636,7 @@ def _furnish_remaining():
         for xx in (18.02,19.58):line(qdec,(xx,4.83,z+.105),(xx,4.90,z+.105),.013,brass2,12)
     collider('main_bedroom_dresser',17.38,20.22,3.26,4.90,0,1.26)
     # Open steel hanging rail along the same side as the three river prints.
-    rack_x=10.21
+    rack_x=bunk_partition+.58
     for y in (4.35,7.58):
         line(qdec,(rack_x,y,.07),(rack_x,y,1.57),.012,rail,12)
         line(qdec,(rack_x-.34,y,.065),(rack_x+.72,y,.065),.012,rail,12)
@@ -634,7 +648,7 @@ def _furnish_remaining():
                 (rack_x+.015,y,1.523),(rack_x+.015,y,1.485),(rack_x+.568,y,1.402),
                 (rack_x-.525,y,1.402),(rack_x+.015,y,1.485)]
         for a,bp in zip(points,points[1:]):line(qdec,a,bp,.006,timber,8)
-    collider('main_bedroom_hanging_rail',9.65,10.96,4.32,7.61,0,1.58)
+    collider('main_bedroom_hanging_rail',rack_x-.56,rack_x+.75,4.32,7.61,0,1.58)
     # The crown has two staggered levels of tines and six candle bulbs (L1040619 and DSC01701).
     cx,cy=15.65,11.75
     tine=material('Master · amber antlers','#94754f',0,.55)
@@ -662,11 +676,12 @@ def _furnish_remaining():
          (14.32,15.035,1.788),(16.86,15.035,1.788)],plaque,[(1,0),(0,0),(0,1),(1,1)])
     for j in range(3):
         start=8.29+j*.96;end=start+.90
-        bx(qdec,9.656,9.72,start,end,1.19,1.655,woodboard)
+        bx(qdec,bunk_partition+.026,bunk_partition+.09,start,end,1.19,1.655,woodboard)
         river=texmat('Master · photographed river panel '+str(j+1),'Master - river panel '+str(j+1)+'.jpg')
         # From in front of this wall +Y appears to the right.
-        face('Master · river triptych panel '+str(j+1),[(9.727,start+.025,1.20),(9.727,end-.025,1.20),
-             (9.727,end-.025,1.645),(9.727,start+.025,1.645)],river,[(0,0),(1,0),(1,1),(0,1)])
+        art_x=bunk_partition+.097
+        face('Master · river triptych panel '+str(j+1),[(art_x,start+.025,1.20),(art_x,end-.025,1.20),
+             (art_x,end-.025,1.645),(art_x,start+.025,1.645)],river,[(0,0),(1,0),(1,1),(0,1)])
     # Theater-gray split drapes at the primary's divided-light front window. DSC01554.
     curtain=material('Master · gray linen drapes','#8f8985',0,.91)
     line(qdec,(10.62,3.38,1.89),(16.78,3.38,1.89),.013,rail,16)
@@ -816,7 +831,7 @@ def _furnish_remaining():
     bunk=group('Bunk bedroom by television | steel frame, painted loft joists and tall chest')
     # Photo 027 explicitly identifies the twin-over-full. The outer posts jog
     # out at the lower rail and the inclined ladder follows the wider mattress.
-    x0,x1,y0=.68,7.20,4.07
+    x0,x1,y0=bunk_foot,bunk_head,4.07
     twin_edge=y0+3.25
     full_edge=y0+4.50
     for x in (x0,x1):
@@ -844,15 +859,52 @@ def _furnish_remaining():
         z=.224+j*.267;yy=ladder_y(z)
         bx(bunk,x0+.19,x0+1.40,yy-.060,yy+.060,z-.014,z+.014,rail)
     # DSC01557 looks from the ladder to the tall chest, window and living-room sofa.
-    bx(bunk,5.87,8.12,13.65,14.98,.034,1.15,night)
+    chest_back=bunk_partition-.06
+    bx(bunk,chest_back-1.33,chest_back,12.68,14.93,.034,1.15,night)
     for j in range(5):
-        bx(bunk,5.93,8.06,13.57,13.65,.09+j*.209,.271+j*.209,night)
-        for xx in (6.26,7.74):line(bunk,(xx,13.56,.18+j*.209),(xx,13.51,.18+j*.209),.012,brass2,9)
-    collider('bunk_tall_chest',5.87,8.12,13.51,14.98,0,1.15)
+        bx(bunk,chest_back-1.41,chest_back-1.33,12.74,14.87,.09+j*.209,.271+j*.209,night)
+        for yy in (13.06,14.54):line(bunk,(chest_back-1.41,yy,.18+j*.209),(chest_back-1.47,yy,.18+j*.209),.012,brass2,9)
+    collider('bunk_tall_chest',chest_back-1.47,chest_back,12.68,14.93,0,1.15)
     for xx in (1.1,3.8,6.6):bx(bunk,xx,xx+.22,3.21,15.02,loftdeck-.20,loftdeck-.13,mint)
     cyl(bunk,4.15,9.55,1.99,2.025,.096,lamp,20);cyl(bunk,4.15,9.55,2.025,2.067,.109,cream,20)
     finish(bunk);collider('bunk_beds',x0,x1,y0,full_edge,0,.42)
     collider('bunk_ladder',x0+.15,x0+1.43,twin_edge,ladder_front+.05,0,1.60)
+    # SYKIARIOL model 1327, green: open shelf, two removable bins and
+    # a rolled steel frame on splayed timber legs. The drawers open into the room.
+    table_w,table_d,table_h=.38989,.30988,.55499
+    tx=bunk_partition-.07-table_w/(2*ft)
+    ty=full_edge+.17+table_d/(2*ft)
+    table=group('Bunk bedside | mint steel two-drawer nightstand',(tx,ty,.014))
+    enamel=material('Nightstand · mint enamel','#a5c7ba',.18,.42)
+    bins=material('Nightstand · seafoam drawer bins','#9abeb0',.03,.54)
+    labels=material('Nightstand · pale finger pulls','#deebe3',.14,.47)
+    feet=material('Nightstand · warm beech legs','#bd9b70',0,.67)
+    w,d=table_w/2,table_d/2
+    table_base=.144;radius=.026;lip=.007
+    for sx in (-1,1):
+        for sy in (-1,1):
+            table.beam((sx*(w-.023),sy*(d-.022),.002),(sx*(w-.050),sy*(d-.047),table_base+.005),.010,feet,12,.016)
+    # A radiused rectangular sleeve with open front, back and shelf aperture.
+    def sleeve_loop(y,inset):
+        ring=[]
+        for cx,cz,start in [(w-radius,table_h-radius,0),(-w+radius,table_h-radius,pi/2),
+                            (-w+radius,table_base+radius,pi),(w-radius,table_base+radius,3*pi/2)]:
+            for i in range(6):
+                a=start+pi*i/10
+                ring.append(table.vert((cx+(radius-inset)*cos(a),y,cz+(radius-inset)*sin(a))))
+        return ring
+    rings=[sleeve_loop(y,i) for y,i in [(-d,0),(d,0),(d,lip),(-d,lip)]]
+    for a,b in zip(rings,rings[1:]+rings[:1]):
+        for i in range(len(a)):
+            j=(i+1)%len(a);table.face((a[i],b[i],b[j],a[j]),enamel)
+    table.cube((0,-d+.014,(table_base+table_h)/2),(table_w-2*lip,.006,table_h-table_base-2*radius),enamel)
+    for bottom in (table_base+.015,table_base+.145):
+        table.cube((0,.004,bottom+.055),(table_w-.036,table_d-.028,.109),bins,10)
+        table.cube((0,.004,bottom+.110),(table_w-.025,table_d-.018,.008),enamel,14)
+        table.cube((0,d-.003,bottom+.100),(.089,.007,.022),labels,6)
+    table.cube((0,0,table_base+.274),(table_w-2*lip,table_d-.007,.009),enamel)
+    finish(table)
+    collider('bunk_nightstand',tx-w/ft,tx+w/ft,ty-d/ft,ty+d/ft,.013,.014+table_h)
     bath_script=work/'Bathroom.py'
     exec(compile(bath_script.read_text(),str(bath_script),'exec'),{**globals(),**locals()})
     # DSC01704 looks from full bed straight out onto this long striped hall runner.

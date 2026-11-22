@@ -55,6 +55,7 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
   let near=false,distance=Infinity,equipped=false,drawnAt=0,strength=1,exhausted=false,recoverAt=0,lastTick=now();
   let swing=null,queuedHit=null,reloadAfter=null,loading=null,clearing=false,lastClear=0,lastShadow=0,hint='',hover=null;
   const stump=root.getObjectByName('Scored chopping stump');
+  const cradle=root.getObjectByName('Split log cradle');
   const ray=new T.Raycaster(),ndc=new T.Vector2(),point=new T.Vector3(),viewer=new T.Vector3();
   const oldEdge=new T.Vector3(),newEdge=new T.Vector3(),projected=new T.Vector3();
   let preferred=null,notch=null;
@@ -279,11 +280,15 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     canvas.style.cursor=hover?'pointer':'';showTarget(now());
   });
   canvas.addEventListener('pointerup',e=>{
-    const clicked=tap?.id===e.pointerId;pressed.delete(e.pointerId);tap=null;
+    const clicked=tap?.id===e.pointerId && Math.hypot(e.clientX-tap.x,e.clientY-tap.y)<=(e.pointerType==='touch'?10:5);
+    pressed.delete(e.pointerId);tap=null;
     if(!clicked||!canInput())return;
     const locked=document.pointerLockElement===canvas;
     const hit=hitTest(locked?null:e.clientX,locked?null:e.clientY,e.pointerType==='touch'?9:3);
-    if(hit?.kind==='axe'?pickup():hit?.kind==='round' && strike(hit))canvas.focus({preventScroll:true});
+    if(hit?.kind==='axe' && !handsBusy() || hit?.kind==='round'){
+      if(hit.kind==='axe')pickup();else strike(hit);
+      e.preventDefault();canvas.focus({preventScroll:true});
+    }
   });
   canvas.addEventListener('pointerleave',()=>{canvas.style.cursor='';hover=null;showTarget(now());});
   function cancel(e){pressed.delete(e.pointerId);tap=null;}
@@ -321,7 +326,8 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     if(!canInput()||e.defaultPrevented||e.repeat||e.altKey||e.ctrlKey||e.metaKey)return;
     if(document.pointerLockElement!==canvas && ![canvas,document.body].includes(e.target))return;
     if(e.code==='KeyE'){
-      if(equipped){returnAxe();hint='';refresh();}else pickup();
+      if(equipped){returnAxe();hint='';refresh();}
+      else if(!(hover?.kind==='axe' || hitTest(null,null)?.kind==='axe') || !pickup())return;
       e.preventDefault();
     }else if(e.code==='Space' && equipped){
       const aim=hitTest(null,null);if(aim?.kind==='round')strike(aim);
@@ -329,6 +335,24 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     }
   });
   return {view,
+    get equipped(){return equipped;},
+    hitWood(raycaster){
+      if(!physics.count || swing || handsBusy())return null;
+      const hit=physics.hitPiece(raycaster);
+      if(!hit || equipped && station.targets.includes(hit.object))return null;
+      const obstacles=[stump,cache,cradle];
+      if(station.round.visible)obstacles.push(station.round);
+      if(!equipped)obstacles.push(station.maul);
+      for(const mesh of obstacles){
+        mesh.updateWorldMatrix(true,true);
+        if(raycaster.intersectObject(mesh,true)[0]?.distance<hit.distance-.003)return null;
+      }
+      return hit;
+    },
+    pickUpHit(hit){
+      if(swing || handsBusy() || !physics.take(takeSplitLog,hit.object))return false;
+      returnAxe();hint='';refresh();return true;
+    },
     blocksStep(wx,wz,footY){
       if(!physics.count)return false;
       root.worldToLocal(p.set(wx,footY,wz));return physics.blocksStep(p.x,p.z,p.y);

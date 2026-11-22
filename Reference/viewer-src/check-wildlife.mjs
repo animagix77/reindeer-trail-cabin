@@ -4,12 +4,15 @@ import fs from 'node:fs/promises';
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {STANDING_EYE_HEIGHT,WalkSpace} from './walking.js';
+import {createThrowColliders} from './throw-colliders.js';
 import {installWildlife} from './wildlife.js';
 import {makeDeer} from './wildlife-model.js';
 
 const bytes=await fs.readFile(process.argv[2]);
 const loader=new GLTFLoader();
-loader.register(()=>({name:'Walk geometry only',loadMaterial:async()=>new T.MeshBasicMaterial()}));
+loader.register(parser=>({name:'Walk geometry only',async loadMaterial(index){
+  const mat=new T.MeshBasicMaterial();mat.name=parser.json.materials[index].name;return mat;
+}}));
 const model=await loader.parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.length),'');
 model.scene.updateMatrixWorld(true);
 const space=new WalkSpace();
@@ -23,7 +26,7 @@ model.scene.traverse(obj=>{
 const scene=new T.Scene(),camera=new T.PerspectiveCamera(),stock={apple:5,carrot:4,vegetables:4};
 const foods=new Set(),events=[],bites=[],wordToFood={apple:'apple',carrot:'carrot',greens:'vegetables'};
 let state,deer,clock=0;
-const herd=installWildlife(scene,space,camera,{onChange(value){
+const herd=installWildlife(scene,space,camera,{colliders:createThrowColliders(space,model.scene),onChange(value){
   state=value;events.push(value.message);
   const meal=value.message.match(/ate the (\w+) (from your hand|you tossed)/);
   if(!meal)return;

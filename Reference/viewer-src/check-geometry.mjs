@@ -5,7 +5,9 @@ import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {STANDING_EYE_HEIGHT,WalkSpace,walkIntent} from './walking.js';
 import {walkingGait} from './footsteps.js';
+import {checkSmartTV} from './check-smart-tv.mjs';
 import {checkFirewood} from './check-firewood.mjs';
+import {checkThrowColliders} from './check-throw-colliders.mjs';
 import {checkWorldActions} from './check-world-actions.mjs';
 import {installEggSwings} from './egg-swings.js';
 
@@ -240,6 +242,27 @@ function traverseRoute(label,points,startingHeight=0,checkStep){
     assert(Math.hypot(body.x-target.x,body.z-target.z)<.025,label+' obstructed at '+[x,y]);
   }
   return body;
+}
+// Stand in the bedroom doorway, then walk past the dresser to the bedside.
+traverseRoute('Aisle from living room to bunk bedside',[[3.55,16.6],[3.55,12.4],[4.9,10.4],[5.1,9.45]]);
+traverseRoute('Aisle to the bunk ladder',[[3.55,12.4],[2.4,10.5],[1.65,9.72]]);
+{
+  const frame=[],plaster=[],table=[];
+  scene.traverse(o=>{
+    if(!o.isMesh)return;
+    const name=o.userData.part;
+    if(name.startsWith('Bunk bedroom by television'))frame.push(o);
+    if(name.startsWith('Bunk and primary common wall'))plaster.push(o);
+    if(name.startsWith('Bunk bedside |'))table.push(o);
+  });
+  const besidePost=at(7.218,4.07,1.02);
+  const wall=hits(plaster,besidePost,xAxis)[0],post=hits(frame,besidePost,xAxis.clone().negate())[0];
+  assert(wall && post && wall.distance+post.distance<.02,'Pillow-end bedpost must clear the plaster by less than two centimetres');
+  const nightstand=at(6.51,9.25,1);
+  const top=hits(table,nightstand,down)[0];
+  assert(top && Math.abs(top.point.y-at(6.51,9.25,.569).y)<.006,'Open-shelf nightstand is at the pillow end of the lower bunk');
+  assert(!walks.spawn(nightstand.x,nightstand.z,nightstand.y+.5,2.88)?.label.startsWith('WalkSurface_MainFloor'),
+    'The main-floor walker cannot enter the nightstand');
 }
 // Check the actual published surfaces as well as the collision lane. A clear
 // centerline alone would miss the false recess formerly behind the pedal bin.
@@ -725,6 +748,8 @@ function checkBasement(){
 }
 checkBasement();
 
+checkSmartTV(scene,walks);
+checkThrowColliders(scene,walks);
 checkFirewood(scene,walks);
 checkWorldActions(scene,walks);
 const survey=JSON.parse(await fs.readFile(new URL('../model-geometry.json',import.meta.url),'utf8'));

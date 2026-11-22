@@ -46,7 +46,7 @@ function fixtures(model,wood){
   return {targets,occluders};
 }
 
-export function installWorldActions({model,canvas,camera,firewood,activities,sceneControls,
+export function installWorldActions({model,canvas,camera,firewood,woodSplit,television,activities,sceneControls,
   space,getBody,neighbors,seatOccupied,seat,schedule}){
   const button=document.getElementById('world-action'),label=document.getElementById('world-action-label');
   const {targets,occluders}=fixtures(model,firewood);
@@ -56,6 +56,8 @@ export function installWorldActions({model,canvas,camera,firewood,activities,sce
   function available(){return !!getBody() && !activities.open && !document.querySelector('dialog[open]');}
   function actionFor(t,body){
     const wood=firewood.state;
+    // With wood in hand a tap aims the throw, including at yard furniture.
+    if(wood?.held && t.id!=='pit' && !Object.hasOwn(woodNames,t.id))return '';
     if(t.id==='furnace'){
       if(outdoorsFloor(body.label))return '';
       return sceneControls.isFurnaceOn()?'Turn furnace off':'Turn furnace on';
@@ -69,15 +71,15 @@ export function installWorldActions({model,canvas,camera,firewood,activities,sce
         if(wood?.held)return wood.canToss?'Toss '+(wood.heldName||woodNames[wood.held])+' into fire':'';
         return sceneControls.isFireLit()?'Put out fire':'Light fire';
       default:
-        if(!wood || wood.inFlight || activities.offeringFood || !wood.nearby.includes(t.id))return '';
-        if(wood.held)return wood.held===t.id?'Put back '+(wood.heldName||woodNames[t.id]):'';
-        return wood.counts[t.id]>0?'Pick up '+woodNames[t.id]:'';
+        if(wood?.held===t.id && !activities.offeringFood && wood.nearby.includes(t.id))
+          return 'Put back '+(wood.heldName||woodNames[t.id]);
+        return '';
     }
   }
   function blocked(t,distance){
     cast.far=distance-.025;
     for(const block of occluders){
-      if(t.ignore.includes(block.owner) || !cast.ray.intersectBox(block.bounds,broadHit))continue;
+      if(t.ignore?.includes(block.owner) || !cast.ray.intersectBox(block.bounds,broadHit))continue;
       // Rotated walls have large world-aligned bounds. Test their actual faces
       // before rejecting a reachable stove or grill on this side of the wall.
       obstructions.length=0;
@@ -86,17 +88,21 @@ export function installWorldActions({model,canvas,camera,firewood,activities,sce
     }
     return false;
   }
-  function aim(pixel){
-    const body=getBody();
-    if(!body || !available())return null;
-    if(seated)return {target:seated,caption:'Stand up'};
+  function setRay(pixel){
     if(pixel){
       const rect=canvas.getBoundingClientRect();
-      if(!rect.width||!rect.height)return null;
+      if(!rect.width||!rect.height)return false;
       ndc.set(2*(pixel.x-rect.left)/rect.width-1,1-2*(pixel.y-rect.top)/rect.height);
     }else ndc.set(0,0);
     camera.updateWorldMatrix(true,false);
     cast.setFromCamera(ndc,camera);
+    cast.far=Infinity;return true;
+  }
+  function aim(pixel){
+    const body=getBody();
+    if(!body || !available())return null;
+    if(seated)return {target:seated,caption:'Stand up'};
+    if(!setRay(pixel))return null;
     let best=null,closest=Infinity;
     for(const t of targets){
       const range=t.id==='pit' && firewood.state?.held?5.5:t.range;
@@ -107,10 +113,31 @@ export function installWorldActions({model,canvas,camera,firewood,activities,sce
       if(distance>=closest || blocked(t,distance))continue;
       closest=distance;best={target:t,caption:text};
     }
+    if(!firewood.state?.held && !firewood.state?.inFlight && !activities.offeringFood){
+      // Use the visible surface so that individual logs can be lifted from a
+      // pile and a click in the spaces between twigs still hits the ground.
+      for(const source of [firewood,woodSplit,television]){
+        if(!source)continue;
+        const tv=source===television;
+        if(!tv && source!==woodSplit && woodSplit?.equipped)continue;
+        cast.far=source===woodSplit?Math.min(closest,2.70):closest;
+        const contact=tv?source.hit(cast):source.hitWood(cast);
+        if(!contact || contact.distance>=closest)continue;
+        if(source===woodSplit && (Math.hypot(body.x-contact.point.x,body.z-contact.point.z)>1.65 ||
+            Math.abs(body.y-contact.point.y)>1.95))continue;
+        const target={id:tv?'tv':'wood',source,contact};
+        if(blocked(target,contact.distance))continue;
+        closest=contact.distance;
+        best={target,caption:tv?'Use TV':'Pick up '+(woodNames[contact.kind]||'split wood')};
+      }
+    }
     return best;
   }
   function show(item){
     displayed=item?.target??null;
+    document.documentElement.toggleAttribute('data-direct-focus',!!displayed?.contact);
+    document.documentElement.toggleAttribute('data-grabbable',displayed?.id==='wood');
+    document.documentElement.toggleAttribute('data-direct-aim',!!displayed?.contact && (!hover || document.pointerLockElement===canvas));
     const next=item?.caption??'';
     if(next===caption)return;
     caption=next;button.hidden=!next;label.textContent=next;
@@ -144,6 +171,10 @@ export function installWorldActions({model,canvas,camera,firewood,activities,sce
     if(!item || !available())return false;
     if(seated){leave();return true;}
     const t=item.target;
+    if(t.contact){
+      const used=t.id==='tv'?t.source.select(t.contact.uv):t.source.pickUpHit(t.contact);
+      schedule();return used!==false;
+    }
     if(!actionFor(t,getBody()))return false;
     switch(t.id){
       case 'chair':sit(t);break;
@@ -153,16 +184,18 @@ export function installWorldActions({model,canvas,camera,firewood,activities,sce
         if(firewood.state?.held)firewood.toss();else sceneControls.toggleFire();
         break;
       default:
-        if(firewood.state?.held)firewood.putBack();else firewood.pickUp(t.id);
+        firewood.putBack();
     }
     schedule();return true;
   }
   function currentAim(){
-    if(hover && document.pointerLockElement!==canvas){
-      const underCursor=aim(hover);
-      if(underCursor)return underCursor;
-    }
-    return aim(null);
+    return aim(document.pointerLockElement===canvas?null:hover);
+  }
+  function throwAt(pixel){
+    if(!available() || seated || !firewood.state?.held || activities.offeringFood || !setRay(pixel))return false;
+    const thrown=firewood.throwWood(cast.ray.direction);
+    if(thrown)schedule();
+    return thrown;
   }
   function update(){
     if(seated && seatOccupied(seated.number,true))leave();
@@ -181,23 +214,31 @@ export function installWorldActions({model,canvas,camera,firewood,activities,sce
     }
   });
   canvas.addEventListener('pointerup',e=>{
-    const tapped=press?.id===e.pointerId;
+    const tapped=press?.id===e.pointerId && Math.hypot(e.clientX-press.x,e.clientY-press.y)<=7;
     pointers.delete(e.pointerId);press=null;
     // While seated, looking around cannot accidentally stand the visitor up.
-    if(!tapped || seated)return;
-    const result=aim(document.pointerLockElement===canvas?null:{x:e.clientX,y:e.clientY});
-    if(use(result) && !activities.open)canvas.focus({preventScroll:true});
+    if(!tapped || seated || e.defaultPrevented)return;
+    const pixel=document.pointerLockElement===canvas?null:{x:e.clientX,y:e.clientY};
+    const result=aim(pixel);
+    if((result?use(result):throwAt(pixel)) && !activities.open)canvas.focus({preventScroll:true});
   });
   canvas.addEventListener('pointerleave',e=>{
     if(!button.contains(e.relatedTarget)){hover=null;schedule();}
   });
   for(const event of ['pointercancel','lostpointercapture'])canvas.addEventListener(event,e=>{press=null;pointers.delete(e.pointerId);});
   window.addEventListener('blur',cancel);
+  window.addEventListener('pagehide',cancel);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){cancel();hover=null;}});
+  window.addEventListener('touchend',e=>{if(!e.touches.length)cancel();},{passive:true});
+  window.addEventListener('touchcancel',cancel,{passive:true});
   document.addEventListener('pointerlockchange',()=>{cancel();hover=null;schedule();});
   button.addEventListener('click',()=>{
     // Retest reach and sight after walking, and before acting on a pointer prompt.
     const aimed=currentAim();
-    if(displayed && aimed?.target===displayed && use(aimed) && !activities.open)canvas.focus({preventScroll:true});
+    const target=aimed?.target;
+    const same=target===displayed || target?.contact && target.contact.object===displayed?.contact?.object &&
+      target.contact.instanceId===displayed.contact.instanceId;
+    if(displayed && same && use(aimed) && !activities.open)canvas.focus({preventScroll:true});
   });
   document.addEventListener('keydown',e=>{
     if(e.target!==document.body && e.target!==canvas)return;
@@ -207,8 +248,11 @@ export function installWorldActions({model,canvas,camera,firewood,activities,sce
     if(e.defaultPrevented||e.repeat||e.altKey||e.ctrlKey||e.metaKey||
       !['KeyE','KeyG','KeyT'].includes(e.code))return;
     const aimed=currentAim();
-    if(!aimed || (e.code==='KeyG' && !Object.hasOwn(woodNames,aimed.target.id)) ||
-      (e.code==='KeyT' && (aimed.target.id!=='pit' || !firewood.state?.held)))return;
+    if(e.code==='KeyT'){
+      if((aimed?.target.id==='pit' && firewood.state?.held)?use(aimed):throwAt(document.pointerLockElement===canvas?null:hover))e.preventDefault();
+      return;
+    }
+    if(!aimed || (e.code==='KeyG' && aimed.target.id!=='wood' && !Object.hasOwn(woodNames,aimed.target.id)))return;
     if(use(aimed))e.preventDefault();
   });
   return {update,leave,get seated(){return !!seated;},get seatHeading(){return seated?.yaw;},get seatId(){return seated?.number;}};

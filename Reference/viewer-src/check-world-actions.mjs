@@ -8,9 +8,10 @@ import {makeHiker} from './hiker.js';
 
 class Element extends EventTarget {
   hidden=true; textContent=''; classList={add(){},remove(){}};
+  attributes=new Set();
   contains(node){return node===this;}
   getBoundingClientRect(){return {left:0,top:0,width:800,height:600};}
-  focus(){} toggleAttribute(){}
+  focus(){} toggleAttribute(key,enabled){if(enabled)this.attributes.add(key);else this.attributes.delete(key);}
 }
 export function checkWorldActions(model,space){
   const canvas=new Element(),button=new Element(),label=new Element();
@@ -27,27 +28,30 @@ export function checkWorldActions(model,space){
     const sceneControls={isFireLit:()=>fire,toggleFire(){fire=!fire;},
       isFurnaceOn:()=>furnace,toggleFurnace(){furnace=!furnace;}};
     const place=spot=>{body=spot;camera.position.set(spot.x,spot.y+spot.eye,spot.z);};
-    const controls=installWorldActions({model,camera,canvas,activities,sceneControls,space,firewood:wood,
+    const options={model,camera,canvas,activities,sceneControls,space,firewood:wood,
       getBody:()=>body,neighbors:()=>neighbors,seatOccupied:(id,resolving)=>id===taken && (!resolving||tie),
-      seat(next,yaw){place(next);if(yaw!=null)camera.rotation.set(-.1,yaw,0,'YXZ');},schedule(){}});
+      seat(next,yaw){place(next);if(yaw!=null)camera.rotation.set(-.1,yaw,0,'YXZ');},schedule(){}};
+    const controls=installWorldActions(options);
     function update(){wood.update(body,'yard',clock,activities.offeringFood);controls.update();}
     function key(code){doc.dispatchEvent(Object.assign(new Event('keydown',{cancelable:true}),{code}));update();}
-    function pointer(event,x=400,y=300,type='touch'){
-      canvas.dispatchEvent(Object.assign(new Event(event),{pointerId:1,pointerType:type,button:0,clientX:x,clientY:y}));
+    function pointer(event,x=400,y=300,type='touch',id=1){
+      canvas.dispatchEvent(Object.assign(new Event(event,{cancelable:true}),{pointerId:id,pointerType:type,button:0,clientX:x,clientY:y}));
     }
     function tap(){pointer('pointerdown');pointer('pointerup');update();}
     function center(name){return new T.Box3().setFromObject(model.getObjectByName(name),true).getCenter(new T.Vector3());}
     function approach(target,expected){
+      const seen=new Set();
       for(const distance of [.97,1.32,1.55,1.8,2.1]){
         for(let i=0;i<30;i++){
           const angle=i*2*Math.PI/30,x=target.x+distance*Math.cos(angle),z=target.z+distance*Math.sin(angle);
           const spot=space.spawn(x,z,target.y+STANDING_EYE_HEIGHT,target.y);
           if(!spot || Math.abs(spot.y-target.y)>1.3)continue;
           place(spot);camera.lookAt(target);update();
+          seen.add(label.textContent);
           if(!button.hidden && label.textContent===expected)return;
         }
       }
-      assert.fail('No usable approach to '+expected+' at '+target.toArray());
+      assert.fail('No usable approach to '+expected+' at '+target.toArray()+' (found '+[...seen].join(', ')+')');
     }
     const ring=center('WalkBlock_FireRing'),chairBoards=[],finishes=[];
     model.traverse(o=>{if(o.isMesh && /^Adirondack slat timber/.test(o.material.name))chairBoards.push(o);});
@@ -94,13 +98,40 @@ export function checkWorldActions(model,space){
     taken=-1;update();const departure={...body};tap();
     neighbors=[departure];key('KeyE');assert(Math.hypot(body.x-departure.x,body.z-departure.z)>.5);
     assert(space.spawn(body.x,body.z,body.y+body.eye,body.y));neighbors=[];
-    for(const [k,singular] of Object.entries({twigs:'twigs',sticks:'stick',logs:'split log'})){
-      approach(wood.targets[k],'Pick up '+singular);tap();assert.equal(wood.state.held,k);
-      assert.equal(label.textContent,'Put back '+singular);key('KeyE');assert.equal(wood.state.held,null);
+    function pieceCenter(kind){
+      const stock=world.getObjectByName('Gatherable '+kind),matrix=new T.Matrix4();
+      stock.updateWorldMatrix(true,false);
+      stock.getMatrixAt(stock.count-1,matrix);
+      // A forked branch's bounding-box center can be empty air. Aim at an
+      // actual face on the piece, including after placing it back on the pile.
+      const geometry=stock.geometry,positions=geometry.attributes.position,index=geometry.index;
+      const point=new T.Vector3();
+      for(let i=0;i<3;i++)point.add(new T.Vector3().fromBufferAttribute(positions,index?index.getX(i):i));
+      return point.divideScalar(3).applyMatrix4(matrix).applyMatrix4(stock.matrixWorld);
     }
-    approach(wood.targets.sticks,'Pick up stick');key('KeyE');
+    for(const [k,singular] of Object.entries({twigs:'twigs',sticks:'stick',logs:'split log'})){
+      const target=pieceCenter(k);approach(target,'Pick up '+singular);
+      // Move the actual piece off-center and use its screen coordinates.
+      camera.rotateY(.18);camera.updateMatrixWorld();
+      const pixel=target.clone().project(camera),x=(1+pixel.x)*400,y=(1-pixel.y)*300;
+      pointer('pointermove',x,y,'mouse');update();
+      assert(doc.documentElement.attributes.has('data-direct-focus'),'Reachable wood under the cursor needs direct feedback');
+      pointer('pointerdown',x,y);pointer('pointerdown',x+30,y,'touch',2);
+      pointer('pointerup',x,y);pointer('pointerup',x+30,y,'touch',2);update();
+      pointer('pointerdown',x,y);pointer('pointermove',x+25,y);pointer('pointerup',x,y);update();
+      pointer('pointerdown',x,y);pointer('pointercancel',x,y);pointer('pointerup',x,y);update();
+      assert.equal(wood.state.held,null,'Pinch, drag and cancelled gestures must leave the pile alone');
+      pointer('pointerdown',x,y);pointer('pointerup',x,y);update();assert.equal(wood.state.held,k);
+      pointer('pointerleave',0,0,'mouse');
+      approach(wood.targets[k],'Put back '+singular);key('KeyE');assert.equal(wood.state.held,null);
+    }
+    const remote=pieceCenter('logs');
+    place({...body,x:remote.x+5,z:remote.z});camera.lookAt(remote);update();key('KeyG');
+    assert.equal(wood.state.held,null,'Distant wood cannot be grabbed');
+    approach(pieceCenter('sticks'),'Pick up stick');key('KeyE');
     approach(ring,'Toss stick into fire');tap();assert(wood.state.inFlight);assert.equal(fires.fuelSnapshot().sticks,0);
-    clock+=2;update();assert(fires.fuelSnapshot().sticks>0);assert(!fire);
+    for(let i=0;i<360 && wood.state.inFlight;i++){clock+=1/60;update();}
+    assert(fires.fuelSnapshot().sticks>0);assert(!fire);
     approach(ring,'Light fire');button.dispatchEvent(new Event('click'));update();assert(fire);
     assert.equal(label.textContent,'Put out fire');key('KeyE');assert(!fire);
     const grate=model.getObjectByName('GrillSurface').getWorldPosition(new T.Vector3());
@@ -116,6 +147,31 @@ export function checkWorldActions(model,space){
       hiker.pose(0,0,true);assert(hiker.seated && hiker.height<standingHeight-.4);
       hiker.pose(0,0,false);assert(!hiker.seated && hiker.height===standingHeight);hiker.dispose();
     }
+    const log=pieceCenter('logs');approach(log,'Pick up split log');
+    // Place a real, rotated obstacle in the same sightline and install a new
+    // controller so it indexes that obstruction exactly as at tour startup.
+    const blocker=new T.Mesh(new T.BoxGeometry(.42,.42,.035));
+    blocker.name='WalkBlock_TestWoodOcclusion';blocker.position.lerpVectors(camera.position,log,.5);
+    blocker.lookAt(camera.position);model.add(blocker);blocker.updateMatrixWorld();
+    try{
+      const otherCanvas=new Element();
+      const covered=installWorldActions({...options,canvas:otherCanvas});
+      covered.update();
+      assert(!doc.documentElement.attributes.has('data-grabbable'),'A log behind a solid object is out of reach');
+      for(const type of ['pointerdown','pointerup']){
+        otherCanvas.dispatchEvent(Object.assign(new Event(type),{pointerType:'touch',pointerId:3,button:0,clientX:400,clientY:300}));
+      }
+      assert.equal(wood.state.held,null);
+    }finally{blocker.removeFromParent();blocker.geometry.dispose();blocker.material.dispose();}
+    approach(chair,'Sit by the fire');
+    const throwingCanvas=new Element();let direction;
+    installWorldActions({...options,canvas:throwingCanvas,firewood:{targets:wood.targets,
+      state:{held:'logs',nearby:[]},throwWood(ray){direction=ray.clone();return true;}},
+      seat(){assert.fail('A throw at a chair must leave the visitor standing');}});
+    for(const type of ['pointerdown','pointerup']){
+      throwingCanvas.dispatchEvent(Object.assign(new Event(type),{pointerType:'mouse',pointerId:2,button:0,clientX:400,clientY:300}));
+    }
+    assert(direction && direction.distanceTo(camera.getWorldDirection(new T.Vector3()))<1e-6,'Throw follows the cursor toward furniture');
   }finally{globalThis.document=previousDocument;globalThis.window=previousWindow;}
   console.log('Two burgundy and two natural chairs passed seat-pan, backrest, eye height, fire-facing and standing clearance checks. Occupancy, loose wood, fire, grill and furnace interactions passed.');
 }

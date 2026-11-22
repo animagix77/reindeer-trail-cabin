@@ -1,7 +1,8 @@
 import * as T from 'three';
 import {STANDING_EYE_HEIGHT} from './walking.js';
 import {makeDeer,makeFoodTemplates,makeOfferingHand} from './wildlife-model.js';
-import {createTossMotion} from './toss-motion.js';
+import {createThrowColliders} from './throw-colliders.js';
+import {createThrowMotion} from './toss-motion.js';
 
 const cell=.32, feet=.3048, angle=5.4*Math.PI/180, C=Math.cos(angle), S=Math.sin(angle);
 const clamp=T.MathUtils.clamp, damp=T.MathUtils.damp;
@@ -177,7 +178,7 @@ function contactShadow(){
   return new T.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});
 }
 
-export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
+export function installWildlife(scene,space,camera,{onChange=()=>{},colliders=createThrowColliders(space,scene)}={}){
   const range=deerRange(space),food=makeFoodTemplates(),inventory={...stock},items=[],herd=[];
   const set=new T.Group();set.name='Backyard wildlife';scene.add(set);
   const hand=makeOfferingHand(),palm=new T.Group();palm.name='Offering';palm.add(hand);scene.add(palm);palm.visible=false;
@@ -261,32 +262,28 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
     // Aim a physically scaled, gravity-driven arc at open ground in front.
     // Look down for a short underhand toss. No food is spent on a blocked throw.
     const reach=clamp(3.2+handForward.y*2.45,1.2,4.7),start=offering.clone();
-    let motion=null,diners=[];
-    const landingHeight=(x,z)=>{
-      const h=range.safeGround(x,z);
-      return h===null?null:h+.041;
-    };
-    for(let dist=reach;dist>=.75&&!motion;dist-=.20){
+    let velocity=null;
+    for(let dist=reach;dist>=.75&&!velocity;dist-=.20){
       const p=start.clone().addScaledVector(forward,dist),node=range.point(p.x,p.z,.32);
       if(!node||range.ground(p.x,p.z)===null)continue;
       p.y=range.ground(p.x,p.z)+.041;
       const trial=.41+dist*.085;
       let blocked=false;
       for(let j=1;j<16;j++){
-        const t=j/16,probe=start.clone().lerp(p,t);probe.y+=4.90*trial*trial*t*(1-t);
+        const t=j/16,probe=start.clone().lerp(p,t);probe.y+=4.905*trial*trial*t*(1-t);
         const floor=range.ground(probe.x,probe.z);
         if(floor===null||floor+.04>probe.y){blocked=true;break;}
       }
-      if(!blocked){
-        const attempt=createTossMotion({kind,start,contact:p,duration:trial,groundAt:landingHeight});
-        diners=herd.filter(d=>stance(d,attempt.rest,true));
-        if(diners.length)motion=attempt;
+      if(!blocked && herd.some(d=>stance(d,p,true))){
+        velocity=p.sub(start).divideScalar(trial);velocity.y+=4.905*trial;
       }
     }
-    if(!motion){notify('Face an open patch of ground to toss food.');return false;}
+    if(!velocity){notify('Face an open patch of ground to toss food.');return false;}
     returnHeld();inventory[kind]--;
     const mesh=food[kind].clone();mesh.name='Tossed '+kind;set.add(mesh);mesh.position.copy(start);
-    items.push({id:++nextId,kind,mesh,end:motion.rest,motion,age:0,landed:false,owner:null,diners});
+    const motion=createThrowMotion({kind,mesh,velocity,colliders,obstacles:items.filter(i=>i.landed).map(i=>i.mesh)});
+    mesh.userData.throwKind=kind;
+    items.push({id:++nextId,kind,mesh,end:mesh.position,motion,age:0,landed:false,owner:null,diners:[]});
     notify('Tossed '+labels[kind]+'. The herd can follow it.');return true;
   }
   function refill(){
@@ -294,10 +291,20 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
     notify('Basket refilled.');return true;
   }
   function updateFood(dt){
-    for(const item of items){
+    for(const item of [...items]){
       if(item.landed)continue;
       item.age+=dt;
       item.landed=item.motion.sample(item.age,item.mesh);
+      if(item.landed){
+        // A rebound or a sideways roll can change which deer can actually
+        // reach this serving. Aim each muzzle at the final physical position.
+        item.diners=item.motion.lost?[]:herd.filter(d=>stance(d,item.end,true));
+        item.motion=null;
+        if(!item.diners.length){
+          set.remove(item.mesh);items.splice(items.indexOf(item),1);inventory[item.kind]++;
+          notify('That serving rolled out of reach. It is back in your basket.');
+        }
+      }
     }
   }
   function stance(d,target,preview=false){

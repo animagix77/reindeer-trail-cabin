@@ -301,12 +301,32 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
     }
     return count;
   }
-  function take(accept){
+  function hitPiece(raycaster){
+    const hits=[];
+    const origin=root.worldToLocal(center.copy(raycaster.ray.origin));
+    for(const {mesh,body} of pieces){
+      const reach=raycaster.far+body.boundingRadius+.04;
+      if(body.position.distanceSquared(origin)>reach*reach)continue;
+      // Even in a merged draw batch, the individual billet keeps its exact
+      // geometry and pose. It can be selected without unpacking the pile.
+      mesh.updateWorldMatrix(true,false);
+      mesh.raycast(raycaster,hits);
+    }
+    let closest=null;
+    for(const hit of hits)if(!closest || hit.distance<closest.distance)closest=hit;
+    return closest;
+  }
+  function take(accept,selected){
     if(!pieces.length)return false;
-    // Clear a piece resting across the chopping face first. Otherwise lift the
-    // highest piece of the pile so removing one cannot leave a hovering stack.
-    let chosen=pieces.findIndex(blocksReload);
-    if(chosen<0)for(let i=0;i<pieces.length;i++)if(chosen<0 || pieces[i].body.position.y>=pieces[chosen].body.position.y)chosen=i;
+    let chosen;
+    if(selected){
+      chosen=pieces.findIndex(item=>item.mesh===selected);
+      if(chosen<0)return false;
+    }else{
+      // The "Carry a piece" shortcut favors wood that is in the way of loading.
+      chosen=pieces.findIndex(blocksReload);
+      if(chosen<0)for(let i=0;i<pieces.length;i++)if(chosen<0 || pieces[i].body.position.y>=pieces[chosen].body.position.y)chosen=i;
+    }
     const item=pieces[chosen];if(accept && !accept(item.body.mass,item.mesh))return false;
     removePieces([item]);return true;
   }
@@ -361,7 +381,7 @@ export function createSplitPhysics({root,groundAt,onContact,onSupport,onStockWoo
     collisionSpeed=0;
     return active;
   }
-  return {release,lodge,step,canLoad,clearBlock,blocksStep,take,stackGroundWood,
+  return {release,lodge,step,canLoad,clearBlock,blocksStep,hitPiece,take,stackGroundWood,
     get stackableCount(){refreshPile();return groundStock.length;},
     get hasBlockWood(){refreshPile();return hasBlockWood;},
     get surface(){return pieces.filter(i=>i.supported||overFace(i)).map(i=>i.mesh);},

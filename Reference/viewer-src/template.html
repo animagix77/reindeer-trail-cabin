@@ -233,6 +233,10 @@ main{
 #world-tools{position:absolute;z-index:3;left:50%;bottom:103px;transform:translateX(-50%);pointer-events:none}
 #world-tools button{pointer-events:auto;min-height:44px;min-width:65px;padding:9px 15px;border:1px solid #f3dbac;border-radius:22px;background:#f0d6a6;color:#25352b;font-size:.88rem;font-weight:650;box-shadow:0 2px 9px #09160d55}
 #world-tools #scene-deer{background:var(--hud);border-color:var(--hud-line);color:var(--ink)}
+html[data-direct-focus] #view{cursor:pointer}
+html[data-grabbable] #view{cursor:grab}
+html[data-direct-focus] #world-tools #world-action:not(:focus-visible){position:absolute;width:1px;height:1px;min-width:0;min-height:0;overflow:hidden;clip-path:inset(50%);pointer-events:none;padding:0;border:0}
+html[data-direct-aim] main::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:6px;height:6px;border:1px solid #fff1d1;border-radius:50%;box-shadow:0 0 0 1px #3b322a;pointer-events:none;z-index:2}
 html[data-world-focus] #scene-deer,html.is-seated #scene-deer,main:has(#activity:not([hidden])) #world-tools,main:has(#woodwork:not([hidden])) #scene-deer{display:none}
 main:has(#world-action:not([hidden]),#woodwork:not([hidden]),#activity:not([hidden])) #hint,html.is-seated :is(#hint,#stick){visibility:hidden}
 html.has-walked #hint{visibility:hidden;opacity:0}
@@ -419,8 +423,8 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 <dialog id="tour-guide" aria-labelledby="guide-title">
   <div class="guide-heading"><h2 id="guide-title">Cabin guide</h2><button type="button" id="guide-close" aria-label="Close cabin guide">×</button></div>
   <h3>Getting around</h3>
-  <p class="guide-keys">W and S walk forward and back. A and D sidestep. Drag to look around, or turn with the left and right arrows. Page Up and Page Down look up and down. Click what you want to use, or press E when an action appears.</p>
-  <p class="guide-touch">Move with the left pad and drag the scene to look around. Tap an object or its action when you get close.</p>
+  <p class="guide-keys">W and S walk forward and back. A and D sidestep. Drag to look around, or turn with the left and right arrows. Page Up and Page Down look up and down. Click nearby wood to pick it up, then click where you want to throw it. You can also aim and press E to use an object or T to throw.</p>
+  <p class="guide-touch">Move with the left pad and drag the scene to look around. Tap nearby wood to pick it up, then tap in the direction you want to throw it.</p>
   <p>To find the basement, follow the driveway past the garage to the paved area beside the back deck. Face the basement door and walk straight down two steps to enter.</p>
   <div class="guide-row">
     <button id="lock" type="button" hidden>Mouse look</button>

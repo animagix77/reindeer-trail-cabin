@@ -15,8 +15,8 @@ export function installSceneControls({setConditions,share,setFurnace,setFirePit,
     sound.setAttribute('aria-checked',String(wantsSound));
     const messages={
       ready:['On','Sound is enabled and will start with your first interaction.'],
-      on:['On','Woodland ambience, fire and footsteps are on.'],
-      off:['Off','Woodland ambience, fire and footsteps are muted.'],
+      on:['On','Cabin music and environmental sounds are on.'],
+      off:['Off','Cabin music and environmental sounds are muted.'],
       unavailable:['Unavailable','This browser could not play audio. Select Sound to retry.']
     };
     soundState.textContent=messages[state][0];
