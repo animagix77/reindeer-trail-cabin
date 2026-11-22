@@ -11,8 +11,8 @@ const swingReach=1.2,pickupReach=1.45,returnDistance=1.8;
 export function installWoodSplitting(scene,model,space,{camera,schedule,takeSplitLog,handsBusy,onSwing,onStrike,onContact,onStockWood,stockTotal=()=>0}){
   const station=makeSplittingBlock(model),root=station.root;
   const ground=(x,z)=>space.heights(x,z).find(h=>h.label==='WalkSurface_ParcelGround')?.y;
-  // Use the open gravel shoulder past the last driveway edging stone.
-  const px=-1.8,py=33.05;
+  // Owner-marked clearing between the fieldstone row and the overturned boat.
+  const px=-15.3,py=57;
   const x=4.65-.3048*(.995562*px+.094108*py),z=-8.5+.3048*(-.094108*px+.995562*py);
   let baseY=ground(x,z);
   for(let i=0;i<8;i++){

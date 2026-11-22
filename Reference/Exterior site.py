@@ -356,7 +356,7 @@ def build_exterior_site():
             if omit:continue
             k=len(v)-1;fs.extend(((k,k+1,k+len(X)+1),(k,k+len(X)+1,k+len(X))))
     helper('WalkSurface_ParcelGround',v,fs)
-    driveway_edge_details(site_group,land,helper,blocker,tube)
+    driveway_edge_details(site_group,land,helper,tube)
     rectsurf('FrontLanding',29,33,-5,0,dp+.015)
     # Replace the original smooth handrail and sparse steps with the photographed
     # porch flight. The existing appraisal-sized landing and side guards stay in place.

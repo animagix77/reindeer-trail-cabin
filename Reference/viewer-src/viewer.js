@@ -62,6 +62,7 @@ if(viewport){
   viewport.addEventListener('scroll',syncViewport);
 }
 const canvas = element('view');
+const stick=element('stick'),nub=element('nub');
 const controlsPanel = element('tools');
 let sceneCanRender=false;
 let updateEggSwings;
@@ -88,7 +89,7 @@ function footSurface(){
   if(/^WalkSurface_Basement/.test(body.label))return /Wood|Bathroom/.test(body.label)?'wood':'pavement';
   if(/Bathroom/.test(body.label))return 'tile';
   if(/Gravel/.test(body.label))return 'gravel';
-  if(/Flagstone|WellFloor|ServiceDriveStep|LowerServiceStep|ExteriorServiceLanding|DeckStairLanding|RearStoneStep/.test(body.label))return 'pavement';
+  if(/Flagstone|WellFloor|ServiceDriveStep|LowerServiceStep|ExteriorServiceLanding|DeckStairLanding|RearStoneStep|DrivewayFieldstone/.test(body.label))return 'pavement';
   if(/ParcelGround|MainFloor/.test(body.label)){
     finishRay.ray.origin.set(body.x,body.y+.24,body.z);finishRay.ray.direction.copy(down);finishRay.far=.48;
     const hits=finishRay.intersectObjects(finishMeshes,false);
@@ -103,6 +104,7 @@ function footSurface(){
   return 'wood';
 }
 let body=null,frame=0,lastTime=0,stickPointer=null;
+let stickType='';
 let previousFrame=0,overBudget=0,underBudget=0;
 const maxRatio=Math.min(devicePixelRatio||1,matchMedia('(pointer: coarse)').matches?1.5:2);
 function paceRenderer(time){
@@ -119,10 +121,17 @@ function paceRenderer(time){
 }
 const walkKeys=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
 const walking=()=>body!==null;
+function clearPad() {
+  stickPointer=null;stickType='';axes.x=axes.y=0;
+  nub.style.transform='';
+}
 function stopWalking() {
   camera.position.y-=bob;bob=0;gait.reset();velocity.set(0,0);
-  held.clear();axes.x=axes.y=0;stickPointer=null;
-  element('nub').style.transform='';
+  held.clear();
+  if(stickPointer!==null && stick.hasPointerCapture(stickPointer))stick.releasePointerCapture(stickPointer);
+  clearPad();
+  for(const id of pointers.keys())if(canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);
+  pointers.clear();
   if(frame) cancelAnimationFrame(frame);
   frame=0;lastTime=0;previousFrame=0;
 }
@@ -181,27 +190,51 @@ window.addEventListener('keyup',e=>held.delete(e.code));
 window.addEventListener('blur',stopWalking);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stopWalking();else if(sceneCanRender)render();});
 window.addEventListener('focus',()=>{if(sceneCanRender)render();});
-const stick=element('stick');
+window.addEventListener('pagehide',stopWalking);
+matchMedia('(orientation: portrait)').addEventListener('change',()=>{
+  stopWalking();if(sceneCanRender)schedule();
+});
 function steer(e) {
   const rect=stick.getBoundingClientRect(),range=rect.width*.33;
+  if(!range){clearPad();return;}
   let x=(e.clientX-rect.left-rect.width/2)/range;
   let y=(e.clientY-rect.top-rect.height/2)/range;
   const scale=Math.max(1,Math.hypot(x,y));
   axes.x=x/scale;axes.y=y/scale;
-  element('nub').style.transform='translate('+axes.x*range+'px,'+axes.y*range+'px)';
+  nub.style.transform='translate('+axes.x*range+'px,'+axes.y*range+'px)';
   schedule();
 }
 stick.addEventListener('pointerdown',e=>{
-  if(!walking() || worldActions?.seated || stickPointer!==null) return;
-  stickPointer=e.pointerId;stick.setPointerCapture(e.pointerId);
+  if(!walking() || worldActions?.seated || e.button!==0)return;
+  if(stickPointer!==null && stickPointer!==e.pointerId && stick.hasPointerCapture(stickPointer))return;
+  stickPointer=e.pointerId;stickType=e.pointerType;
+  // Direct touch has implicit capture. Also follow its ID at window level
+  // when a browser retargets a drag or its final event.
+  if(e.pointerType!=='touch')stick.setPointerCapture(e.pointerId);
   e.preventDefault();steer(e);
 });
-stick.addEventListener('pointermove',e=>{if(stickPointer===e.pointerId) steer(e);});
-for(const type of ['pointerup','lostpointercapture','pointercancel']) stick.addEventListener(type,e=>{
-  if(stickPointer!==e.pointerId)return;
-  axes.x=axes.y=0;stickPointer=null;element('nub').style.transform='';
+window.addEventListener('pointermove',e=>{
+  if(stickPointer===e.pointerId)steer(e);
+},{capture:true,passive:true});
+function endPointer(e){
+  if(e.pointerId===stickPointer)clearPad();
+  pointers.delete(e.pointerId);
+}
+for(const type of ['pointerup','pointercancel'])window.addEventListener(type,endPointer,true);
+stick.addEventListener('lostpointercapture',e=>{
+  if(e.pointerId===stickPointer && !stick.hasPointerCapture(e.pointerId))clearPad();
 });
-const touchControls=matchMedia('(pointer: coarse)');
+// Recover when Safari ends a contact without a corresponding pointer event.
+// A finger still held on the other control keeps its own gesture.
+function endTouch(e){
+  const touches=Array.from(e.touches);
+  if(stickType==='touch' && !touches.some(t=>stick.contains(t.target)))clearPad();
+  if(!touches.some(t=>t.target===canvas)){
+    for(const [id,p] of pointers)if(p.type==='touch')pointers.delete(id);
+  }
+}
+for(const type of ['touchend','touchcancel'])window.addEventListener(type,endTouch,{capture:true,passive:true});
+const touchControls=matchMedia('(pointer: coarse)'),touchPad=matchMedia('(any-pointer: coarse)');
 function hint() {
   if(!walking()) return 'Drag to look around · Scroll or pinch to zoom';
   if(document.pointerLockElement===canvas) return 'Mouse to look · Esc to release';
@@ -212,7 +245,7 @@ function updateLookControls(){
   element('look-gesture').textContent=hint();
   element('lock').hidden=!walking() || !canvas.requestPointerLock;
   element('lock').textContent=document.pointerLockElement===canvas?'Release mouse':'Mouse look';
-  element('stick').hidden=!walking() || worldActions?.seated || !matchMedia('(any-pointer: coarse)').matches;
+  stick.hidden=!walking() || worldActions?.seated || !touchPad.matches;
   let label='Cabin view. Drag or use the arrow keys to look around.';
   if(walking()) label=touchControls.matches?'Walk with the movement pad and drag to look around.':
     'Walk forward with W and back with S. Sidestep left with A and right with D. The up and down arrows also walk. Turn with the left and right arrows, or drag to look around.';
@@ -220,6 +253,7 @@ function updateLookControls(){
   canvas.setAttribute('aria-label',label);
 }
 touchControls.addEventListener('change',updateLookControls);
+touchPad.addEventListener('change',()=>{clearPad();updateLookControls();});
 element('lock').addEventListener('click',async()=>{
   if(document.pointerLockElement===canvas) document.exitPointerLock();
   else {
@@ -251,7 +285,8 @@ let yaw=0,pitch=0;
 
 function look() {
   camera.rotation.set(pitch,yaw,0,'YXZ');
-  render();
+  camera.updateMatrixWorld();
+  schedule();
 }
 const tourAreas={
   outside:{label:'Driveway',slug:'driveway',aliases:['property','well','well-casing','splitting','wood-splitting']},
@@ -290,7 +325,6 @@ function changeView(view) {
   if(document.pointerLockElement===canvas) document.exitPointerLock();
   body=null;
   activeView=view;
-  pointers.clear();
   document.documentElement.classList.add('inside');
   locationPicker.value=view;
   activities.close();
@@ -321,13 +355,13 @@ function reset() {
 }
 canvas.addEventListener('pointerdown',event=>{
   if(!walking() || document.pointerLockElement===canvas || event.button!==0) return;
-  canvas.setPointerCapture(event.pointerId);
-  pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+  if(event.pointerType!=='touch')canvas.setPointerCapture(event.pointerId);
+  pointers.set(event.pointerId,{x:event.clientX,y:event.clientY,type:event.pointerType});
 });
 canvas.addEventListener('pointermove',event=>{
   const old=pointers.get(event.pointerId);
   if(!old) return;
-  const next={x:event.clientX,y:event.clientY};
+  const next={x:event.clientX,y:event.clientY,type:old.type};
   if(pointers.size===1) {
     const speed=2*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/canvas.clientHeight;
     yaw+=(next.x-old.x)*speed;
@@ -341,9 +375,9 @@ canvas.addEventListener('pointermove',event=>{
   }
   pointers.set(event.pointerId,next);
 });
-for (const type of ['pointerup','pointercancel','lostpointercapture']) {
-  canvas.addEventListener(type,event=>pointers.delete(event.pointerId));
-}
+canvas.addEventListener('lostpointercapture',event=>{
+  if(!canvas.hasPointerCapture(event.pointerId))pointers.delete(event.pointerId);
+});
 canvas.addEventListener('wheel',event=>{
   if(!walking()) return;
   event.preventDefault();
@@ -378,7 +412,7 @@ const activities=activityControls({
   lid:on=>grill?.open(on)
 });
 const propertyMap=installPropertyMap({
-  stopMovement(){stopWalking();pointers.clear();},
+  stopMovement:stopWalking,
   destinations(){
     const locations={};
     for(const key of ['entry','yard']){
@@ -392,7 +426,7 @@ const propertyMap=installPropertyMap({
 });
 const party=installParty({
   world,schedule,
-  stop(){stopWalking();pointers.clear();},
+  stop:stopWalking,
   getPose(){
     const round=n=>Math.round(n*100)/100;
     const seated=worldActions?.seated;
@@ -451,17 +485,17 @@ const party=installParty({
   apply:(s,guest)=>sceneControls.apply(s,guest),solo:()=>sceneControls.solo()
 });
 const waterNotes=installWaterNotes({
-  pause(){stopWalking();pointers.clear();},
+  pause:stopWalking,
   resume(){if(sceneCanRender)schedule();}
 });
 const welcome=installWelcome({
-  pause(){stopWalking();pointers.clear();},
+  pause:stopWalking,
   resume(){if(sceneCanRender) schedule();},
   invite:party.invite,offline:party.offline,enter:party.enter
 });
 const loading=installLoadingScreen(welcome.setLoadState);
 const tourInterface=installTourInterface({
-  stopMovement(){stopWalking();pointers.clear();},
+  stopMovement:stopWalking,
   resume(){if(sceneCanRender)schedule();},
   isOutside:()=>outdoorsFloor(body?.label)
 });
@@ -512,7 +546,7 @@ window.addEventListener('keydown',event=>{
 function zoom(factor) {
   camera.fov=THREE.MathUtils.clamp(camera.fov*factor,30,94);
   camera.updateProjectionMatrix();
-  render();
+  schedule();
 }
 element('near').addEventListener('click',()=>zoom(.78));
 element('far').addEventListener('click',()=>zoom(1/.78));

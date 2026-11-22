@@ -84,7 +84,8 @@ export function makeSplittingBlock(model){
   let index=0,wood=createOakRound(index);
   const round=marker(new T.Mesh(oakGeometry(wood),materials),'Unsplit round');round.position.y=top;root.add(round);
   const rounds=[];
-  for(let row=0;row<3;row++)for(let col=0;col<4-row;col++)rounds.push([-.60-col*.218-row*.105,.122+row*.187,-.35+.02*Math.sin(row+3*col)]);
+  // Bed the first course of rough bark into the gravel on the sloping clearing.
+  for(let row=0;row<3;row++)for(let col=0;col<4-row;col++)rounds.push([-.60-col*.218-row*.105,.096+row*.187,-.35+.02*Math.sin(row+3*col)]);
   const cache=marker(new T.InstancedMesh(blank(.112,.36),materials,rounds.length),'Unsplit oak rounds');
   const obj=new T.Object3D();
   rounds.forEach(([x,y,z],i)=>{

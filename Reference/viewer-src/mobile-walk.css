@@ -134,3 +134,18 @@
     bottom: calc(var(--hud-bottom) + var(--toolbar-height) + 6px);
   }
 }
+
+/* A tablet can use the wide layout and still have a movement pad. Leave the
+   pad's entire hit area free when the wood-splitting controls appear. */
+@media (any-pointer: coarse) and (min-width: 701px) and (min-height: 481px) {
+  #woodwork:not([hidden]) {
+    left: calc(max(16px, env(safe-area-inset-left)) + var(--pad-size) + 12px);
+    right: auto;
+  }
+}
+
+#stick, #view {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}

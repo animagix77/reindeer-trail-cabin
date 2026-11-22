@@ -410,6 +410,33 @@ function topCheck(x,y,helper,visible){
   const stones=[-23,-20,-17,-14,-11,-8].filter(x=>
     [31.8,32.1,32.4,32.7,33].some(y=>hits(edging,at(x,y,25),down).length));
   assert(stones.length>=3,'Missing rough stone row at the end of the driveway');
+  function crossEdging(from,to){
+    const origin=groundAt(from);
+    let foot=walks.spawn(origin.x,origin.z,origin.y+1.59);
+    assert(foot,'Cannot stand at the start of the fieldstone crossing');
+    let rise=0;
+    const steps=Math.ceil(Math.hypot(to.x-from.x,to.z-from.z)/.04);
+    for(let i=1;i<=steps;i++){
+      const p=from.clone().lerp(to,i/steps);
+      foot=walks.move(foot,p.x-foot.x,p.z-foot.z);
+      assert(Math.hypot(foot.x-p.x,foot.z-p.z)<.003,'Driveway edging blocked the direct route');
+      const grade=walks.heights(p.x,p.z).find(h=>h.label==='WalkSurface_ParcelGround');
+      const stone=hits(edging,new T.Vector3(p.x,25,p.z),down)[0];
+      if(stone && stone.point.y>grade.y+.003){
+        assert.equal(foot.label,'WalkSurface_DrivewayFieldstone');
+        assert(Math.abs(foot.y-stone.point.y)<.003,'Feet missed the visible stone top');
+        rise=Math.max(rise,foot.y-grade.y);
+      }else{
+        assert(Math.abs(foot.y-grade.y)<.004,'Invisible support over the ground between stones');
+      }
+    }
+    assert.equal(foot.label,'WalkSurface_ParcelGround','Visitor did not step back onto the ground');
+    return rise;
+  }
+  const drive=at(-8.2,24,0),clearing=at(-15.3,54.1,0);
+  assert(crossEdging(drive,clearing)>.15 && crossEdging(clearing,drive)>.15,
+    'Walk over the layered fieldstones on the way to the chopping block and back');
+  assert.equal(crossEdging(at(-12.94,30,0),at(-12.94,35,0)),0,'The gap between slabs should stay open');
 }
 
 // Probe the rendered timber and joinery themselves. Their world-aligned boxes

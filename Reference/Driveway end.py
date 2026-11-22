@@ -59,7 +59,7 @@ def finish_driveway_clearing(land, local_xy):
             uv[loop].uv=((x-x0)/(x1-x0),(y-y0)/(y1-y0))
 
 
-def driveway_edge_details(group, land, helper, blocker, tube):
+def driveway_edge_details(group, land, helper, tube):
     # In the owner's view the camera points south-southeast from the asphalt.
     # Fit the boat to the modeled ground near that sightline's parcel crossing.
     from mathutils.bvhtree import BVHTree
@@ -190,11 +190,11 @@ def driveway_edge_details(group, land, helper, blocker, tube):
     uvs=border.data.uv_layers.new(name='Stone tops and split faces')
     for poly,coords in zip(border.data.polygons,stone_uv):
         for loop,uv in zip(poly.loop_indices,coords):uvs.data[loop].uv=uv
-    # Continue to leave the original walking lane clear at the row's ends.
-    ends=[-24.2,-21.65,-19.85,-17.4,-14.1,-11.85,-9.5,-7.25,-5.90]
-    for j,(a,b) in enumerate(zip(ends,ends[1:])):
-        y=32.42+.12*math.sin(j*.64);z=ground((a+b)/2,y)
-        blocker('DriveEndStone%02d'%j,pos(a+.06,y,z-.05),pos(b-.06,y,z-.05),.30,.24)
+    # Step onto the actual tops and chipped shoulders. Between rocks, the
+    # underlying driveway or gravel supplies the walking surface.
+    border.data.calc_loop_triangles()
+    tops=[tuple(tri.vertices) for tri in border.data.loop_triangles if tri.normal.z>0]
+    helper('WalkSurface_DrivewayFieldstone',vertices,tops)
     orange=mat('Driveway markers · faded orange','#d46e56',rough=.76)
     white=mat('Driveway markers · pale reflective tips','#d4d1bf',metal=.08,rough=.56)
     for x in (-23.9,-17.65,-6.05):
