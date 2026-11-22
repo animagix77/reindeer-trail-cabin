@@ -127,30 +127,74 @@ def driveway_edge_details(group, land, helper, blocker, tube):
            [(i,(i+1)%count,(i+1)%count+count,i+count) for i in range(count)])
 
     rng=random.Random(20250614)
-    vertices=[];faces=[];tints=[]
-    colors=['#a69a87','#8c8274','#a8907e','#938b7e','#ac9c89']
-    stones=[mat('Driveway edging · fieldstone '+str(i+1),c,rough=.96) for i,c in enumerate(colors)]
-    # Flat, irregular fieldstones set end to end across part of the drive.
+    # Weathered bedding planes and broken edges taken from the owner's driveway.
+    stone=mat('Driveway edging · split fieldstone','#b19d90',rough=.94)
+    image=stone.node_tree.nodes.new('ShaderNodeTexImage')
+    image.image=bpy.data.images.load(str(work/'Exterior materials'/'Driveway fieldstone.jpg'),check_existing=True)
+    image.image.pack()
+    surface=stone.node_tree.nodes.get('Principled BSDF')
+    stone.node_tree.links.new(image.outputs['Color'],surface.inputs['Base Color'])
+    vertices=[]; faces=[]; stone_uv=[]
+    def slab(x,y,long,wide,base,height,variant,skew=0):
+        # The top follows the shallow pitch of each stone, but the cleavage
+        # face reaches a separate, angular lip and intermittent chipped corners.
+        outline=[(-.98,-.46),(-.77,-.91),(-.17,-1),(.23,-.80),(.73,-.89),
+                 (1,-.43),(.93,.49),(.48,.95),(-.32,.88),(-.85,.70)]
+        footprint=[(u*rng.uniform(.93,1.02),v*rng.uniform(.86,1.04)) for u,v in outline]
+        first=len(vertices); coords=[]
+        def add(u,v,h):
+            coords.append((u,v,h))
+            px,py=x+long*u+skew*v,y+wide*v
+            vertices.append(pos(px,py,ground(px,py)+base+height*h))
+        for layer in range(3):
+            for i,(u,v) in enumerate(footprint):
+                if layer==0: size,h=rng.uniform(.86,.98),-.15
+                elif layer==1: size,h=rng.uniform(.96,1.02),rng.uniform(.55,.84)
+                else: size,h=(rng.uniform(.63,.74) if i in (3,7) else rng.uniform(.88,.98)),rng.uniform(.85,1)
+                add(u*size,v*size,h)
+        n=len(footprint)
+        add(.04,.13,1.01)
+        center=3*n
+        def face(ids,side=False,use_x=True):
+            faces.append(tuple(first+i for i in ids))
+            texcoords=[]
+            for i in ids:
+                u,v,h=coords[i]
+                s=(u if use_x else v)*.46+.50
+                t=(1-max(0,min(h,1))) if side else .50-v*.46
+                texcoords.append(((256*int(side)+4.5+247*s)/512,1-(variant*64+4.5+55*t)/256))
+            stone_uv.append(texcoords)
+        for i in range(n):
+            j=(i+1)%n
+            use_x=abs(footprint[j][0]-footprint[i][0])*long>abs(footprint[j][1]-footprint[i][1])*wide
+            face((i,j,j+n,i+n),True,use_x)
+            face((i+n,j+n,j+2*n,i+2*n),True,use_x)
+            face((2*n+i,2*n+j,center))
+    # Six main slabs, the second and fifth in layers, with the few loose chips
+    # resting against them as in the photograph. Lateral coordinates are feet.
+    slabs=[(-23.43,32.42,.73,.43,-.025,.108,0,.07),
+           (-21.06,32.39,1.73,.60,-.030,.117,2,-.04),
+           (-21.17,32.45,1.67,.63,.069,.130,0,.08),
+           (-18.87,32.49,.57,.59,-.024,.133,1,-.04),
+           (-15.70,32.53,2.68,.71,-.037,.166,1,.09),
+           (-11.20,32.39,1.84,.67,-.029,.125,2,-.05),
+           (-11.28,32.43,1.67,.59,.065,.158,2,.11),
+           (-7.99,32.30,1.66,.59,-.029,.122,3,-.16),
+           (-6.08,32.25,.25,.40,-.030,.102,3,-.06),
+           (-18.99,32.59,.36,.32,.085,.102,1,-.08),
+           (-9.55,32.46,.43,.47,.076,.199,0,-.10),
+           (-8.99,32.50,.33,.39,.081,.104,3,.09),
+           (-22.87,31.96,.32,.23,-.025,.065,1,.07)]
+    for spec in slabs:slab(*spec)
+    border=mesh('Driveway end · rough stone edging',vertices,faces,stone,group)
+    uvs=border.data.uv_layers.new(name='Stone tops and split faces')
+    for poly,coords in zip(border.data.polygons,stone_uv):
+        for loop,uv in zip(poly.loop_indices,coords):uvs.data[loop].uv=uv
+    # Continue to leave the original walking lane clear at the row's ends.
     ends=[-24.2,-21.65,-19.85,-17.4,-14.1,-11.85,-9.5,-7.25,-5.90]
     for j,(a,b) in enumerate(zip(ends,ends[1:])):
-        x=(a+b)/2;y=32.42+.25*math.sin(j*.64);long=(b-a)*.495;wide=rng.uniform(.48,.7)
-        h=rng.uniform(.12,.205)
-        contour=[(-.97,-.51),(-.70,-1),(.47,-.92),(.92,-.51),(1,.48),(.41,.96),(-.51,.81),(-1,.41)]
-        ring=[(x+u*long,y+v*wide) for u,v in contour]
-        start=len(vertices);n=len(ring);z=ground(x,y)
-        vertices.extend(pos(u,v,z-.09) for u,v in ring)
-        vertices.extend(pos(u,v,z+h*rng.uniform(.48,.79)) for u,v in ring)
-        vertices.extend(pos(x+(u-x)*rng.uniform(.64,.85),y+(v-y)*.76,z+h*rng.uniform(.85,1.0)) for u,v in ring)
-        for row in (0,1):
-            for i in range(n):
-                l=start+row*n+i;m=start+row*n+(i+1)%n
-                faces.append((l,m,m+n,l+n));tints.append((j+int(i==1))%len(stones))
-        lid=tuple(range(start+2*n,start+3*n))
-        faces.append(lid);tints.append(j%len(stones))
-        blocker('DriveEndStone%02d'%j,pos(a+.06,y,z-.05),pos(b-.06,y,z-.05),wide*1.65*ft,h+.05)
-    border=mesh('Driveway end · rough stone edging',vertices,faces,stones[0],group)
-    for m in stones[1:]:border.data.materials.append(m)
-    for f,idx in zip(border.data.polygons,tints):f.material_index=idx
+        y=32.42+.12*math.sin(j*.64);z=ground((a+b)/2,y)
+        blocker('DriveEndStone%02d'%j,pos(a+.06,y,z-.05),pos(b-.06,y,z-.05),.30,.24)
     orange=mat('Driveway markers · faded orange','#d46e56',rough=.76)
     white=mat('Driveway markers · pale reflective tips','#d4d1bf',metal=.08,rough=.56)
     for x in (-23.9,-17.65,-6.05):
