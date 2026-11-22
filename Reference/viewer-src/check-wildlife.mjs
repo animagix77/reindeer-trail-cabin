@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {WalkSpace} from './walking.js';
+import {STANDING_EYE_HEIGHT,WalkSpace} from './walking.js';
 import {installWildlife} from './wildlife.js';
 import {makeDeer} from './wildlife-model.js';
 
@@ -77,7 +77,7 @@ const nearest=()=>deer.reduce((best,d)=>gap(d.position,camera.position)<gap(best
 until(()=>gap(nearest().position,camera.position)<4.2,55,'No deer left cover on seeing the apple');
 const curious=nearest(),beforeAlarm=curious.position.clone(),buckBefore=deer[1].position.clone();
 const direction=new T.Vector3().subVectors(curious.position,camera.position);direction.y=0;direction.normalize();
-let body=space.spawn(camera.position.x,camera.position.z,camera.position.y,camera.position.y-1.59);
+let body=space.spawn(camera.position.x,camera.position.z,camera.position.y,camera.position.y-STANDING_EYE_HEIGHT);
 for(let f=0;f<65 && !events.some(m=>m.includes('scattered'));f++){
   body=space.move(body,.048*direction.x,.048*direction.z);
   camera.position.set(body.x,body.y+body.eye,body.z);frame();
@@ -118,7 +118,7 @@ herd.refill();assert.deepEqual(state.inventory,stock);
 // The shy buck's original stand is far from the food at the central clearing.
 // The willing deer must travel the woodland route and reach the new offering.
 const outpost=initialPositions[1];
-camera.position.copy(outpost);camera.position.y+=1.59;
+camera.position.copy(outpost);camera.position.y+=STANDING_EYE_HEIGHT;
 camera.lookAt(new T.Vector3().fromArray(herd.view.target));run(.3);
 assert(state.near,'The wooded side of the parcel should support feeding');
 const beforeApproach=deer.map(d=>gap(camera.position,d.position));
@@ -139,7 +139,7 @@ assert(!tossMeal.hand && gap(beforeToss[tossMeal.animal],mealPosition)>5,'Tossed
 
 // Observe real paths while standing on the driveway, outside the feeding zone.
 const drive=model.scene.getObjectByName('WalkSpawn_Outside').getWorldPosition(new T.Vector3());
-camera.position.copy(drive);camera.position.y+=1.59;
+camera.position.copy(drive);camera.position.y+=STANDING_EYE_HEIGHT;
 const origins=deer.map(d=>d.position.clone()),previous=origins.map(p=>p.clone());
 const excursions=deer.map(()=>0);
 for(let f=0;f<65*30;f++){
@@ -148,7 +148,7 @@ for(let f=0;f<65*30;f++){
     assert(gap(previous[i],d.position)<.115,'A roaming deer jumped between patches');
     excursions[i]=Math.max(excursions[i],gap(d.position,origins[i]));previous[i].copy(d.position);
     if(f%15===0){
-      const ground=space.spawn(d.position.x,d.position.z,d.position.y+1.59,d.position.y);
+      const ground=space.spawn(d.position.x,d.position.z,d.position.y+STANDING_EYE_HEIGHT,d.position.y);
       assert(ground && Math.abs(ground.y-d.position.y)<.04,'Deer crossed an obstruction or left the terrain');
     }
   }

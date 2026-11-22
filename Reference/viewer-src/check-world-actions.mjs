@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as T from 'three';
+import {STANDING_EYE_HEIGHT} from './walking.js';
 import {installFirewood} from './firewood.js';
 import {installTourFires} from './fires.js';
 import {installWorldActions} from './world-actions.js';
@@ -40,7 +41,7 @@ export function checkWorldActions(model,space){
       for(const distance of [.97,1.32,1.55,1.8,2.1]){
         for(let i=0;i<30;i++){
           const angle=i*2*Math.PI/30,x=target.x+distance*Math.cos(angle),z=target.z+distance*Math.sin(angle);
-          const spot=space.spawn(x,z,target.y+1.59,target.y);
+          const spot=space.spawn(x,z,target.y+STANDING_EYE_HEIGHT,target.y);
           if(!spot || Math.abs(spot.y-target.y)>1.3)continue;
           place(spot);camera.lookAt(target);update();
           if(!button.hidden && label.textContent===expected)return;
@@ -75,10 +76,10 @@ export function checkWorldActions(model,space){
       assert.equal(back.object.material.name.includes('burgundy'),finish==='burgundy','The back and seat finishes must match');
       const before={...body};pointer('pointerdown');pointer('pointermove',440,330);pointer('pointerup',440,330);update();
       assert(!controls.seated,'A look gesture cannot sit');
-      tap();assert.equal(controls.seatId,i);assert(body.eye<before.eye-.35);
+      tap();assert.equal(controls.seatId,i);assert(body.eye<before.eye-.25);
       assert(Math.hypot(body.x-pan.x,body.z-pan.z)<.001);
       assert(Math.abs(camera.position.y-pan.y-.82)<.001,'Eye height must follow the authored seat pan');
-      assert(!space.spawn(pan.x,pan.z,body.y+1.59,body.y),'A visitor cannot stand inside a chair');
+      assert(!space.spawn(pan.x,pan.z,body.y+STANDING_EYE_HEIGHT,body.y),'A visitor cannot stand inside a chair');
       const gaze=camera.getWorldDirection(new T.Vector3());gaze.y=0;gaze.normalize();
       assert(gaze.dot(forward)>.999,'The seated hiker must face the ring');
       assert.equal(label.textContent,'Stand up');

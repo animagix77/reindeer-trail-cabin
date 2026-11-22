@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import {installWoodSplitting} from './wood-splitting.js';
-import {WalkSpace} from './walking.js';
+import {STANDING_EYE_HEIGHT,WalkSpace} from './walking.js';
 import {makeSplittingBlock} from './splitting-block.js';
 import './check-maul-motion.mjs';
 
@@ -18,9 +18,9 @@ class Element extends EventTarget {
 test('walking respects a heap and still lets a visitor escape if wood topples into their path',()=>{
   const space=new WalkSpace(),floor=new T.Mesh(new T.PlaneGeometry(4,4));
   floor.rotation.x=-Math.PI/2;floor.updateMatrixWorld();space.add(floor,'WalkSurface_ParcelGround');
-  const start=space.spawn(0,0,1.59);
+  const start=space.spawn(0,0,STANDING_EYE_HEIGHT);
   space.dynamicBlocker=(x,z)=>x>.18 && x<.8 && Math.abs(z)<.5;
-  assert.equal(space.spawn(.4,0,1.59),null);
+  assert.equal(space.spawn(.4,0,STANDING_EYE_HEIGHT),null);
   assert(space.move(start,1,0).x<=.18);
   const surrounded={...start,x:.35};
   assert(space.move(surrounded,-.42,0).x<.18);
@@ -60,7 +60,7 @@ function setup(t,{touch=false,reduced=false,stocking=false}={}){
     assert.fail(description+' ('+stage()+', '+el('split-message').textContent+')');
   }
   function stand(x,z){
-    camera.position.copy(station.localToWorld(new T.Vector3(x,1.59,z)));
+    camera.position.copy(station.localToWorld(new T.Vector3(x,STANDING_EYE_HEIGHT,z)));
     camera.lookAt(station.localToWorld(new T.Vector3(0,.75,0)));
     camera.updateMatrixWorld(true);tick();
   }

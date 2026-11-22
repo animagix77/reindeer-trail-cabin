@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {STANDING_EYE_HEIGHT} from './walking.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {fuelDuration} from './fires.js';
 import {makeOfferingHand} from './wildlife-model.js';
@@ -185,7 +186,7 @@ export function installFirewood(scene,model,space,camera,fires,onChange=()=>{},o
   // chairs. These loose pieces lie on its open approach, just short of the drain.
   const anchors={twigs:supplyFloor(plan(38.25,47.35)),sticks:supplyFloor(plan(38.55,48.75)),logs:supplyFloor(plan(38.70,50.0))};
   const entry=floorAt(plan(34.65,46.92)),look=anchors.sticks.clone();
-  entry.y+=1.59;look.y+=.19;
+  entry.y+=STANDING_EYE_HEIGHT;look.y+=.19;
   const view={eye:entry.toArray(),target:look.toArray(),fov:63};
   const geometry={twigs:branches(true),sticks:branches(false),logs:splitLog()};
   // Split-log cut surfaces and end grain are two-sided, including the fresh cut

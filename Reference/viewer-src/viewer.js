@@ -28,7 +28,7 @@ import {installSceneControls} from './scene-controls.js';
 import {batchStatic} from './batch.js';
 import {installWoodlandSound,outdoorsFloor} from './woodland-sound.js';
 import {installTourLighting} from './tour-lighting.js';
-import {WalkSpace,walkIntent} from './walking.js';
+import {WalkSpace,walkIntent,STANDING_EYE_HEIGHT} from './walking.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -268,7 +268,7 @@ document.addEventListener('mousemove',e=>{
 });
 function spawnBody(preset) {
   let p=new THREE.Vector3().fromArray(preset.eye);
-  const expected=p.y-1.59;
+  const expected=p.y-STANDING_EYE_HEIGHT;
   let candidate=walkSpace.spawn(p.x,p.z,p.y,expected);
   // A slightly different export may put a photo-matched camera immediately beside a handrail.
   for(const distance of [.12,.24,.40,.58]) {
@@ -464,7 +464,7 @@ const party=installParty({
       for(const radius of [1.15,.8,1.55])for(let i=0;i<12;i++){
         const angle=guest.yaw+(index-1)*Math.PI/4+i*Math.PI/6;
         const x=guest.x-radius*Math.sin(angle),z=guest.z-radius*Math.cos(angle);
-        const floor=walkSpace.spawn(x,z,guest.y+(guest.view==='loft'?1:1.59),guest.y);
+        const floor=walkSpace.spawn(x,z,guest.y+(guest.view==='loft'?1:STANDING_EYE_HEIGHT),guest.y);
         if(!floor || Math.abs(floor.y-guest.y)>.25)continue;
         const others=[...occupied,...party.neighbors()];
         if(others.some(p=>p.view!=='property'&&Math.abs(p.y-floor.y)<.8&&Math.hypot(x-p.x,z-p.z)<.74))continue;
@@ -591,7 +591,7 @@ async function show() {
       const step=gltf.scene.getObjectByName('WalkSurface_RetainerTread04');
       const aim=new THREE.Box3().setFromObject(step).getCenter(new THREE.Vector3());
       aim.y+=.92;
-      starts.outside={eye:[anchor.x,anchor.y+1.59,anchor.z],target:aim.toArray(),fov:65};
+      starts.outside={eye:[anchor.x,anchor.y+STANDING_EYE_HEIGHT,anchor.z],target:aim.toArray(),fov:65};
       object.visible=false;
     }
     if(!object.isMesh) return;
@@ -609,6 +609,11 @@ async function show() {
     if(eye && target){
       const position=eye.getWorldPosition(new THREE.Vector3());
       const aim=target.getWorldPosition(new THREE.Vector3());
+      // Blender's standing photo markers are 1.59 m above the floor.
+      // Translate the sightline together to keep its original pitch.
+      const heightAdjustment=STANDING_EYE_HEIGHT-1.59;
+      position.y+=heightAdjustment;
+      aim.y+=heightAdjustment;
       if(key==='entry'){
         // The roadside photo was taken behind the retaining wall. Start on the walk to the door.
         const towardDoor=aim.clone().sub(position);

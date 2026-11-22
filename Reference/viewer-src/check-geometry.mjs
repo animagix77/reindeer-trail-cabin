@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {WalkSpace,walkIntent} from './walking.js';
+import {STANDING_EYE_HEIGHT,WalkSpace,walkIntent} from './walking.js';
 import {walkingGait} from './footsteps.js';
 import {checkFirewood} from './check-firewood.mjs';
 import {checkWorldActions} from './check-world-actions.mjs';
@@ -179,10 +179,12 @@ for(const id of [1,2]){
   assert(seat && seat.point.y>bounds.min.y+.45 && seat.point.y<bounds.min.y+.75,
     'Missing seat cushion inside hanging basket '+id);
 }
+// The exported TourEye markers retain their authored camera height.
+const markerEyeHeight=1.59;
 let spawns=0;
 for(const name of names.filter(n=>n.startsWith('TourEye_'))){
   const v=scene.getObjectByName(name).getWorldPosition(new T.Vector3());
-  assert(walks.spawn(v.x,v.z,v.y,v.y-(name.endsWith('_loft')?1:1.59)),'Walk start obstructed '+name);
+  assert(walks.spawn(v.x,v.z,v.y,v.y-(name.endsWith('_loft')?1:markerEyeHeight)),'Walk start obstructed '+name);
   spawns++;
 }
 for(const x of [28.22,28.8,29.8,30.60,31.2,32.21,33.15,33.75]){
@@ -224,7 +226,7 @@ for(const h of [.15,1.0,1.85,2.17]){
 // The photographed stair-side route and the passage to the primary barn door
 // must both work using the browser's real walker and clearance radius.
 function traverseRoute(label,points,startingHeight=0,checkStep){
-  const first=at(...points[0],startingHeight+1.59);
+  const first=at(...points[0],startingHeight+STANDING_EYE_HEIGHT);
   let body=walks.spawn(first.x,first.z,first.y,2.88+startingHeight);
   assert(body,label+' has no starting floor');
   for(const [x,y] of points.slice(1)){
@@ -263,7 +265,8 @@ const axisX=at(1,0,0).sub(at(0,0,0)).normalize(),againstX=axisX.clone().negate()
 // Hold each strafe key in the actual entry hallway with the camera facing
 // along it. The visitor can step toward both walls without changing aim.
 {
-  const eye=at(31,8.8,1.59),body=walks.spawn(eye.x,eye.z,eye.y);
+  const eye=at(31,8.8,STANDING_EYE_HEIGHT),body=walks.spawn(eye.x,eye.z,eye.y);
+  assert.equal(body?.eye,STANDING_EYE_HEIGHT,'Clear hallway must use the standing viewpoint');
   const yaw=Math.atan2(-axisX.z,axisX.x),pad={x:0,y:0};
   function intent(...keys){return walkIntent(new Set(keys),pad,yaw,1/60);}
   const forward=intent('KeyW');
@@ -338,7 +341,9 @@ for(const h of [.47,1.06,1.68]){
 }
 traverseRoute('Primary door around the stone pier',[[25.35,20.16],[24.7,18.8],[24.7,12.75],[22.28,12.75]]);
 const stairRoute=[[25.35,20.16],[19.9,19.56],[16.94,19.35],[16.94,16.83],[15.65,16.83],[9.05,16.83],[7.85,16.83],[7.85,19.55]];
-assert.equal(traverseRoute('Tree nook to loft',stairRoute).label,'WalkSurface_LoftLanding');
+const loftArrival=traverseRoute('Tree nook to loft',stairRoute);
+assert.equal(loftArrival.label,'WalkSurface_LoftLanding');
+assert(loftArrival.eye>0 && loftArrival.eye<=1,'Loft route must retain its low viewpoint');
 assert.equal(traverseRoute('Loft down to tree nook',[...stairRoute].reverse(),2.21).label,'WalkSurface_MainFloor_west');
 traverseRoute('Woodpile to the fire ring between the chairs',[[34.65,46.92],[32.,46.2],[30.4,47.6],[30.1,50.6],[29.1,52.5]],-1.11);
 const visibleSolids=[];
@@ -398,7 +403,7 @@ function topCheck(x,y,helper,visible){
   const center=groundAt(at(-18.7,74,0));
   assert.equal(walks.test(center,center.x,center.z),null,'Visitor can step through the overturned hull');
   assert([-13,-11,-9].some(x=>{
-    const from=groundAt(at(x,26,0));from.y+=1.59;
+    const from=groundAt(at(x,26,0));from.y+=STANDING_EYE_HEIGHT;
     return [-22,-19,-16].some(targetX=>{
       const to=groundAt(at(targetX,74,0));to.y+=.23;
       return firstVisible(from,to)?.object.userData.part===name;
@@ -412,7 +417,7 @@ function topCheck(x,y,helper,visible){
   assert(stones.length>=3,'Missing rough stone row at the end of the driveway');
   function crossEdging(from,to){
     const origin=groundAt(from);
-    let foot=walks.spawn(origin.x,origin.z,origin.y+1.59);
+    let foot=walks.spawn(origin.x,origin.z,origin.y+STANDING_EYE_HEIGHT);
     assert(foot,'Cannot stand at the start of the fieldstone crossing');
     let rise=0;
     const steps=Math.ceil(Math.hypot(to.x-from.x,to.z-from.z)/.04);
@@ -473,7 +478,7 @@ function checkDeck(){
   const sideRail=firstVisible(at(23.25,29.2,1.03),at(23.25,29.2,.70));
   assert.equal(sideRail?.object.userData.part,timber,'Missing side guard cap away from house');
 
-  const rackEye=at(27.9,29.75,1.525),frame='Deck firewood rack · tubular steel frame';
+  const rackEye=at(27.9,29.75,STANDING_EYE_HEIGHT-.065),frame='Deck firewood rack · tubular steel frame';
   const logs='Deck firewood rack · split logs';
   const materialFaces=new Set();
   for(const x of [24.25,24.6,24.95,25.3,25.65,26.0,26.35,26.7]){
@@ -493,7 +498,7 @@ function checkDeck(){
       'Both rack feet must rest on the deck boards');
   }
   const center=at(25.48,27.18,-.065),approach=at(25.48,29.7,-.065);
-  const guest=walks.spawn(approach.x,approach.z,approach.y+1.59,approach.y);
+  const guest=walks.spawn(approach.x,approach.z,approach.y+STANDING_EYE_HEIGHT,approach.y);
   assert.equal(guest?.label,'WalkSurface_CoveredDeck','Cannot stand in front of the rack');
   const stop=walks.move(guest,center.x-guest.x,center.z-guest.z);
   const beforeRack=(stop.x-center.x)*inward.x+(stop.z-center.z)*inward.z;
@@ -505,7 +510,7 @@ function checkDeck(){
     [44.72,33.6],[38.32,33.6],[38.25,32.05],[35,32.05],[34.63,30.3],
     [34.63,29.2],[27.9,29.75],[30.7,27.5],[30.7,24.8]];
   const yard=scene.getObjectByName('TourEye_yard').getWorldPosition(new T.Vector3());
-  const yardHeight=yard.y-at(0,0,1.59).y;
+  const yardHeight=yard.y-at(0,0,markerEyeHeight).y;
   assert.equal(traverseRoute('Yard steps to rack and dining slider',path,yardHeight).label,'WalkSurface_MainFloor_west');
   assert.equal(traverseRoute('Dining slider past wood rack to garden',[...path].reverse()).label,'WalkSurface_ParcelGround');
 
@@ -517,7 +522,7 @@ function checkDeck(){
     [34.65,46.92],[32,46.2],[30.4,47.6],[30.1,50.6],[29.1,52.5]];
   function gardenWalk(points,height,sign){
     return traverseRoute('Grill-side steps and garden path',points,height,(before,after)=>{
-      assert(after.eye>=1.58,'Forced crouch on grill-side garden path');
+      assert(Math.abs(after.eye-STANDING_EYE_HEIGHT)<=.01,'Forced crouch on grill-side garden path');
       if(before.label!==after.label || after.label!=='WalkSurface_ParcelGround')return;
       const distance=Math.hypot(after.x-before.x,after.z-before.z);
       const rise=sign*(after.y-before.y);
@@ -575,7 +580,7 @@ function checkBasement(){
       let last=body;
       for(let i=0;i<n;i++){
         body=walks.move(body,dx/n,dz/n);
-        assert(body.eye>=1.58,'Unexpected crouch on '+body.label);
+        assert(Math.abs(body.eye-STANDING_EYE_HEIGHT)<=.01,'Unexpected crouch on '+body.label);
         floors.add(body.label);
         if(Math.hypot(body.x-last.x,body.z-last.z)>.43 || i===n-1){
           clearance(last,body);
@@ -600,7 +605,7 @@ function checkBasement(){
       const travel=i*stride;
       assert(Math.hypot(body.x-start.x-forward.x*travel,body.z-start.z-forward.z*travel)<.002,
         'Straight basement entry requires steering on '+body.label);
-      assert(body.eye>=1.58,'Forced crouch on straight basement entry at '+body.label);
+      assert(Math.abs(body.eye-STANDING_EYE_HEIGHT)<=.01,'Forced crouch on straight basement entry at '+body.label);
       const change=sign*(body.y-previous.y);
       if(Math.abs(change)>.035){
         assert(change>=.11 && change<=.22,'Unexpected basement riser height '+change);
@@ -625,7 +630,7 @@ function checkBasement(){
   assert.deepEqual(names.filter(n=>/^WalkSurface_LowerServiceStep/.test(n)).sort(),lowerFlight);
   for(const x of [doorX-.65,doorX,doorX+.65]){
     const apron=at(x,32.9,lowerFloor+.34),inside=at(x,24.7,lowerFloor);
-    const start=walks.spawn(apron.x,apron.z,apron.y+1.59,apron.y);
+    const start=walks.spawn(apron.x,apron.z,apron.y+STANDING_EYE_HEIGHT,apron.y);
     assert.match(start?.label||'',/^WalkSurface_UtilityFlagstoneApron(?:\.\d+)?$/);
     const bottom=walkStraightSteps(start,inside,-1);
     assert.equal(bottom.label,'WalkSurface_BasementEntryWood');
@@ -636,11 +641,11 @@ function checkBasement(){
   const required=[...lowerFlight,'WalkSurface_ExteriorServiceLanding','WalkSurface_BasementEntryWood'];
   for(const [name,eyeHeight,approach,visit] of [
     ['WalkSpawn_Outside',0,drivewayApproach,lowerVisit],
-    ['TourEye_yard',1.59,gardenApproach,[]]
+    ['TourEye_yard',markerEyeHeight,gardenApproach,[]]
   ]){
     const anchor=scene.getObjectByName(name).getWorldPosition(new T.Vector3());
     const floor=anchor.y-eyeHeight;
-    const start=walks.spawn(anchor.x,anchor.z,floor+1.59,floor);
+    const start=walks.spawn(anchor.x,anchor.z,floor+STANDING_EYE_HEIGHT,floor);
     assert(start,'Missing walking start for '+name);
     const path=[anchor,...approach,...apronAndDoor,...visit];
     const there=follow(start,path.slice(1));
@@ -703,7 +708,7 @@ function checkBasement(){
     ['Basement | 40 gallon electric water heater',[mechanicalAisle,20.85],[39.64,20.85,1.00]],
     ['Basement | laundry electrical panel and switches',[32.25,19.45],[35.55,19.28,1.78]]
   ]){
-    const hit=firstVisible(local(...eye,1.59),local(...look));
+    const hit=firstVisible(local(...eye,STANDING_EYE_HEIGHT),local(...look));
     assert.equal(hit?.object.userData.part,who,'Obstructed view of '+who+' from '+eye+' toward '+look);
     if(finish)assert.equal(hit.object.material.name,finish,'Unexpected finish on '+who);
   }
@@ -764,7 +769,7 @@ assert(cap.point.y-grade.point.y>.25 && cap.point.y-grade.point.y<.34,'Well cap 
 const wellBlock=scene.getObjectByName('WalkBlock_WellCasing');
 const wellFootprint=new T.Box3().setFromObject(wellBlock).getSize(new T.Vector3());
 assert(wellFootprint.x<.25 && wellFootprint.z<.25,'The well collision footprint obstructs the landing');
-assert.equal(walks.spawn(wellProbe.x,wellProbe.z,grade.point.y+1.59,grade.point.y),null,'Visitors can walk through the casing');
+assert.equal(walks.spawn(wellProbe.x,wellProbe.z,grade.point.y+STANDING_EYE_HEIGHT,grade.point.y),null,'Visitors can walk through the casing');
 const wellEye=scene.getObjectByName('TourEye_well').getWorldPosition(new T.Vector3());
 const wellLook=scene.getObjectByName('TourLook_well').getWorldPosition(new T.Vector3());
 assert(hits(wellSight,wellEye,wellLook.sub(wellEye).normalize())[0]?.object.material.name.startsWith('Water well ·'),

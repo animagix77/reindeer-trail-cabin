@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {STANDING_EYE_HEIGHT} from './walking.js';
 import {makeDeer,makeFoodTemplates,makeOfferingHand} from './wildlife-model.js';
 import {createTossMotion} from './toss-motion.js';
 
@@ -183,7 +184,7 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
   const shadowMat=contactShadow(),shadowGeo=new T.PlaneGeometry(.80,1.52);shadowGeo.rotateX(-Math.PI/2);
   const groundAt=p=>range.ground(p.x,p.z)??range.point(p.x,p.z)?.p.y??0;
   const p0=plan(11.1,60.2),look=plan(15.4,46.5);
-  p0.y=groundAt(p0)+1.59;look.y=groundAt(look)+.82;
+  p0.y=groundAt(p0)+STANDING_EYE_HEIGHT;look.y=groundAt(look)+.82;
   const view={eye:p0.toArray(),target:look.toArray(),fov:62};
   // The doe and yearling browse the wooded strip outside the stored boat.
   // The buck follows a separate circuit on the opposite edge of the parcel.
@@ -227,7 +228,7 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
     camera.getWorldDirection(forward);forward.y=0;
     if(forward.lengthSq()<.0001)forward.set(0,0,-1);
     forward.normalize();right.set(-forward.z,0,forward.x);
-    const ground=range.ground(camera.position.x,camera.position.z)??(camera.position.y-1.59);
+    const ground=range.ground(camera.position.x,camera.position.z)??(camera.position.y-STANDING_EYE_HEIGHT);
     offering.copy(camera.position).addScaledVector(forward,.59).addScaledVector(right,.165);
     const gaze=camera.getWorldDirection(handForward).y;
     offering.y=clamp(camera.position.y-.29+gaze*.37,ground+.80,ground+1.26);

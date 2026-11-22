@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+export const STANDING_EYE_HEIGHT=1.49;
+
 // Collision geometry is exported with the house and uses glTF Y-up metres.
 // A 2 m grid limits movement queries to faces and convex blockers near the visitor.
 const CELL=2, RADIUS=.19, STEP=.32, DROP=.36;
@@ -95,12 +97,12 @@ export class WalkSpace {
       clearance=Math.min(clearance,b.minY-floor.y-.07);
     }
     if(clearance<.75) return null;
-    const eye=/loft/i.test(floor.label)?1.00:1.59;
+    const eye=/loft/i.test(floor.label)?1.00:STANDING_EYE_HEIGHT;
     return {x,z,y:floor.y,eye:Math.min(eye,clearance-.12),label:floor.label};
   }
   spawn(x,z,eyeY,expectedFloor=null) {
     const hits=this.heights(x,z);
-    const target=expectedFloor??eyeY-1.59;
+    const target=expectedFloor??eyeY-STANDING_EYE_HEIGHT;
     for(const h of [...hits].sort((a,b)=>Math.abs(a.y-target)-Math.abs(b.y-target))) {
       const state=this.settle(x,z,h,hits);
       if(state && !this.dynamicBlocker?.(x,z,state.y)) return state;

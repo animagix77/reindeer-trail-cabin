@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {STANDING_EYE_HEIGHT} from './walking.js';
 import {makeSplittingBlock} from './splitting-block.js';
 import {createSplitPhysics} from './split-physics.js';
 
@@ -43,7 +44,7 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
     const range=Math.hypot(camera.position.x-x,camera.position.z-z);
     if(range<10)onContact?.(speed*Math.min(1,2/Math.max(1,range)));
   }});
-  const eye=worldPoint(.04,0,.96);eye.y=(ground(eye.x,eye.z)??root.position.y)+1.59;
+  const eye=worldPoint(.04,0,.96);eye.y=(ground(eye.x,eye.z)??root.position.y)+STANDING_EYE_HEIGHT;
   const view={eye:eye.toArray(),target:worldPoint(0,.72,0).toArray(),fov:62};
   const el=id=>document.getElementById(id);
   const panel=el('woodwork'),action=el('split-action'),collect=el('split-collect');
@@ -336,7 +337,7 @@ export function installWoodSplitting(scene,model,space,{camera,schedule,takeSpli
       const dt=Math.max(0,seconds-lastTick);
       const activePhysics=physics.step(dt);
       distance=Math.hypot(camera.position.x-x,camera.position.z-z);
-      const here=activeView!=='property' && distance<2.25 && Math.abs(camera.position.y-root.position.y-1.55)<1.25;
+      const here=activeView!=='property' && distance<2.25 && Math.abs(camera.position.y-root.position.y-STANDING_EYE_HEIGHT)<1.25;
       if(near!==here){near=here;hint='';clearPointers();}
       if(equipped && (!near || distance>returnDistance)){returnAxe();hint='';}
       if(queuedHit && phase(seconds)==='ready'){

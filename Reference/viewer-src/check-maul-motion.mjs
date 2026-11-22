@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
+import {STANDING_EYE_HEIGHT} from './walking.js';
 import {makeSplittingMaul} from './splitting-maul.js';
 
 function equipped(outcome,pace=1){
   const root=new T.Group(),tool=makeSplittingMaul(root);
   root.position.set(-2,1.2,3.5);root.rotation.y=.63;
   const camera=new T.PerspectiveCamera(65,1.6,.035,180);
-  camera.position.copy(root.localToWorld(new T.Vector3(.22,1.59,.96)));
+  camera.position.copy(root.localToWorld(new T.Vector3(.22,STANDING_EYE_HEIGHT,.96)));
   const target=new T.Vector3(.035,.775,.026);
   camera.lookAt(root.localToWorld(target.clone()));camera.updateMatrixWorld();
   const aim={...target,nx:.96,nz:-.28,outcome,duration:tool.swingDuration*pace,endStamina:.43};

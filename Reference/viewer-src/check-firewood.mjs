@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as T from 'three';
+import {STANDING_EYE_HEIGHT} from './walking.js';
 import {installTourFires,fuelDuration} from './fires.js';
 import {installFirewood} from './firewood.js';
 import {createTossMotion} from './toss-motion.js';
@@ -109,7 +110,7 @@ export function checkFirewood(model,space){
   const ring=center('WalkBlock_FireRing'),basket=center('WalkBlock_HangingBasket1');
   const away=basket.clone().sub(ring);away.y=0;away.normalize();
   const behind=basket.clone().addScaledVector(away,.88);
-  visit({eye:[behind.x,ring.y+1.59,behind.z],target:ring.toArray()});
+  visit({eye:[behind.x,ring.y+STANDING_EYE_HEIGHT,behind.z],target:ring.toArray()});
   assert(wood.snapshot().nearPit);assert(!wood.toss(),'Firewood cannot travel through a hanging chair');
   wood.update(null,'property',now);assert.equal(wood.snapshot().held,'logs');
   const body=visit(yard);assert(wood.toss());now+=4;wood.update(body,'yard',now);
