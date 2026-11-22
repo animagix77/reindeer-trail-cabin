@@ -212,6 +212,21 @@ for(const x of [23,28,33,40]){
 // The plaster projection beside the loft stairs meets the stone pier. Cast
 // rays at both ends of each new face, including the plaster-to-stone seam.
 const xAxis=at(1,0,0).sub(at(0,0,0)).normalize();
+// Both low ends of the cedar ceiling must close against an interior finish.
+const loftFinishes=[];
+scene.traverse(o=>{if(o.isMesh && o.userData.part?.startsWith('Loft · cedar lining'))loftFinishes.push(o);});
+for(const x of [.21,4,8.88]){
+  for(const h of [2.22,2.52]){
+    const hit=hits(loftFinishes,at(x,8,h),inward.clone().negate())[0];
+    assert(hit?.object.userData.part==='Loft · cedar lining at low eave','Open loft eave at '+[x,h]);
+  }
+}
+for(const y of [7.1,10,15.2]){
+  for(const h of [2.22,2.55]){
+    const hit=hits(loftFinishes,at(8.5,y,h),xAxis)[0];
+    assert(hit?.object.userData.part==='Loft · cedar lining at bedroom side','Open loft side at '+[y,h]);
+  }
+}
 for(const h of [.15,1.0,1.85,2.17]){
   for(const y of [15.29,16.85,18.13]){
     const hit=hits(nookWalls,at(20.25,y,h),xAxis)[0];

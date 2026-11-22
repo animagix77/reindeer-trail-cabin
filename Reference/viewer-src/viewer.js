@@ -7,7 +7,7 @@ import {watchSmallwoodSeason} from './smallwood-season.js';
 import {cabinFilm} from './cabin-film.js';
 import {walkingGait} from './footsteps.js';
 import {installHallReflections} from './hall-reflections.js';
-import {installMotionFloodlights} from './motion-floodlights.js';
+import {addFloodlightFixtures} from './motion-floodlights.js';
 import {installWalkingFlashlight} from './walking-flashlight.js';
 import {installTreeLights} from './tree-lights.js';
 import {installParty} from './party.js';
@@ -73,7 +73,7 @@ const camera = new THREE.PerspectiveCamera(39,1,0.03,4000);
 const world = new THREE.Scene();
 const woodland=installWoodlandSound();
 const flashlightButton=element('flashlight');
-let flashlight,floodlights,hallReflections,flashlightOn=false;
+let flashlight,hallReflections,flashlightOn=false;
 let television,lighting,fires,firewood,woodSplit,ringCenter,grill,wildlife,entryDoors,treeLights,film,surfaces;
 let renderer,worldActions,updateGrass,updateFallingLeaves;
 let season,sceneWeather;
@@ -443,7 +443,11 @@ const party=installParty({
     const order=candidates.slice(index).concat(candidates.slice(0,index));
     body=order.find(s=>occupied.every(p=>Math.hypot(s.x-p.x,s.z-p.z)>.83))??order[0];
     camera.position.set(body.x,body.y+body.eye,body.z);
-    if(index){yaw=Math.atan2(body.x-origin.x,body.z-origin.z);pitch=0;}
+    // Keep the cabin as the focal point from each available arrival spot.
+    const target=starts.outside.target;
+    const dx=target[0]-body.x,dz=target[2]-body.z;
+    yaw=Math.atan2(-dx,-dz);
+    pitch=Math.atan2(target[1]-camera.position.y,Math.hypot(dx,dz));
     look();
   },
   meet(guest,{index=0,occupied=[]}={}){
@@ -496,7 +500,6 @@ function render(firstFrame=false){
   const outside=outdoorsFloor(body?.label);
   lighting?.update(camera.position,activeView,seconds,camera,outside,body?.label);
   flashlight?.update(camera,walking(),outside,flashlightOn);
-  const animateFlood=floodlights?.update(camera.position,walking() && outside,lighting?.daylight??1,seconds,walking());
   const animateTV=television?.update(camera.position,body?.label,seconds);
   const animateSplitting=woodSplit?.update(activeView,seconds,velocity.lengthSq()>.0025);
   const animateWood=firewood?.update(body,activeView,seconds,activities.offeringFood);
@@ -516,7 +519,7 @@ function render(firstFrame=false){
   const cinematic=film && walking();
   const adapting=cinematic?film.render(world,camera,lighting,outside,seconds):false;
   if(!cinematic)renderer.render(world,camera);
-  if(!document.hidden && (adapting || animateTV || animateSwings || animateFlood || animateSplitting || animateWood || animateFoliage || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
+  if(!document.hidden && (adapting || animateTV || animateSwings || animateSplitting || animateWood || animateFoliage || animateLeaves || animateGrass || animateTree || animateGuests || animateDoors || animateFire || animateGrill || animateDeer || lighting?.animated))schedule();
 }
 function updateState(button,enabled) {button.setAttribute('aria-pressed',String(enabled));}
 element('reset').addEventListener('click',reset);
@@ -579,11 +582,11 @@ async function show() {
   gltf.scene.traverse(object=>{
     if(/^WalkSpawn_Outside/i.test(object.name)) {
       const anchor=object.getWorldPosition(new THREE.Vector3());
-      // Face the walk up to the porch, with the garage to the left of the first flight.
-      const step=gltf.scene.getObjectByName('WalkSurface_RetainerTread04');
-      const aim=new THREE.Box3().setFromObject(step).getCenter(new THREE.Vector3());
-      aim.y+=.92;
-      starts.outside={eye:[anchor.x,anchor.y+STANDING_EYE_HEIGHT,anchor.z],target:aim.toArray(),fov:65};
+      // Stand back from the lower steps to frame both garage bays and the porch.
+      const eye=anchor.clone();
+      eye.y+=STANDING_EYE_HEIGHT;
+      const aim=eye.clone().add(new THREE.Vector3(-8.56,1.45,4.97));
+      starts.outside={eye:eye.toArray(),target:aim.toArray(),fov:62.3};
       object.visible=false;
     }
     if(!object.isMesh) return;
@@ -669,7 +672,7 @@ async function show() {
   updateFallingLeaves=installFallingLeaves(world,gltf.scene,walkSpace,reducedMotion,schedule);
   surfaces=installCabinSurfaces(gltf.scene,renderer);
   await loading.preparing(3,'Lighting and drawing your first view');
-  floodlights=installMotionFloodlights(world,gltf.scene,schedule);
+  addFloodlightFixtures(world);
   updateEggSwings=installEggSwings(gltf.scene,reducedMotion);
   batchStatic(gltf.scene);
   lighting.captureExterior();

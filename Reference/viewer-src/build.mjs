@@ -59,7 +59,8 @@ let template=(await fs.readFile(path.join(base,'template.html'),'utf8'))
   .replace('%%BRAND_STYLES%%',()=>brandStyles)
   .replace('%%MOBILE_STYLES%%',()=>mobileStyles.join('\n'));
 const homeAnchor=(label)=>'<a class="cabin-site-link" href="../">'+label+'</a>';
-template=template.replaceAll('%%CABIN_NAME%%',website?homeAnchor('The Reindeer Trail'):'The Reindeer Trail')
+template=template.replaceAll('%%CABIN_URL%%',website?'../':'https://reindeertrail.com/')
+  .replaceAll('%%CABIN_NAME%%',website?homeAnchor('The Reindeer Trail'):'The Reindeer Trail')
   .replace('%%CABIN_HOME%%',website?homeAnchor('Return to the cabin website'):'');
 const modelDir=website?path.dirname(requestedOut):path.dirname(outPath);
 if(website){

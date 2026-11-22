@@ -198,6 +198,8 @@ main{
 #views,#scene-panel,.dock nav,#activity,#woodwork{background:var(--hud);border:1px solid var(--hud-line);border-radius:5px;color:var(--ink);box-shadow:0 3px 16px #0a161b38}
 #tour-controls #views{grid-area:nav;justify-self:end;display:flex;flex-wrap:nowrap;gap:1px;padding:1px 3px;pointer-events:auto}
 .view-picker{display:flex;align-items:center;gap:5px;min-width:0;padding-left:6px;color:var(--sub);font-size:.78rem}
+.site-return{display:inline-flex;align-items:center;justify-content:center;align-self:stretch;padding:4px 9px;border-left:1px solid var(--hud-line);color:var(--ink);font:600 .84rem/1.1 var(--sans);text-align:center;text-underline-offset:.18em}
+.site-return:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
 #tour-controls select{font-family:inherit;line-height:1.1;font-weight:650;font-size:.83rem;background:transparent;color:var(--ink);border:0;cursor:pointer}
 #tour-controls select option{color:#faf6e9;background:#24332b}
 #views button,.dock nav button{min-height:38px;padding:4px 11px;color:var(--ink);background:transparent;font-size:.83rem;border-radius:7px}
@@ -357,6 +359,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
     <label class="view-picker"><span>Start at</span><select id="location" aria-label="Tour starting point"></select></label>
     <button type="button" id="map-toggle" aria-haspopup="dialog" aria-controls="property-map" aria-expanded="false">Map</button>
     <button type="button" id="party-toggle" aria-haspopup="dialog" aria-controls="party">Cabin chat</button>
+    <a class="site-return" href="%%CABIN_URL%%">Back to cabin</a>
   </nav>
   <section id="scene-panel" aria-label="Scene settings">
     <div class="time-setting">

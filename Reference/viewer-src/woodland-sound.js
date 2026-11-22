@@ -10,16 +10,15 @@ function random(seed){
   return ()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
 }
 function channel(ctx,kind,channelIndex){
-  const rate=22050,seconds={wind:15,day:19,crickets:16,fire:12}[kind];
-  const samples=new Float32Array(seconds*rate),rng=random(619+channelIndex*7001+kind.length*55);
+  const rate=22050,seconds={rain:13,day:37,crickets:16,fire:12}[kind];
+  const samples=new Float32Array(seconds*rate),rng=random(619+(kind==='day'?0:channelIndex*7001)+kind.length*55);
   const wrap=n=>n%samples.length;
-  if(kind==='wind'||kind==='fire'){
+  if(kind==='rain'||kind==='fire'){
     let slow=0,middle=0;
     for(let i=0;i<samples.length;i++){
-      const white=rng()*2-1,s=i/rate;
+      const white=rng()*2-1;
       slow=.987*slow+.013*white;middle=.84*middle+.16*white;
-      const breeze=.57+.24*Math.sin(tau*s/seconds+.5)+.15*Math.cos(3*tau*s/seconds);
-      samples[i]=kind==='fire'?(.27*middle+.60*slow)*(.64+.36*rng()):(.36*middle+1.2*slow)*breeze;
+      samples[i]=kind==='fire'?(.27*middle+.60*slow)*(.64+.36*rng()):(white-middle)*.09;
     }
     if(kind==='fire'){
       // Bark popping and fine resin ticks have independent attack, decay,
@@ -37,7 +36,7 @@ function channel(ctx,kind,channelIndex){
       }
     }
   }else if(kind==='crickets'){
-    for(let voice=0;voice<4;voice++){
+    for(let voice=0;voice<2;voice++){
       const pitch=3050+820*rng()+280*voice,period=.42+.58*rng();
       let t=rng()*period;
       while(t<seconds){
@@ -54,19 +53,21 @@ function channel(ctx,kind,channelIndex){
     }
   }else{
     // A few distant whistles leave long gaps in a quiet daylight clearing.
-    let at=.3+rng()*2.7;
+    let at=.8+rng()*1.8;
     while(at<seconds){
-      const startPitch=1730+1350*rng(),count=2+Math.floor(rng()*3);
+      const startPitch=1620+1280*rng(),count=2+Math.floor(rng()*3);
+      const pan=rng()*.9-.45,level=.19*Math.sqrt((1+(channelIndex?pan:-pan))/2);
+      const contour=220+520*rng(),spacing=.17+.12*rng();
       for(let c=0;c<count;c++){
-        const start=Math.floor((at+c*.22)*rate),duration=.083+.10*rng();
+        const start=Math.floor((at+c*spacing)*rate),duration=.083+.10*rng();
         let phase=0;
         for(let i=0;i<rate*duration;i++){
           const t=i/rate,u=t/duration;
-          phase+=tau*(startPitch+(350+140*c)*Math.sin(u*Math.PI)-430*u)/rate;
-          samples[wrap(start+i)]+=.19*Math.sin(Math.PI*u)**2*(Math.sin(phase)+.12*Math.sin(phase*2));
+          phase+=tau*(startPitch+contour*Math.sin(u*Math.PI)-(200+85*c)*u)/rate;
+          samples[wrap(start+i)]+=level*Math.sin(Math.PI*u)**2*(Math.sin(phase)+.12*Math.sin(phase*2));
         }
       }
-      at+=4.3+3.8*rng();
+      at+=5.2+5.6*rng();
     }
   }
   // Window the loop boundaries so short noise changes never produce a click.
@@ -130,7 +131,7 @@ export function installWoodlandSound() {
   }
   function makeTracks(){
     if(tracks.fire)return;
-    for(const kind of ['wind','day','crickets','fire']){
+    for(const kind of ['rain','day','crickets','fire']){
       const left=channel(audio,kind,0),right=channel(audio,kind,1);
       const buf=audio.createBuffer(2,left.length,22050);
       buf.getChannelData(0).set(left);buf.getChannelData(1).set(right);
@@ -224,9 +225,9 @@ export function installWoodlandSound() {
       if(tracks.carol)aim('carol',tracks.carol,indoors?.13:0,indoors?.7:.32);
       const wet=weather==='rain',snow=weather==='snow';
       const room=outside?1:.095;
-      aim('wind',tracks.wind,walking?room*(snow?.28:wet?.63:.34):0);
-      aim('day',tracks.day,walking?room*day*(wet?.07:snow?.035:.16):0);
-      aim('crickets',tracks.crickets,walking?room*(1-day)*(wet?.11:snow?0:.43):0);
+      aim('rain',tracks.rain,walking && wet?room*.065:0);
+      aim('day',tracks.day,walking?room*day*(wet?.065:snow?.045:.19):0);
+      aim('crickets',tracks.crickets,walking?room*(1-day)*(wet?.04:snow?0:.13):0);
       const distance=ring?camera.position.distanceTo(ring):100;
       const rolloff=1/(1+.32*Math.max(0,distance-1.1))**1.8;
       aim('fire',tracks.fire,walking?(outside?1:.22)*Math.min(1,fire)*rolloff:0,.095);

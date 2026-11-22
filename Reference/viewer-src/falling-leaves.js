@@ -1,6 +1,6 @@
 import * as T from 'three';
 
-const maxLeaves=7, palette=[0xe6b84b,0xd99c43,0xeac773,0xc47c35,0xac622f];
+const maxLeaves=36, palette=[0xe6b84b,0xd99c43,0xeac773,0xc47c35,0xac622f];
 const underCover=/^WalkSurface_(MainFloor|Loft|Bathroom|Basement|CoveredDeck|FrontLanding)/;
 
 function exposedGround(space,x,z){
@@ -53,7 +53,7 @@ export function installFallingLeaves(world,model,space,motion,schedule){
     let source,total=0;
     for(const site of sources){
       const dx=site.x-camera.position.x,dz=site.z-camera.position.z,distance=Math.hypot(dx,dz);
-      if(distance>19||distance<.75)continue;
+      if(distance>28||distance<.75)continue;
       const facing=horizon>.1?(dx*forward.x+dz*forward.z)/(distance*horizon):1;
       if(facing<-.1)continue;
       // Favour the nearby woodline, with enough variation to avoid a single emitter.
@@ -63,8 +63,8 @@ export function installFallingLeaves(world,model,space,motion,schedule){
     }
     if(!source)return;
     const speed=(.72+Math.random()*.45)*(weather==='rain'?1.25:1);
-    const wind=(.09+Math.random()*.15)*(weather==='rain'?1.6:weather==='cloudy'?1.2:1);
-    const advance=arriving?Math.max(0,(source.y-camera.position.y-1-Math.random()*2)/speed):0;
+    const wind=(.18+Math.random()*.30)*(weather==='rain'?1.6:weather==='cloudy'?1.2:1);
+    const advance=arriving?Math.max(0,(source.y-camera.position.y-.25-Math.random()*4)/speed):0;
     active.push({source,speed,wind,start:seconds-advance,phase:Math.random()*Math.PI*2,
       scale:.78+Math.random()*.43,color:palette[Math.floor(Math.random()*palette.length)],
       landed:null});
@@ -81,8 +81,9 @@ export function installFallingLeaves(world,model,space,motion,schedule){
     if(arriving){active.length=0;next=seconds;}
     previous=seconds;
     if(seconds>=next){
-      if(active.length<maxLeaves)release(camera,seconds,weather,arriving);
-      next=seconds+(2.8+Math.random()*5.4)/Math.max(.12,leafFall);
+      const batch=arriving?Math.ceil(9*leafFall):1+Math.floor(Math.random()*3);
+      for(let i=0;i<batch&&active.length<maxLeaves;i++)release(camera,seconds,weather,arriving);
+      next=seconds+(.65+Math.random()*.95)/Math.max(.06,leafFall);
     }
 
     let count=0;

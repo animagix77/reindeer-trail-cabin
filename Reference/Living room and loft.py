@@ -119,7 +119,7 @@ def floorface(name,x0,x1,y0,y1,z,material,unit):
 # DSC01698 and the kitchen threshold photograph show the boards parallel to the gable.
 living_outline=[(.12,15.25,.014),(21.1,15.25,.014),(21.1,28.87,.014),(.12,28.87,.014)]
 surface('Living room · floor',living_outline,living_floor,[(y*ft/3.60,-x*ft/1.52) for x,y,z in living_outline])
-loftdeck=2.20; front=8.95;ynorth=15.25;yback=28.78
+loftdeck=2.20; front=8.95;ynorth=15.25;yback=28.82
 block('Loft · timber platform',.18,front,7.0,yback,loftdeck-.12,loftdeck,darkwood)
 floorface('Loft · floor finish',.18,front,7,yback,loftdeck+.002,lining,4.8)
 under=[(.18,ynorth,loftdeck-.123),(front,ynorth,loftdeck-.123),(front,yback,loftdeck-.123),(.18,yback,loftdeck-.123)]
@@ -128,7 +128,7 @@ for x in (1.2,3.25,5.35,7.53):beam('Loft · exposed joist',(x,ynorth,loftdeck-.1
 # Two ceiling finishes follow the measured, gently offset roof planes; each skylight
 # has an opening in the exterior surface and a profiled inner reveal.
 def top(u,v):return soffit(u,v)
-for x0,x1,v0,v1,material in [(0.2,front,7.0,yback,loft_wood),(front,21.1,ynorth,yback,ceilingmat)]:
+for x0,x1,v0,v1,material in [(.18,front,7.0,yback,loft_wood),(front,21.1,ynorth,yback,ceilingmat)]:
     for sign in (0,1):
         r0=ridge(x0,1);r1=ridge(x1,1)
         corners=([(x0,v0),(x1,v0),(x1,r1),(x0,r0)] if sign==0 else [(x0,r0),(x1,r1),(x1,v1),(x0,v1)])
@@ -160,6 +160,22 @@ def wallmaterial(name,polygon,material,holes=(),axes=(0,2)):
         surface(name,part,material,[(p[axes[0]]/5,p[2]/1.45) for p in part])
 xg=.18;ym=28.82
 wallmaterial('East wall · under loft',[(xg,ynorth,.014),(xg,ym,.014),(xg,ym,loftdeck-.12),(xg,ynorth,loftdeck-.12)],ochre,[east_window],(1,2))
+# Finish the low eave and the bedroom side of the platform up to the cedar
+# roof. These inside faces sit just clear of the bedroom plaster behind them.
+loft_side=front-.045
+loft_eave=7.045
+for label,edge in [
+    ('low eave',[(loft_side,loft_eave),(xg,loft_eave)]),
+    ('bedroom side',[(loft_side,ynorth),(loft_side,loft_eave)])]:
+    a,b=edge
+    pts=[(*a,loftdeck),(*b,loftdeck),(*b,top(*b)),(*a,top(*a))]
+    axis=0 if label=='low eave' else 1
+    surface('Loft · cedar lining at '+label,pts,loft_wood,
+            [(p[axis]*ft/2.3,(p[2]-loftdeck)/.86) for p in pts])
+a=(loft_side,ynorth);b=(front,ynorth)
+pts=[(*a,loftdeck),(*b,loftdeck),(*b,top(*b)),(*a,top(*a))]
+surface('Loft · cedar lining at stair jamb',pts,loft_wood,
+        [(p[0]*ft/2.3,(p[2]-loftdeck)/.86) for p in pts])
 crest_y=ridge(xg,1)
 for a,b in [(7,crest_y),(crest_y,ym)]:
     outline=[(xg,a,loftdeck),(xg,b,loftdeck),(xg,b,top(xg,b)),(xg,a,top(xg,a))]

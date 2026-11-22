@@ -57,6 +57,7 @@
     line-height: 1.12;
   }
   #views button { border-left: 1px solid var(--hud-line); border-radius: 0; }
+  #views .site-return { max-width: 5em; padding-inline: 5px; font-size: .78rem; }
   #views #party-toggle { max-width: 8.5em; padding-inline: 5px; overflow-wrap: anywhere; }
   #tour-controls #scene-panel { gap: 7px; padding-inline: 9px; }
   .time-setting { min-width: 0; }

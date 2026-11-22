@@ -253,7 +253,7 @@ export function installTourLighting(scene,renderer,model,arrival) {
   ].map(([x,y,z,color,power,range])=>({p:fromPlan(x,y,z),color,power,range}));
   // The four low, frosted path lights run between the two stair flights.
   // Model their soft pooled light on the risers and rails in existing nearby
-  // lamp slots. The steps stay readable after the motion heads switch off.
+  // lamp slots to keep the steps readable at night.
   const middleStep=model.getObjectByName('WalkSurface_RetainerTread04');
   const stepBounce={p:new THREE.Box3().setFromObject(middleStep).getCenter(new THREE.Vector3())
     .add(new THREE.Vector3(1.1,1.25,.65)),color:0xffc88e,power:0,range:3.7,approach:true};

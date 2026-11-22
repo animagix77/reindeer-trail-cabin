@@ -24,6 +24,7 @@ def build_details():
         x0=sx0+(front-sx0)*b;x1=sx0+(front-sx0)*a
         blocker('LoftStairGuard'+str(j),x0,x1,guard-.11,guard+.11,loftdeck*a+.04,loftdeck*b+.77)
     blocker('LoftOpenEdge',front-.13,front+.08,guard+.15,28.72,loftdeck,loftdeck+.88)
+    blocker('LoftBedroomSide',loft_side,front,loft_eave,ynorth,loftdeck,top(front,ynorth))
     blocker('LoftEaveNorth',.18,front,6.95,7.30,loftdeck,loftdeck+1.7)
     # The roof drops toward the eaves. Follow the underside closely enough for
     # a visitor to duck with the pitch and stop before reaching the low edges.

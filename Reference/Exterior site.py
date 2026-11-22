@@ -1098,6 +1098,6 @@ def build_exterior_site():
     # Road crossing and parcel context imagery are visible only. Starting point and
     # walk support remain wholly on this lot.
     spawn=bpy.data.objects.new('WalkSpawn_Outside',None);site_group.objects.link(spawn)
-    spawn.location=wpos(-16,-10,.025);spawn.empty_display_type='PLAIN_AXES';spawn.empty_display_size=.05
+    spawn.location=wpos(-16.56,-14.17,.025);spawn.empty_display_type='PLAIN_AXES';spawn.empty_display_size=.05
     return site_group
 site_extra=build_exterior_site()
