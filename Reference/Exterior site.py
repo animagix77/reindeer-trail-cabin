@@ -766,10 +766,13 @@ def build_exterior_site():
         tube(material,mid-axis*.254,mid+axis*.265+Vector((0,0,.024)),.056,.048,6)
     build_fire_circle_chairs(site_group,center,zpat,blocker)
     picnic_table(ties,site_group,zone,blocker)
-    # Horizontal crown centers are local maxima of nearby high unclassified lidar
-    # returns, separated by 14 feet. Trunk paths and species are illustrative.
-    # The street reference shows a young tree immediately inside the right gate pier.
-    trees=[(4,68,26.6),(-10,68,26.3),(4,54,25.2),(18,72,26.1),(32,72,24.7),(-32,-8,24.6),(46,68,20.9),(-24,70,24.9),(-10,54,24.5),(54,6,17.5),(-34,6,16.4),(54,20,16.8),(-34,46,13.6),(48,54,17.7),(54,-8,17.9),(58,76,18.),(56,34,15.8),(-34,60,13.1),(-38,32,14.4),(4,40,24.),(-30,20,14.4),(-20,44,10.1),(gate_right+.38,roadside_line(gate_right)+1.81,6.8),(38,-12,10.4),(10.5,-16.2,8.3),(-38,74,15.)]
+    # Owner-confirmed clearing: only the side and rear parcel edges carry trees.
+    # Crown heights are approximate. Stations are in the appraisal plan's feet.
+    trees=[
+        (-40,-8,16.4),(-40,9,15.1),(-40,28,14.4),(-40,49,13.6),(-40,65,13.1),
+        (-32,79,24.6),(-15,79,24.9),(4,79,26.6),(21,79,26.1),(39,79,24.7),(55,79,18.0),
+        (60.6,63,20.9),(60.6,43,17.7),(60.6,25,16.8),(60.6,6,17.5),(60.6,-9,17.9),
+    ]
     cards=[];cardfaces=[];carduv=[]
     def spray(a,d,length,width):
         d=Vector(d).normalized()
@@ -782,8 +785,6 @@ def build_exterior_site():
     trunk_uvs={}
     for i,(x,y,h) in enumerate(trees):
         root=Vector(wpos(x,y,-.07));rad=.12+h*.008*rng.uniform(.78,1.14)
-        if abs(x-gate_right-.38)<.01:rad=.065
-        if x==10.5:rad=.088
         skew=Vector((rng.uniform(-1.15,1.15),rng.uniform(-1.15,1.15),0))
         def stem(u):return root+skew*u*u+Vector((0,0,h*u))
         # Broad furrows cast real shadows and break the lower trunk silhouette.
