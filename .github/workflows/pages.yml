@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --prefix Reference/viewer-src
-      - run: node --test Reference/viewer-src/check-open-house.mjs Reference/viewer-src/check-loading.mjs Reference/viewer-src/check-splitting.mjs Reference/viewer-src/check-split-fracture.mjs Reference/viewer-src/check-split-physics.mjs Reference/viewer-src/check-wood-throw.mjs Reference/viewer-src/check-cabin-carol.mjs Reference/viewer-src/check-motion-floodlights.mjs Reference/viewer-src/check-local-conditions.mjs Reference/viewer-src/check-smallwood-season.mjs Reference/viewer-src/check-groundwater.mjs Reference/viewer-src/check-winter.mjs
+      - run: node --test Reference/viewer-src/check-open-house.mjs Reference/viewer-src/check-loading.mjs Reference/viewer-src/check-splitting.mjs Reference/viewer-src/check-split-fracture.mjs Reference/viewer-src/check-split-physics.mjs Reference/viewer-src/check-wood-throw.mjs Reference/viewer-src/check-cabin-carol.mjs Reference/viewer-src/check-motion-floodlights.mjs Reference/viewer-src/check-local-conditions.mjs Reference/viewer-src/check-smallwood-season.mjs Reference/viewer-src/check-groundwater.mjs Reference/viewer-src/check-winter.mjs Reference/viewer-src/check-sled-motion.mjs Reference/viewer-src/check-sled-tracks.mjs
       - run: node Reference/viewer-src/check-geometry.mjs "Reindeer Trail.glb"
       - run: node Reference/viewer-src/check-wildlife.mjs "Reindeer Trail.glb"
       - run: mkdir -p public

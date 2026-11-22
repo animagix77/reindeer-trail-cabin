@@ -18,7 +18,7 @@ export function surface(x,d){
   if(u+v<=1)return (1-u-v)*height(i,j)+u*height(i+1,j)+v*height(i,j+1);
   return (u+v-1)*height(i+1,j+1)+(1-v)*height(i+1,j)+(1-u)*height(i,j+1);
 }
-function drawTerrain(scene){
+function drawTerrain(scene,tracks){
   const positions=[],colors=[],indices=[];
   ds.forEach((d,j)=>xs.forEach((x,i)=>{
     const y=height(i,j),lake=1-T.MathUtils.smoothstep(y,.015,.16);
@@ -35,7 +35,9 @@ function drawTerrain(scene){
   const snow=new T.MeshStandardMaterial({vertexColors:true,roughness:.98});
   snow.onBeforeCompile=s=>{
     s.vertexShader='varying vec3 hillPoint;\n'+s.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nhillPoint=position;');
-    s.fragmentShader='varying vec3 hillPoint;\n'+s.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+    s.uniforms.runnerMarks={value:tracks.texture};
+    s.uniforms.runnerUV={value:tracks.uv};
+    s.fragmentShader='varying vec3 hillPoint; uniform sampler2D runnerMarks; uniform vec4 runnerUV;\n'+s.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
       float d=-hillPoint.z, x=hillPoint.x;
       float lane=floor((x+0.75)/1.5);
       float bent=x-lane*1.5+.36*sin(d*.12+lane*2.)+.19*sin(d*.34+lane);
@@ -47,7 +49,10 @@ function drawTerrain(scene){
       float stepRow=floor(d/.70);
       float bootX=x+3.3+1.23*sin(d*.061)+.67*cos(d*.13)+.15*cos(stepRow*3.14159);
       float boot=1.-smoothstep(.72,1.1,length(vec2(bootX/.13,(fract(d/.70)-.5)*.70/.16)));
-      diffuseColor.rgb*=1.-.14*tracks*(.25+.75*broken)-.15*boot*(1.-smoothstep(55.,68.,d))+.030*grains;
+      diffuseColor.rgb*=1.-.04*tracks*(.25+.75*broken)-.15*boot*(1.-smoothstep(55.,68.,d))+.030*grains;
+      vec3 mark=texture2D(runnerMarks,(vec2(x,d)-runnerUV.xy)*runnerUV.zw).rgb;
+      diffuseColor.rgb*=1.-mark.r*vec3(.42,.34,.27)-mark.b*.08;
+      diffuseColor.rgb+=vec3(.11,.12,.14)*mark.g*(1.-mark.b);
     `);
   };
   const mesh=new T.Mesh(geometry,snow);mesh.receiveShadow=true;scene.add(mesh);
@@ -137,9 +142,10 @@ function beachBuilding(scene){
     }
   }
 }
-export function makeHill(){
+export function makeHill(tracks){
   const scene=new T.Scene();scene.background=new T.Color(0xc6ccd1);scene.fog=new T.FogExp2(0xb9c2c7,.0019);
-  winterSky(scene);drawTerrain(scene);woodland(scene);beachBuilding(scene);
+  scene.onBeforeRender=tracks.flush;
+  winterSky(scene);drawTerrain(scene,tracks);woodland(scene);beachBuilding(scene);
   scene.add(new T.HemisphereLight(0xe4edff,0xa9b3c2,1.7));
   const sun=new T.DirectionalLight(0xffe4b9,1.6);sun.position.set(-56,30,-92);sun.target.position.set(0,0,-27);
   sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);

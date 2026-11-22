@@ -27,7 +27,7 @@ Choose the 3D walkthrough on the website to arrive on the driveway at golden hou
 
 Select **Snow** to watch it build up outdoors. Pick up the shovel by the garage and click or tap nearby snow to clear a path. Walking sounds follow the ground underfoot, including cleared pavement and fresh snow. Each visitor clears their own path.
 
-Select the red or blue sled at the garage to visit Lake Superior State Park in Bethel. Choose **Push off**, drag or use A and D to steer, then choose **Ride again** or **Return to garage**. The downhill grade, beach building and far shore are based on local elevation data, aerial imagery and the owner’s winter photographs. [Lake Superior model sources](Reference/Lake%20Superior.md)
+Select the red or blue sled at the garage to visit Lake Superior State Park in Bethel. Choose **Push off**, drag or use A and D to steer, then choose **Ride again** or **Return to garage**. The sled gains speed on the steeper part of the hill and drifts through turns. Your runner tracks stay in the snow for later runs during the same visit. The downhill grade, beach building and far shore are based on local elevation data, aerial imagery and the owner’s winter photographs. [Lake Superior model sources](Reference/Lake%20Superior.md)
 
 ## Open house
 
