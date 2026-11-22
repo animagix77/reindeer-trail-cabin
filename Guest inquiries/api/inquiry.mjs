@@ -14,7 +14,7 @@ function isReplyAddress(email) {
 }
 
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const headers = new Headers({ Vary: 'Origin', 'Cache-Control': 'no-store' });
     const result = (status, error) => Response.json(error ? { ok: false, error } : { ok: true }, { status, headers });
     const origin = request.headers.get('Origin');
@@ -34,14 +34,15 @@ export default {
 
     let data;
     try {
-      const chunks = [];
+      const decoder = new TextDecoder();
+      let body = '';
       let bytes = 0;
       for await (const chunk of request.body) {
         bytes += chunk.byteLength;
         if (bytes > maxBodyBytes) return result(413, 'body_too_large');
-        chunks.push(chunk);
+        body += decoder.decode(chunk, { stream: true });
       }
-      data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      data = JSON.parse(body + decoder.decode());
     } catch {
       return result(400, 'invalid_json');
     }
@@ -53,7 +54,8 @@ export default {
     if (!isReplyAddress(email)) return result(422, 'invalid_email');
     if (typeof message !== 'string' || message.length > 4000 || !message.trim()) return result(422, 'invalid_message');
 
-    const { CABIN_INQUIRY_FROM: from, CABIN_INQUIRY_TO: to, RESEND_API_KEY: key } = process.env;
+    const settings = env?.RESEND_API_KEY ? env : globalThis.process?.env ?? {};
+    const { CABIN_INQUIRY_FROM: from, CABIN_INQUIRY_TO: to, RESEND_API_KEY: key } = settings;
     if (!from || !to || !key) return result(503, 'delivery_unavailable');
     try {
       const delivery = await fetch('https://api.resend.com/emails', {

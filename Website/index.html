@@ -80,11 +80,16 @@
           <p class="contact-signature">Binh &amp; Rose</p>
         </div>
         <div>
-          <form id="guest-message" hidden>
+          <form id="guest-message" method="post" data-endpoint="" hidden>
+            <div id="guest-reply" hidden>
+              <label for="guest-email">Your email</label>
+              <input id="guest-email" type="email" name="email" maxlength="254" autocomplete="email" disabled>
+              <label class="contact-trap" aria-hidden="true">Website <input id="guest-website" name="website" type="text" tabindex="-1" autocomplete="off" disabled></label>
+            </div>
             <label for="guest-note">Your message</label>
             <textarea id="guest-note" rows="4" required maxlength="4000" aria-describedby="message-hint"></textarea>
             <p id="message-hint">Write your note here, then paste it into Airbnb to send it privately to us.</p>
-            <button class="pill" type="submit">Copy message</button>
+            <button class="pill" type="submit" id="message-submit">Copy message</button>
             <a class="text-link" id="open-host-inbox" href="https://www.airbnb.com/contact_host/1124495370358897568/send_message" target="_blank" rel="noopener">Open Airbnb to send</a>
             <p id="message-status" role="status"></p>
           </form>
