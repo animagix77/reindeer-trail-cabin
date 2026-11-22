@@ -357,9 +357,79 @@ function firstVisible(a,b){
   return probe.intersectObjects(visibleSolids.filter(part=>part.bounds.intersectsBox(bounds)).map(part=>part.mesh),false)[0];
 }
 
+// A collision plane can look correct while the visible tread or floor floats.
+function topCheck(x,y,helper,visible){
+  const world=at(x,y,0),surface=walks.heights(world.x,world.z).find(f=>f.label===helper);
+  assert(surface,'Missing support '+helper);
+  const above=new T.Vector3(world.x,surface.y+.06,world.z);
+  const hit=firstVisible(above,above.clone().addScaledVector(down,.13));
+  assert(hit?.object.userData.part.startsWith(visible) && Math.abs(hit.point.y-surface.y)<.012,
+    helper+' does not meet its visible finish ('+hit?.object.userData.part+')');
+}
+
+// The overturned hull is on uneven forest ground beyond the gravel end.
+{
+  const name='Driveway edge · overturned aluminum rowboat';
+  const points=[];
+  for(const {mesh} of visibleSolids.filter(p=>p.mesh.userData.part===name)){
+    const positions=mesh.geometry.attributes.position;
+    for(let i=0;i<positions.count;i++){
+      const p=new T.Vector3().fromBufferAttribute(positions,i).applyMatrix4(mesh.matrixWorld);
+      const dx=p.x-4.65,dz=p.z+8.5;
+      points.push({p,x:(-c*dx-s*dz)/feet,y:(-s*dx+c*dz)/feet});
+    }
+  }
+  assert(points.length,'Missing overturned rowboat');
+  const extent=axis=>[Math.min(...points.map(p=>p[axis])),Math.max(...points.map(p=>p[axis]))];
+  const [left,right]=extent('x'),[near,far]=extent('y');
+  assert(right-left>11 && right-left<12.5 && far-near>4.1 && far-near<5.2,'Unexpected rowboat dimensions');
+  assert(Math.abs((left+right)/2+18.7)<.6 && Math.abs((near+far)/2-74)<.8,'Rowboat moved from the driveway end');
+  const groundAt=p=>hits(land,new T.Vector3(p.x,40,p.z),down)[0]?.point;
+  const contacts=[];
+  for(const [axis,edge] of [['x',left],['x',right],['y',near],['y',far]]){
+    const side=points.filter(p=>Math.abs(p[axis]-edge)<.28);
+    const low=side.reduce((a,b)=>a.p.y<b.p.y?a:b).p;
+    const floor=groundAt(low);assert(floor,'Rowboat rim has no ground');
+    contacts.push(low.y-floor.y);
+  }
+  assert(contacts.every(gap=>Math.abs(gap)<.18) && contacts.filter(gap=>Math.abs(gap)<.085).length>=2,
+    'Rowboat does not rest on its gunwales: '+contacts.map(gap=>gap.toFixed(2)));
+  assert(names.includes('WalkBlock_OverturnedBoat'),'Missing boat collision hull');
+  const center=groundAt(at(-18.7,74,0));
+  assert.equal(walks.test(center,center.x,center.z),null,'Visitor can step through the overturned hull');
+  assert([-13,-11,-9].some(x=>{
+    const from=groundAt(at(x,26,0));from.y+=1.59;
+    return [-22,-19,-16].some(targetX=>{
+      const to=groundAt(at(targetX,74,0));to.y+=.23;
+      return firstVisible(from,to)?.object.userData.part===name;
+    });
+  }),'The boat is hidden from the driveway end');
+  assert.equal(hits(land,at(-12,26,25),down)[0]?.object.material.name,'Front motor court · weathered asphalt');
+  assert.equal(hits(land,at(-15,36,25),down)[0]?.object.material.name,'Driveway end · gravel and low groundcover');
+  const edging=visibleSolids.filter(o=>o.mesh.userData.part==='Driveway end · rough stone edging').map(o=>o.mesh);
+  const stones=[-23,-20,-17,-14,-11,-8].filter(x=>
+    [31.8,32.1,32.4,32.7,33].some(y=>hits(edging,at(x,y,25),down).length));
+  assert(stones.length>=3,'Missing rough stone row at the end of the driveway');
+}
+
 // Probe the rendered timber and joinery themselves. Their world-aligned boxes
 // overlap on an angled building even when the gap beside the newel is clear.
 function checkDeck(){
+  for(let step=0;step<2;step++){
+    for(const y of [32.25,33.68,34.74]){
+      topCheck(41.30+step*1.08,y,'WalkSurface_RearStep0'+step,'Rear deck · timber treads');
+    }
+    for(const x of [43.9,44.6,45.35]){
+      topCheck(x,36.02+step*1.14,'WalkSurface_RearStoneStep0'+step,'Patio steps · aged slab '+(step+1));
+    }
+    const edge=35.50+(step+1)*1.14;
+    const front=at(44.6,edge+.26,0),inside=at(44.6,edge-.32,0);
+    const sample=at(44.6,edge-.50,0);
+    const tread=walks.heights(sample.x,sample.z).find(f=>f.label==='WalkSurface_RearStoneStep0'+step);
+    front.y=inside.y=tread.y-.07;
+    assert.equal(firstVisible(front,inside)?.object.userData.part,'Patio steps · aged slab '+(step+1),
+      'Lower stair must have a solid masonry nose');
+  }
   const timber='Porch · deck boards, posts and guardrails';
   for(const [height,y] of [[.778,26.122],[.865,26.12]]){
     const seam=at(23.57,y,height);
@@ -461,18 +531,15 @@ function checkBasement(){
   const apronAndDoor=destinations([[doorX,33.4],[doorX,24.7]]);
   const drivewayApproach=destinations([[-8.8,-8.2],[-8.8,30.8],[6.9,30.8],[14.8,30.8],[14.8,33.4]]);
   const gardenApproach=destinations([[11.1,41.6],[doorX,41.6]]);
-  // Approach the panel from the tank aisle, angling away from the end of the
-  // den wall. Test left and right tracking through the bend; a line within
-  // millimetres of the corner passes scripted tests but snags human walkers.
-  function panelApproach(side){
-    return [[37.75+side*.20,13.1],[37.82+side*.12,12.1],[38.125+side*.34,11.4],[38.125+side*.34,6.9]];
-  }
+  // Facing the laundry wall, the bath is on the left. Pass the machine and
+  // rack before turning through the separate doorway to reach the tanks.
+  const bathCenter=[32.20,23.1], laundryAisle=29.1, mechanicalAisle=37.45;
   const lowerVisit=destinations([
-    [doorX,19.35],[29.68,19.35],[29.68,18], // see the washer head-on across its floor space
-    [29.68,19.35],[26.15,19.35],[26.15,13.95],[33.86,13.95],[33.86,18.55],[33.86,13.95], // both bathroom fixtures
-    [37.60,13.95],[37.60,14.3],[37.60,17.5],[37.60,20.85],[37.75,14.0], // water system
-    ...panelApproach(-1),...panelApproach(1).reverse(),
-    [25.86,13.95],[25.86,6.8],[25.86,21.4],[16.5,21.4] // den and garage
+    [doorX,23.1],[27,23.1],bathCenter,[laundryAisle,23.1],
+    [laundryAisle,18.55],[laundryAisle,15.4],[laundryAisle,11.2],
+    [mechanicalAisle,11.2],[mechanicalAisle,14.3],[mechanicalAisle,17.5],
+    [mechanicalAisle,20.85],[mechanicalAisle,11.2],[laundryAisle,11.2],
+    [25.86,6.8],[25.86,21.4],[16.5,21.4]
   ]);
   function follow(body,points){
     const floors=new Set();
@@ -534,12 +601,12 @@ function checkBasement(){
     const start=walks.spawn(apron.x,apron.z,apron.y+1.59,apron.y);
     assert.match(start?.label||'',/^WalkSurface_UtilityFlagstoneApron(?:\.\d+)?$/);
     const bottom=walkStraightSteps(start,inside,-1);
-    assert.equal(bottom.label,'WalkSurface_BasementServiceSlab');
+    assert.equal(bottom.label,'WalkSurface_BasementEntryWood');
     const top=walkStraightSteps(bottom,apron,1);
     assert.equal(top.label,start.label);
     assert(Math.abs(top.y-start.y)<.005,'Basement steps returned visitor to the wrong elevation');
   }
-  const required=[...lowerFlight,'WalkSurface_ExteriorServiceLanding','WalkSurface_BasementServiceSlab'];
+  const required=[...lowerFlight,'WalkSurface_ExteriorServiceLanding','WalkSurface_BasementEntryWood'];
   for(const [name,eyeHeight,approach,visit] of [
     ['WalkSpawn_Outside',0,drivewayApproach,lowerVisit],
     ['TourEye_yard',1.59,gardenApproach,[]]
@@ -551,7 +618,7 @@ function checkBasement(){
     const path=[anchor,...approach,...apronAndDoor,...visit];
     const there=follow(start,path.slice(1));
     const back=follow(there.body,path.slice(0,-1).reverse());
-    const expected=visit.length?[...serviceFlight,...required,'WalkSurface_BasementBathroomFloor','WalkSurface_BasementDenWood','WalkSurface_BasementGarageSlab']:required;
+    const expected=visit.length?[...serviceFlight,...required,'WalkSurface_BasementBathroomFloor','WalkSurface_BasementMechanicalSlab','WalkSurface_BasementDenWood','WalkSurface_BasementGarageSlab']:required;
     for(const label of expected){
       assert(there.floors.has(label) && back.floors.has(label),'Round trip from '+name+' bypassed '+label);
     }
@@ -560,14 +627,6 @@ function checkBasement(){
 
   // Stair helpers must coincide with the actual tread tops at the center and
   // both sides. Headroom and collision alone don't reveal a hovering avatar.
-  function topCheck(x,y,helper,visible){
-    const world=at(x,y,0),surface=walks.heights(world.x,world.z).find(f=>f.label===helper);
-    assert(surface,'Missing support '+helper);
-    const above=new T.Vector3(world.x,surface.y+.06,world.z);
-    const hit=firstVisible(above,above.clone().addScaledVector(down,.13));
-    assert(hit?.object.userData.part.startsWith(visible) && Math.abs(hit.point.y-surface.y)<.012,
-      helper+' does not meet its visible finish ('+hit?.object.userData.part+')');
-  }
   for(const [index,x] of [8.07,9.21,10.35,11.49,12.63].entries()){
     for(const y of [30.17,30.86,31.52])topCheck(x,y,serviceFlight[index],'Garage wing · concrete service tread');
   }
@@ -575,30 +634,51 @@ function checkBasement(){
     for(const x of [doorX-.85,doorX,doorX+.85])topCheck(x,y,lowerFlight[index],'Areaway · concrete tread');
   }
   topCheck(doorX,27.3,'WalkSurface_ExteriorServiceLanding','Areaway · lower landing');
-  topCheck(doorX,24.7,'WalkSurface_BasementServiceSlab','Basement · ServiceSlab');
-  topCheck(33.86,18.55,'WalkSurface_BasementBathroomFloor','Basement powder room | wood-look plank floor');
+  topCheck(doorX,24.7,'WalkSurface_BasementEntryWood','Basement · family room plank boards');
+  topCheck(...bathCenter,'WalkSurface_BasementBathroomFloor','Basement · family room plank boards');
+  topCheck(mechanicalAisle,14.3,'WalkSurface_BasementMechanicalSlab','Basement · MechanicalSlab');
 
   // Visible architectural faces, trim or soil must never occupy the clear
   // doorway even if its collision opening still passes a centerline walk.
   const local=(x,y,h)=>at(x,y,lowerFloor+h);
+  for(const x of [26.45,28.96]){
+    for(const h of [1.63,1.98]){
+      const pane=firstVisible(local(x,24.8,h),local(x,26.4,h));
+      assert.match(pane?.object.userData.part||'',/^Basement · high window pane/,'High basement window is filled in');
+    }
+  }
   for(const x of [doorX-1.02,doorX,doorX+1.02]){
     for(const h of [.15,.95,1.80])assertClear(local(x,27,h),local(x,24.8,h),'Basement threshold');
   }
-  for(const [who,eye,look] of [
+  for(const [wallX,doorY,solidY,wallName] of [
+    [30.55,23.1,25.08,'Basement powder room | enclosure, trim and open door'],
+    [35.70,11.2,13.27,'Basement · interior walls, trim and jambs']
+  ]){
+    for(const offset of [-.69,0,.69]){
+      for(const h of [.20,.95,1.8])assertClear(local(wallX-.68,doorY+offset,h),local(wallX+.68,doorY+offset,h),'Interior doorway');
+    }
+    const hit=firstVisible(local(wallX-.68,solidY,1.35),local(wallX+.68,solidY,1.35));
+    assert.equal(hit?.object.userData.part,wallName,'Missing partition beside the doorway');
+    const wallPoint=local(wallX,solidY,0);
+    assert.equal(walks.test(wallPoint,wallPoint.x,wallPoint.z),null,'Visitor can walk through '+wallName);
+  }
+  for(const [who,eye,look,finish] of [
     ...[-.35,0,.35].flatMap(drift=>[[-.74,.19],[0,.58],[.72,.94]].map(([offset,height])=>[
-      'Basement laundry | graphite front-loading wash and dry combo',[29.68+drift,18],[29.68+offset,22.80,height]
+      'Basement laundry | graphite front-loading wash and dry combo',[laundryAisle,18.55+drift],[34.02,18.55+offset,height]
     ])),
-    ['Basement powder room | dual-flush toilet with raised seat',[33.86,18.55],[31.6,18.65,.64]],
-    ['Basement powder room | vanity, molded basin and chrome mixer',[33.86,18.55],[35.77,18.55,.78]],
-    ['Basement | well pressure tank 1',[37.5,14.3],[39.64,14.3,1.00]],
-    ['Basement | well pressure tank 2',[37.5,17.5],[39.64,17.5,1.00]],
-    ['Basement | well manifold, gauge and distribution pipes',[37.5,15.88],[39.07,15.88,.59]],
-    ['Basement | 40 gallon electric water heater',[37.5,20.85],[39.64,20.85,1.00]],
-    ...[-1,1].map(side=>['Basement | electrical panel, open schedule door and protected breakers',
-      panelApproach(side).at(-1),[40.52,6.9,1.47]])
+    ['Basement laundry | black and yellow storage shelves',[laundryAisle,15.4],[34.86,15.4,1.62]],
+    ['Basement powder room | dual-flush toilet with raised seat',bathCenter,[34.27,25.27,.64]],
+    ['Basement powder room | vanity, molded basin and chrome mixer',bathCenter,[33.44,20.95,.62]],
+    ['Basement | well cartridge filter and insulated bypass',[mechanicalAisle,11.95],[40.18,11.95,1.18]],
+    ['Basement | well pressure tank 1',[mechanicalAisle,14.3],[39.64,14.3,1.00],'Room detail | Well tank · cobalt enamel'],
+    ['Basement | well pressure tank 2',[mechanicalAisle,17.5],[39.64,17.5,1.00],'Room detail | Well tank · olive-gray composite'],
+    ['Basement | well manifold, gauge and distribution pipes',[mechanicalAisle,15.88],[39.07,15.88,.59]],
+    ['Basement | 40 gallon electric water heater',[mechanicalAisle,20.85],[39.64,20.85,1.00]],
+    ['Basement | laundry electrical panel and switches',[32.25,19.45],[35.55,19.28,1.78]]
   ]){
     const hit=firstVisible(local(...eye,1.59),local(...look));
-    assert.equal(hit?.object.userData.part,who,'Obstructed view of '+who);
+    assert.equal(hit?.object.userData.part,who,'Obstructed view of '+who+' from '+eye+' toward '+look);
+    if(finish)assert.equal(hit.object.material.name,finish,'Unexpected finish on '+who);
   }
   assert.equal(names.filter(n=>/^Basement \| well pressure tank \d+$/.test(n)).length,2);
   const lamps=['Areaway','Bathroom','Den','Entry','Garage','PanelAisle','Service'].map(s=>'BasementLamp_'+s);

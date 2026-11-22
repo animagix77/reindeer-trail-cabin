@@ -185,13 +185,12 @@ export function installWildlife(scene,space,camera,{onChange=()=>{}}={}){
   const p0=plan(11.1,60.2),look=plan(15.4,46.5);
   p0.y=groundAt(p0)+1.59;look.y=groundAt(look)+.82;
   const view={eye:p0.toArray(),target:look.toArray(),fov:62};
-  // A doe and yearling share one stand. The buck browses separately. Each
-  // circuit stays on one connected strip of cover; a shortcut through the
-  // yard is never part of ordinary browsing.
+  // The doe and yearling browse the wooded strip outside the stored boat.
+  // The buck follows a separate circuit on the opposite edge of the parcel.
   const routes=[
-    [[-24,75],[-11,75],[-17,71],[-32,76]],
+    [[-29,74],[-36,66],[-30,62],[-34,77]],
     [[55,68],[55,48],[57,58],[46,75]],
-    [[-31,75],[-20,75],[-10,72],[-29,76]]
+    [[-34,70],[-38,63],[-33,76],[-30,70]]
   ].map(route=>{
     let home=0;
     return route.map(([x,y])=>{

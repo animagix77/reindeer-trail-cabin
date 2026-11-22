@@ -1,7 +1,8 @@
 """Basement service equipment. Coordinates in each assembly are metres from the inside of the service wall.
 
-The appraisal shows a tall blue vessel, a separate gray storage heater, and a gray
-panel with a left-hinged schedule door. The owner confirms two pressure vessels.
+The owner's utility-room photo shows a cobalt pressure tank in front of an
+olive-gray tank, a white cartridge filter and insulated pipework. The laundry
+photos place the recessed gray panel in the finished room outside that doorway.
 The inspection records copper distribution, a PE well line, PVC waste, a 40 gal
 electric heater and 100 A service. The pipe routes, dimensions and individual
 fittings below are a visual reconstruction.
@@ -16,9 +17,13 @@ def build_basement_utilities():
     tank_x = (39.64 - wall_x) * ft
     tank_stations = (14.3, 17.5)
     heater_station = 20.85
-    panel_station = 6.9
-    blue = material('Well tank · cobalt enamel', '#28599a', .25, .31)
+    filter_station = 11.95
+    blue = material('Well tank · cobalt enamel', '#205597', .32, .24)
     foot = material('Well tank · dark blue base', '#2f465e', .23, .51)
+    olive = material('Well tank · olive-gray composite', '#727160', .04, .49)
+    foam = material('Well lines · black foam insulation', '#252725', 0, .91)
+    pex = material('Well lines · blue tubing', '#397aaf', .04, .47)
+    cartridge = material('Well filter · warm white housing', '#e9e7d7', .04, .43)
     copper = material('Water line · aged copper', '#ac7050', .66, .48)
     sleeve = material('Pipe fittings · soldered copper', '#be8564', .61, .42)
     polymer = material('Well supply · black polyethylene', '#303434', .02, .56)
@@ -85,22 +90,47 @@ def build_basement_utilities():
         # All front fittings face the visitor in the service aisle.
         builder.beam((x,y,z),(x-length,y,z),radius,finish_mat,sides)
 
+    def jacket_label(builder, radius, offset, z, width, height, finish_mat):
+        # A small equipment label follows the curvature of the tank.
+        strip = []
+        for i in range(7):
+            angle = math.pi + offset + width/radius*(i/6-.5)
+            x,y = tank_x + radius*math.cos(angle), radius*math.sin(angle)
+            strip.append((builder.vert((x,y,z)),builder.vert((x,y,z+height))))
+            if i:
+                builder.face((strip[i-1][0],strip[i][0],strip[i][1],strip[i-1][1]),finish_mat)
+
     for index, station in enumerate(tank_stations, 1):
         tank = asset('well pressure tank %d' % index, station)
-        vessel(tank, tank_x, [(0,.208),(.013,.221),(.101,.219),(.120,.203)], foot)
-        vessel(tank, tank_x, [(.105,.168),(.124,.190),(.159,.221),(.211,.248),
-             (.266,.257),(1.105,.257),(1.160,.253),(1.219,.238),
-             (1.275,.207),(1.324,.155),(1.352,.095),(1.363,.029)], blue)
-        vessel(tank, tank_x, [(.655,.257),(.658,.259),(.663,.260),(.668,.257)], blue)
-        tank.beam((tank_x,0,1.363),(tank_x,0,1.377),.012,brass2,12)
-        tank.beam((tank_x,0,1.375),(tank_x,0,1.389),.011,polymer,12)
+        if index==1:
+            vessel(tank,tank_x,[(0,.212),(.016,.224),(.096,.220),(.123,.204)],foot)
+            vessel(tank,tank_x,[(.103,.172),(.129,.207),(.172,.239),(.231,.268),
+                   (.282,.277),(1.157,.277),(1.218,.272),(1.268,.258),
+                   (1.319,.232),(1.371,.180),(1.406,.113),(1.421,.027)],blue)
+            for z in (.545,.908):
+                vessel(tank,tank_x,[(z,.277),(z+.003,.279),(z+.006,.279),(z+.009,.277)],blue)
+            jacket_label(tank,.2777,.52,.343,.116,.064,directory)
+            tank.beam((tank_x,0,1.421),(tank_x,0,1.435),.012,brass2,12)
+            tank.beam((tank_x,0,1.435),(tank_x,0,1.452),.010,polymer,12)
+        else:
+            vessel(tank,tank_x,[(0,.212),(.015,.216),(.12,.205),(.172,.188)],polymer)
+            vessel(tank,tank_x,[(.144,.176),(.171,.220),(.208,.251),(.261,.262),
+                   (1.092,.262),(1.149,.253),(1.198,.232),(1.256,.190),
+                   (1.297,.138),(1.318,.075),(1.327,.030)],olive)
+            tank.beam((tank_x,0,1.322),(tank_x,0,1.342),.021,olive,16)
+            jacket_label(tank,.263,.08,.290,.111,.075,directory)
+            # The gray vessel has an exposed blue elbow at floor level.
+            pipe(tank,[(tank_x-.238,-.06,.083),(tank_x-.283,-.06,.083),
+                       (tank_x-.283,-.06,.234)],.011,pex,.018,12)
+            tank.beam((tank_x-.283,-.06,.234),(tank_x-.283,-.06,.258),.015,brass2,8)
         # Under-shell water fitting and hex union leading out to the shared manifold.
         port(tank,tank_x,0,.083,.227,.020,brass2)
         port(tank,tank_x-.221,0,.083,.038,.027,brass2,6)
         port(tank,tank_x-.255,0,.083,.023,.019,sleeve)
         finish(tank)
-        collider('basement_pressure_tank_%d'%index, 38.75,40.54,station-.86,station+.86,
-                 slab+.02,slab+1.40)
+        radius,top=(.279,1.452) if index==1 else (.263,1.342)
+        collider('basement_pressure_tank_%d'%index,39.64-radius/ft,39.64+radius/ft,
+                 station-radius/ft,station+radius/ft,slab+.02,slab+floor_finish+top)
 
     heater = asset('40 gallon electric water heater', heater_station)
     vessel(heater,tank_x,[(0,.231),(.020,.251),(.032,.256),(.052,.251),
@@ -116,15 +146,7 @@ def build_basement_utilities():
     pipe(heater,[(tank_x-.312,0,.111),(tank_x-.339,0,.111),(tank_x-.353,0,.081)],
                 .011,brass2,.014)
     # A curved, unlettered yellow service sticker on the jacket matches the appraisal photo.
-    def curved_tag(offset,z,width,height,finish_mat):
-        strip = []
-        for i in range(7):
-            angle = math.pi + offset + width/.252*(i/6-.5)
-            x,y = tank_x + .2525*math.cos(angle), .2525*math.sin(angle)
-            strip.append((heater.vert((x,y,z)),heater.vert((x,y,z+height))))
-            if i:
-                heater.face((strip[i-1][0],strip[i][0],strip[i][1],strip[i-1][1]),finish_mat)
-    curved_tag(.66,.76,.091,.165,label_yellow)
+    jacket_label(heater,.2525,.66,.76,.091,.165,label_yellow)
     # Temperature/pressure relief with side lever and a downturned discharge.
     side_z=1.275
     heater.beam((tank_x,-.222,side_z),(tank_x,-.304,side_z),.017,brass2,10)
@@ -165,15 +187,16 @@ def build_basement_utilities():
         y=sy(station)
         water.beam((mx,y-.037,.083),(mx,y+.037,.083),.022,brass2,12)
         water.beam((tank_x-.24,y,.083),(mx,y,.083),.016,sleeve,10)
-    pipe(water,[(.008,well_y,.75),(-.069,well_y,.75),(-.069,well_y,.152),
-                (-.069,well_y,.083),(mx,well_y,.083)],.020,polymer,.067,12)
-    # Wall sleeve, inlet clamp bands and brass transition fittings.
-    port(water,.001,well_y,.75,.025,.033,shadow)
+    filter_x = (40.18-wall_x)*ft
+    outlet_y = sy(filter_station)+.31
+    pipe(water,[(filter_x,outlet_y,1.329),(filter_x,outlet_y,.083),
+                (filter_x,well_y,.083),(mx,well_y,.083)],.020,polymer,.045,12)
+    # Transition fittings below the insulated outlet.
     for x in (-.363,-.394):
         water.beam((x,well_y,.083),(x+.010,well_y,.083),.023,steel,12)
     water.beam((-.414,well_y,.083),(-.489,well_y,.083),.026,brass2,6)
     pipe(water,[(mx,my1,.083),(cold_x,my1,.083),(cold_x,my1,cold_z),
-                (cold_x,sy(25.18),cold_z)],.0135,copper,.040,12)
+                (cold_x,sy(heater_station)+.103,cold_z)],.0135,copper,.040,12)
     # Brass shutoff and the blue lever are oriented parallel to the ascending line.
     water.beam((cold_x,my1,.43),(cold_x,my1,.55),.024,brass2,8)
     port(water,cold_x,my1,.486,.046,.010,brass2)
@@ -203,122 +226,128 @@ def build_basement_utilities():
     water.cube((-.022,switch_y,1.766),(.045,.082,.085),panel_gray)
     collider('basement_low_pressure_manifold',38.67,39.03,12.28,18.68,slab+.025,slab+.67)
 
+    filtr=asset('well cartridge filter and insulated bypass',filter_station)
+    vessel(filtr,filter_x,[(1.000,.041),(1.010,.055),(1.029,.063),
+           (1.209,.072),(1.251,.073),(1.273,.070)],cartridge,32)
+    for j in range(10):
+        phi=math.tau*j/10
+        dx,dy=math.cos(phi),math.sin(phi)
+        filtr.beam((filter_x+dx*.059,dy*.059,1.026),
+                   (filter_x+dx*.071,dy*.071,1.249),.004,cartridge,8)
+    vessel(filtr,filter_x,[(1.251,.073),(1.262,.086),(1.286,.086),
+           (1.292,.079),(1.309,.081),(1.330,.078),(1.341,.063)],cartridge,32)
+    filtr.cube((filter_x,0,1.329),(.116,.193,.056),cartridge)
+    # Wall-mounted filter bracket and the two foam-covered pipe paths in the photo.
+    filtr.cube((-.016,0,1.374),(.025,.13,.114),steel)
+    filtr.cube((filter_x/2,0,1.357),(-filter_x,.12,.016),steel)
+    for y in (-.045,.045):
+        port(filtr,-.027,y,1.408,.008,.007,steel,8)
+    # The pale filter wrench hangs on a hook above the canister.
+    wrench_x,wrench_z=-.077,1.540
+    ring=[(wrench_x,.082*math.cos(math.tau*j/28),
+           wrench_z+.082*math.sin(math.tau*j/28)) for j in range(29)]
+    filtr.tube(ring,.007,cartridge,8)
+    filtr.cube((wrench_x,0,1.418),(.008,.026,.097),cartridge)
+    filtr.beam((-.008,0,1.627),(wrench_x-.012,0,1.627),.0035,steel,8)
+    pipe(filtr,[(.005,-.37,1.77),(filter_x,-.37,1.77),
+                (filter_x,-.37,1.329),(filter_x,-.091,1.329)],.032,foam,.035,12)
+    pipe(filtr,[(filter_x,.091,1.329),(filter_x,.31,1.329),
+                (filter_x,.31,.181)],.032,foam,.035,12)
+    pipe(filtr,[(filter_x,-.28,1.329),(filter_x,-.28,1.665),
+                (filter_x,.31,1.665),(filter_x,.31,1.329)],.030,foam,.040,12)
+    for y in (-.093,.093):
+        filtr.beam((filter_x,y-.017,1.329),(filter_x,y+.017,1.329),.034,cartridge,12)
+    # Small valve levers and tied paper tags are visible on the old installation.
+    for y,z in ((-.24,1.329),(.11,1.665)):
+        filtr.beam((filter_x,y-.028,z),(filter_x,y+.028,z),.033,brass2,8)
+        port(filtr,filter_x,y,z,.041,.009,brass2)
+        filtr.cube((filter_x-.046,y+.032,z),(.010,.085,.017),label_yellow)
+        pipe(filtr,[(filter_x-.044,y+.058,z),(filter_x-.052,y+.065,z-.030),
+                    (filter_x-.049,y+.057,z-.043)],.0018,directory,.007,5)
+        filtr.cube((filter_x-.049,y+.057,z-.077),(.003,.046,.070),directory,euler=(.11,0,0))
+    finish(filtr)
+    collider('basement_filter',40.18-.092/ft,40.78,
+             filter_station-.40/ft,filter_station+.35/ft,slab+.99,slab+1.83)
+
     hy=sy(heater_station)
     pipe(water,[(tank_x,hy+.103,1.452),(tank_x,hy+.103,1.583),
                 (cold_x,hy+.103,1.583),(cold_x,hy+.103,cold_z)],.0135,copper,.040)
     pipe(water,[(tank_x,hy-.103,1.452),(tank_x,hy-.103,1.679),
-                (hot_x,hy-.103,1.679),(hot_x,hy-.103,hot_z),(hot_x,sy(25.18),hot_z)],.0135,copper,.040)
-    # Twin stubs meet the washer's recessed box below the overhead pair.
-    washer_box_x = 31.27
-    for xp, x, height in ((washer_box_x+.060/ft,cold_x,cold_z),(washer_box_x-.060/ft,hot_x,hot_z)):
-        y=sy(25.18)
-        pipe(water,[(x,y,height),(sx(xp),y,height),(sx(xp),y,1.305-floor_finish)],.011,copper,.035)
-        water.beam((sx(xp),y,1.32),(sx(xp),y,1.35),.014,sleeve)
+                (hot_x,hy-.103,1.679),(hot_x,hy-.103,hot_z),(hot_x,sy(18.55),hot_z)],.0135,copper,.040)
+    # Both washer lines stay on the rough side and exit directly behind the recessed box.
+    washer_box_x,washer_box_y = 35.50,19.30
+    for offset, x, height in ((.060,cold_x,cold_z),(-.060,hot_x,hot_z)):
+        y=sy(washer_box_y)+offset
+        pipe(water,[(x,y,height),(sx(35.93),y,height),(sx(35.93),y,1.280),
+                    (sx(washer_box_x),y,1.280)],.011,copper,.035)
     # Saddle brackets and couplings anchor the overhead pipework to the masonry wall.
-    for station, height, x in ((19.55,cold_z,cold_x),(22.85,cold_z,cold_x),
-                              (22.85,hot_z,hot_x),(24.6,cold_z,cold_x),(24.6,hot_z,hot_x)):
+    for station, height, x in ((19.55,cold_z,cold_x),(20.45,cold_z,cold_x),
+                              (19.07,hot_z,hot_x),(19.86,hot_z,hot_x)):
         y=sy(station)
         water.beam((x,y-.012,height),(x,y+.012,height),.017,steel,12)
         water.beam((x+.008,y,height),(-.006,y,height),.004,steel,6)
         water.cube((-.006,y,height),(.012,.038,.045),panel_gray)
     # These drops are inside the lavatory wall and terminate at the fixture's stops.
-    lav_x=sx(36.24)
-    pipe(water,[(cold_x,sy(18.64),cold_z),(lav_x,sy(18.64),cold_z),
-                (lav_x,sy(18.64),.50)],.010,copper)
-    pipe(water,[(hot_x,hy-.103,hot_z),(hot_x,sy(18.18),hot_z),
-                (lav_x,sy(18.18),hot_z),(lav_x,sy(18.18),.50)],.010,copper)
+    for x, height, end_x, feed_y in ((cold_x,cold_z,33.20,20.20),(hot_x,hot_z,33.66,20.16)):
+        y=sy(feed_y)
+        pipe(water,[(x,y,height),(sx(35.93),y,height),(sx(35.93),y,.50),
+                    (sx(end_x),y,.50)],.010,copper,.026)
+    # Two blue tubing runs sag slightly under the joists above the tanks.
+    for offset,z in ((0,2.24),(-.052,2.28)):
+        line_x=-.245+offset
+        pipe(water,[(.010,sy(12.70)+offset,2.32),(line_x,sy(12.70)+offset,2.32),
+                    (line_x,sy(14.00),z),(line_x,sy(15.90),z+.025),
+                    (line_x,sy(17.18),z-.012),(line_x,sy(18.15),z+.055),
+                    (.010,sy(18.71)+offset,2.35)],.011,pex,.065,10)
+        for station,h in ((14.,z),(15.90,z+.025),(17.18,z-.012)):
+            y=sy(station)
+            water.beam((line_x,y-.008,h),(line_x,y+.008,h),.014,steel,12)
+            water.beam((line_x,y,h+.007),(line_x,y,2.426),.0035,steel,6)
     finish(water)
 
     drain=asset('laundry standpipe, trap and PVC waste',10)
-    dy=sy(25.18)
-    dx=sx(washer_box_x)
-    # Offset the bend below the washer box, then pitch the horizontal run toward the wall.
+    dy=sy(washer_box_y)
+    dx=sx(36.05)
+    # Keep the trap on the service face of the laundry partition, with its
+    # outlet disappearing into the wall. The middle of the aisle stays clear.
     trap_radius=.063
     trap_bottom=.275
-    pts=[(dx,dy,1.235),(dx,dy,trap_bottom+trap_radius)]
+    pts=[(sx(washer_box_x),dy,1.203),(dx,dy,1.203),(dx,dy,trap_bottom+trap_radius)]
     for step in range(1,13):
         angle=math.pi+step*math.pi/12
         pts.append((dx+trap_radius+trap_radius*math.cos(angle),dy,
                     trap_bottom+trap_radius+trap_radius*math.sin(angle)))
-    pts += [(dx+2*trap_radius,dy,.408),(dx+.22,dy,.408),(-.092,dy,.382),
-            (-.092,sy(24.46),.376),(.010,sy(24.46),.376)]
+    pts += [(dx+2*trap_radius,dy,.408),(dx+2*trap_radius,dy-.16,.406),
+            (sx(35.70),dy-.16,.402)]
     pipe(drain,pts,.025,pvc,.024,14)
-    for x in (dx+.32,dx+.92,-.19):
-        elevation=.408-.026*min(1,max(0,(x-dx-.22)/(-.092-dx-.22)))
-        drain.beam((x-.018,dy,elevation),(x+.018,dy,elevation),.029,pvc,14)
+    drain.beam((dx+trap_radius+.014,dy-.16,.404),(dx+trap_radius-.014,dy-.16,.404),.029,pvc,14)
     finish(drain)
 
-    panel=asset('electrical panel, open schedule door and protected breakers',panel_station)
-    # The photographed front has two opposed columns, a steel face and a hinged left door.
-    # Use a blank schedule grid. The homeowner's actual directory stays private.
-    plane=-.115
-    cz=1.46
-    panel.cube((-.015,0,cz),(.032,.503,.775),shadow)
-    panel.cube((-.064,0,cz),(.098,.472,.754),panel_gray)
-    panel.cube((plane,0,cz),(.016,.470,.753),panel_gray)
-    panel.cube((plane-.009,0,cz+.010),(.008,.292,.608),shadow)
-    panel.cube((plane-.015,0,cz+.010),(.011,.283,.600),panel_gray)
-    for y in (-.201,.201):
-        for z in (cz-.338,cz+.338):
-            port(panel,plane-.006,y,z,.006,.0061,steel,10)
-    # A master handle above two rows of molded breakers. No exposed terminals.
-    panel.cube((plane-.024,0,cz+.238),(.017,.100,.042),shadow)
-    panel.cube((plane-.036,0,cz+.239),(.013,.064,.010),rail)
-    for side in (-1,1):
-        y=side*.052
-        for row in range(10):
-            z=cz+.177-row*.048
-            panel.cube((plane-.023,y,z),(.019,.077,.046),rail)
-            panel.cube((plane-.035,y-side*.015,z+.001),(.018,.025,.013),shadow,euler=(0,0,side*.19))
-            panel.cube((plane-.0445,y-side*.016,z+.002),(.002,.009,.003),heater_gray)
-            panel.cube((plane-.022,side*.116,z),(.002,.036,.038),directory)
-        # Two visibly paired handles among the branch positions.
-        panel.cube((plane-.045,y-side*.015,cz+.153),(.009,.017,.055),shadow)
-    hinge_x,hinge_y=plane-.019,.230
-    door_angle=math.radians(148)
-    # With the door swung back, visitors see its lightly printed inner schedule.
-    across=Vector((-math.sin(door_angle),-math.cos(door_angle),0))
-    normal=Vector((math.cos(door_angle),-math.sin(door_angle),0))
-    door_origin=Vector((hinge_x,hinge_y,cz))
-    def on_leaf(distance,height,depth=0):
-        return door_origin+across*distance+normal*depth+Vector((0,0,height))
-    def leaf_face(u0,u1,h0,h1,depth,finish_mat):
-        # Positive depth is the inside of the open door, facing into the aisle.
-        points=[on_leaf(u0,h0,depth),on_leaf(u0,h1,depth),on_leaf(u1,h1,depth),on_leaf(u1,h0,depth)]
-        panel.face([panel.vert(p) for p in points],finish_mat)
-    # A folded sheet with four closed edges.
-    panel.cube(on_leaf(.217,0),(.009,.434,.697),panel_gray,euler=(0,0,-door_angle))
-    for distance in (.014,.421):
-        panel.cube(on_leaf(distance,0,.010),(.013,.010,.666),panel_gray,euler=(0,0,-door_angle))
-    for z in (-.332,.332):
-        panel.cube(on_leaf(.217,z,.010),(.013,.405,.009),panel_gray,euler=(0,0,-door_angle))
-    leaf_face(.075,.318,-.241,.256,.006,directory)
-    for i in range(14):
-        z=.214-i*.032
-        leaf_face(.083,.311,z,z+.0016,.0065,heater_gray)
-    leaf_face(.192,.194,-.226,.214,.0065,heater_gray)
-    for z in (-.228,.228):
-        panel.beam((hinge_x,hinge_y,cz+z-.037),(hinge_x,hinge_y,cz+z+.037),.0075,steel,12)
-    panel.cube(on_leaf(.379,-.061,.011),(.023,.034,.023),shadow,euler=(0,0,-door_angle))
-    for y in (-.114,.0,.12):
-        panel.beam((-.064,y,cz+.36),(-.064,y,cz+.399),.022,steel,12)
-    electrical=asset('service conduits and supports',panel_station)
-    for i, y in enumerate((-.115,0,.12)):
-        height=2.27+i*.041
-        exit_y=-(.34+i*.09)
-        pipe(electrical,[(-.064,y,cz+.389),(-.064,y,height),(-.064,exit_y,height),
-                         (-.064,exit_y,2.421)],.012 if i!=1 else .017,panel_gray,.054,12)
-        electrical.cube((-.030,y,2.075),(.060,.025,.018),panel_gray)
-        electrical.beam((-.064,y,2.065),(-.064,y,2.085),.019,steel,12)
+    # Finished laundry photo: the panel is recessed beside the bath, above the
+    # appliance. The door is closed and the cable entries are inside the partition.
+    panel_x,panel_station = 35.55,19.28
+    panel=group('Basement | laundry electrical panel and switches',
+                (panel_x,panel_station,slab+floor_finish))
+    cz=1.752
+    panel.cube((.006,0,cz),(.024,.398,.646),shadow)
+    panel.cube((-.005,0,cz),(.010,.394,.641),panel_gray)
+    panel.cube((-.012,0,cz),(.006,.353,.581),shadow)
+    panel.cube((-.017,0,cz),(.006,.345,.573),panel_gray)
+    for y in (-.175,.175):
+        for z in (cz-.297,cz+.297):
+            port(panel,-.010,y,z,.0026,.0042,steel,10)
+    for z in (cz-.185,cz+.185):
+        panel.beam((-.022,.174,z-.020),(-.022,.174,z+.020),.005,panel_gray,12)
+    panel.cube((-.021,-.117,cz-.018),(.007,.045,.036),shadow)
+    panel.cube((-.026,-.127,cz-.019),(.004,.018,.026),rail)
+    # Two white control plates sit immediately to the right in the photograph.
+    for index,y in enumerate((-.249,-.328)):
+        panel.cube((.004,y,cz-.172),(.019,.067,.105),ivory)
+        panel.cube((-.008,y,cz-.172),(.010,.030,.051),shadow if index else cream)
+        for z in (cz-.211,cz-.133):
+            port(panel,-.005,y,z,.002,.0024,steel,8)
     finish(panel)
-    finish(electrical)
-    collider('basement_electric_panel',40.30,40.78,panel_station-.79,panel_station+.77,
-             slab+1.10,slab+1.88)
-    # Two short hulls follow the swung door in plan so the walk aisle stays clear.
-    for i in range(2):
-        a,b=on_leaf(i*.217,0),on_leaf((i+1)*.217,0)
-        collider('basement_panel_leaf_%d'%i,wall_x+min(a.x,b.x)/ft-.022,
-                 wall_x+max(a.x,b.x)/ft+.022,panel_station+min(a.y,b.y)/ft-.022,
-                 panel_station+max(a.y,b.y)/ft+.022,slab+1.13,slab+1.84)
+    collider('basement_electric_panel',panel_x-.028/ft,panel_x+.018/ft,
+             panel_station-.365/ft,panel_station+.20/ft,slab+1.45,slab+2.11)
 
 build_basement_utilities()

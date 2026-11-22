@@ -302,6 +302,7 @@ def build_exterior_site():
             for i in f.loop_indices:
                 land.data.uv_layers.active.data[i].uv*=1.45
     land['basis']='USGS 1 m DEM. Apron, timber stairs, fire circle and pedestrian paths are photo-guided estimates.'
+    finish_driveway_clearing(land,local)
     # Helper geometry is hidden by the viewer. Each support polygon has no underside.
     def helper(name,verts,faces):
         o=mesh(name,verts,faces,None,site_group);o.display_type='WIRE';o.hide_render=True
@@ -355,6 +356,7 @@ def build_exterior_site():
             if omit:continue
             k=len(v)-1;fs.extend(((k,k+1,k+len(X)+1),(k,k+len(X)+1,k+len(X))))
     helper('WalkSurface_ParcelGround',v,fs)
+    driveway_edge_details(site_group,land,helper,blocker,tube)
     rectsurf('FrontLanding',29,33,-5,0,dp+.015)
     # Replace the original smooth handrail and sparse steps with the photographed
     # porch flight. The existing appraisal-sized landing and side guards stay in place.
@@ -385,11 +387,17 @@ def build_exterior_site():
     # landing. IMG_4453 shows the second flight turning toward the garden.
     wooden_steps=Timberwork('Rear deck · timber treads, risers and stair strings',porch_wood,deck)
     landing_z=dp-.435
+    groove_wood=mat('Patio steps · worn board flutes','#73634c',rough=.89)
     for j in range(2):
         x0=41+1.08*j;x1=x0+1.08;z=dp-.145*(j+1)
         for board in range(2):
             xx=x0+(board+.5)*.54
             wooden_steps.member((xx,deck_stair_y0+.07,z-.023),(xx,deck_stair_y1-.04,z-.023),.54*ft-.003,.046)
+        # Rounded, weathered treads with lengthwise grooves like the close-up.
+        for flute in range(8):
+            xx=x0+.08+flute*.132
+            prism(groove_wood,pos(xx,deck_stair_y0+.10,z+.0004),
+                  pos(xx,deck_stair_y1-.07,z+.0004),.003,.001)
         wooden_steps.member((x1-.09,deck_stair_y0+.07,z-.075),(x1-.09,deck_stair_y1-.04,z-.075),.043,.106)
         rectsurf('RearStep%02d'%j,x0,x1,deck_stair_y0,deck_stair_y1,z+.005)
     for y in (deck_stair_y0+.05,deck_stair_y1-.03):
@@ -401,41 +409,31 @@ def build_exterior_site():
         uvmesh(name,[pos(x,y,top) for x,y in corners],[(0,1,2,3)],finish,1.6)
     concrete_slab('Rear deck · poured landing',stair_toe,landing_end,deck_stair_y0,deck_stair_y1,landing_z,dp-.90)
     rectsurf('DeckStairLanding',stair_toe,landing_end,deck_stair_y0,deck_stair_y1,landing_z+.002)
+    tread_stone=mapped('Patio steps · photographed weathered stone','Patio tread stone.jpg')
     for j in range(2):
         ya=deck_stair_y1+j*1.14;yb=ya+1.14;z=landing_z-.145*(j+1)
-        # The turned flight keeps the photographed masonry footing and cheek.
-        # Two weathered boards span each tread, with the downhill edge over its riser.
-        plank(stone,stair_toe+.02,lower_stair_side-.02,ya,yb-.10,dp-.90,z-.047)
-        for board in range(2):
-            yy=ya+(board+.5)*.57
-            wooden_steps.member((stair_toe,yy,z-.022),(lower_stair_side,yy,z-.022),.57*ft-.004,.044)
-        wooden_steps.member((stair_toe+.015,yb-.085,z-.091),
-                            (lower_stair_side-.015,yb-.085,z-.091),.036,.101)
+        plank(darkstone,stair_toe+.14,lower_stair_side-.15,ya+.05,yb-.23,dp-.90,z-.11)
+        patio_step(j+1,stair_toe,lower_stair_side,ya,yb,z,tread_stone)
         rectsurf('RearStoneStep%02d'%j,stair_toe,lower_stair_side,ya,yb,z+.003)
-    for x in (stair_toe+.04,lower_stair_side-.03):
-        wooden_steps.member((x,deck_stair_y1-.055,landing_z-.105),
-                            (x,lower_stair_end-.035,dp-.835),.045,.154)
+    # One open timber rail beside the upper flight. The turned landing and
+    # lower masonry steps have low stone edging, with a clear view to the patio.
+    rail_y=deck_stair_y0+.07
+    wooden_steps.member((stair_toe-.10,rail_y,landing_z),(stair_toe-.10,rail_y,landing_z+.90),.086,.086)
+    for h in (.28,.86):
+        wooden_steps.member((40.75,rail_y,dp+h),(stair_toe-.10,rail_y,landing_z+h),.049,.076)
+    blocker('RearRailUpperHouse',pos(40.75,rail_y,dp),pos(stair_toe-.10,rail_y,landing_z),.089,.91)
     wooden_steps.finish()
-    stair_guards=Timberwork('Rear deck · cedar 2x4 flight and landing guards',porch_wood,deck)
-    outer=landing_end-.11
-    inside=stair_toe+.015
-    upper_y=deck_stair_y0+.055
-    turn_y=deck_stair_y1-.025
-    # The open landing turns ninety degrees, from the two deck treads into
-    # the lower flight. Returns run only along exposed edges of the landing.
-    edges=[
-        ('UpperHouse',(40.75,upper_y,dp),(inside,upper_y,landing_z),(False,True)),
-        ('UpperGarden',(40.75,turn_y,dp),(inside,turn_y,landing_z),(False,True)),
-        ('LandingHouse',(inside,upper_y,landing_z),(outer,upper_y,landing_z),(False,True)),
-        ('LandingEnd',(outer,upper_y,landing_z),(outer,turn_y,landing_z),(False,True)),
-        ('LandingReturn',(outer,turn_y,landing_z),(lower_stair_side-.02,turn_y,landing_z),(False,True)),
-        ('LowerInner',(inside,turn_y,landing_z),(inside,lower_stair_end-.035,dp-.87),(False,True)),
-        ('LowerOuter',(lower_stair_side-.02,turn_y,landing_z),
-                      (lower_stair_side-.02,lower_stair_end-.035,dp-.87),(False,True))]
-    for name,a,b,newels in edges:
-        sawn_guard(stair_guards,a,b,newels)
-        blocker('RearRail'+name,pos(*a),pos(*b),.089,.974)
-    stair_guards.finish()
+    concrete_slab('Patio landing · garden curb',landing_end-.18,landing_end+.17,
+                  deck_stair_y0-.10,deck_stair_y1+.07,landing_z+.09,dp-.90)
+    blocker('PatioGardenCurb',pos(landing_end,deck_stair_y0,dp-.87),
+            pos(landing_end,deck_stair_y1,dp-.87),.105,.525)
+    # The white elbow comes out from under the deck fascia beside the steps.
+    boot=Timberwork('Patio steps · white downspout elbow',trim,deck)
+    path=[(40.67,35.92,dp-.23),(40.67,36.10,dp-.40),(40.67,36.10,dp-.70),
+          (40.77,36.26,dp-.78),(41.11,36.83,dp-.815)]
+    for start,end in zip(path,path[1:]):
+        boot.member(start,end,.083,.060)
+    boot.finish()
     concrete_slab('Rear landing · low retaining cheek',lower_stair_side,lower_stair_side+.27,
                   deck_stair_y1,lower_stair_end+.04,landing_z+.018,dp-.90)
     blocker('RearStoneCheek',pos(lower_stair_side+.12,deck_stair_y1,dp-.87),

@@ -11,10 +11,15 @@ const swingReach=1.2,pickupReach=1.45,returnDistance=1.8;
 export function installWoodSplitting(scene,model,space,{camera,schedule,takeSplitLog,handsBusy,onSwing,onStrike,onContact,onStockWood,stockTotal=()=>0}){
   const station=makeSplittingBlock(model),root=station.root;
   const ground=(x,z)=>space.heights(x,z).find(h=>h.label==='WalkSurface_ParcelGround')?.y;
-  // Gravel shoulder beside the garage motor court, clear of the driveway stairs.
-  const px=-8,py=32.6;
+  // Use the open gravel shoulder past the last driveway edging stone.
+  const px=-1.8,py=33.05;
   const x=4.65-.3048*(.995562*px+.094108*py),z=-8.5+.3048*(-.094108*px+.995562*py);
-  root.position.set(x,ground(x,z),z);root.rotation.y=1.52;scene.add(root);
+  let baseY=ground(x,z);
+  for(let i=0;i<8;i++){
+    const angle=i*Math.PI/4;
+    baseY=Math.min(baseY,ground(x+.305*Math.cos(angle),z+.305*Math.sin(angle))??baseY);
+  }
+  root.position.set(x,baseY,z);root.rotation.y=1.52;scene.add(root);
   root.updateMatrixWorld(true);
   const worldPoint=(x,y,z)=>root.localToWorld(new T.Vector3(x,y,z));
   function groundAt(x,z){

@@ -109,7 +109,7 @@ export function installWeather(scene,model) {
     const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];
     for(const m of materials){
       if(!m.isMeshStandardMaterial)continue;
-      if(/^(?:Asphalt shingle|Leaf litter|Cool-season fescue|Fine crushed gravel|Fire circle · pale|Paved public road|Porch · natural sawn timber|Entry · blue-gray crushed|Backdrop_Woodland floor)/i.test(m.name)) {
+      if(/^(?:Asphalt shingle|Leaf litter|Cool-season fescue|Fine crushed gravel|Fire circle · pale|Paved public road|Porch · natural sawn timber|Entry · blue-gray crushed|Backdrop_Woodland floor|Rowboat ·|Driveway (?:end · gravel|edging ·)|Patio steps ·)/i.test(m.name)) {
         coatOutdoorMaterial(model,m);
       }
     }

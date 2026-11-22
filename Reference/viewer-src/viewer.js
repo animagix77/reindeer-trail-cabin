@@ -88,7 +88,7 @@ function footSurface(){
   if(/^WalkSurface_Basement/.test(body.label))return /Wood|Bathroom/.test(body.label)?'wood':'pavement';
   if(/Bathroom/.test(body.label))return 'tile';
   if(/Gravel/.test(body.label))return 'gravel';
-  if(/Flagstone|WellFloor|ServiceDriveStep|LowerServiceStep|ExteriorServiceLanding/.test(body.label))return 'pavement';
+  if(/Flagstone|WellFloor|ServiceDriveStep|LowerServiceStep|ExteriorServiceLanding|DeckStairLanding|RearStoneStep/.test(body.label))return 'pavement';
   if(/ParcelGround|MainFloor/.test(body.label)){
     finishRay.ray.origin.set(body.x,body.y+.24,body.z);finishRay.ray.direction.copy(down);finishRay.far=.48;
     const hits=finishRay.intersectObjects(finishMeshes,false);
@@ -561,7 +561,7 @@ async function show() {
       object.visible=false;
     }
     if(!object.isMesh) return;
-    if(/asphalt|pavement|poured concrete|fescue|leaf litter|brushed greige floor porcelain|charcoal.gray tile|blue-gray crushed stone/i.test(object.material.name) && !/shingle/i.test(object.material.name))finishMeshes.push(object);
+    if(/asphalt|pavement|poured concrete|fescue|leaf litter|brushed greige floor porcelain|charcoal.gray tile|blue-gray crushed stone|Driveway end · gravel/i.test(object.material.name) && !/shingle/i.test(object.material.name))finishMeshes.push(object);
     let helper=object;
     while(helper && !/^Walk(Surface|Block)_/i.test(helper.name)) helper=helper.parent;
     if(!helper) return;

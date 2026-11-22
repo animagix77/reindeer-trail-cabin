@@ -1,8 +1,8 @@
 """Downstairs powder room and laundry, in the local frame of Remaining interior.py.
 
-IMG_4398 shows the open WC opposite the compact sink cabinet. Photos 087/088
-show a single graphite wash/dry combo, wire rack and supplies. The arrangement
-within the basement, door handing and concealed service connections are estimates.
+IMG_4398 establishes the WC opposite a compact sink cabinet. The owner's
+marked photo and later installation photos show the enclosed corner, open
+paneled door, graphite combination washer/dryer and freestanding shelving.
 """
 def build_basement_fixtures():
     from math import pi, sin, cos
@@ -39,48 +39,51 @@ def build_basement_fixtures():
     def oval(cx, cy, z, rx, ry, count=48):
         return [(cx + rx*cos(2*pi*j/count), cy + ry*sin(2*pi*j/count), z) for j in range(count)]
 
-    # The leaf swings out and back against the service side. Both jambs are
-    # outside the aligned sightline between the china and the sink cabinet.
-    west, east, south, north = 31.10, 36.24, 15.52, 20.73
-    jamb_l, jamb_r = 32.48, 35.28
+    # The rear foundation and plant-room partition form two sides of the bath.
+    # Build only the two new returns shown in the owner's red outline.
+    front,back = 30.55,35.55
+    south,north = 20.17,25.76
+    jamb_low,jamb_high = 21.63,24.43
     head = slab_z + 2.015
     walls = group('Basement powder room | enclosure, trim and open door')
-    runs = [
-        ('West', west-.10, west+.10, south-.10, north+.10),
-        ('East', east-.10, east+.10, south-.10, north+.10),
-        ('Back', west+.10, east-.10, north-.10, north+.10),
-        ('FrontL', west+.10, jamb_l, south-.10, south+.10),
-        ('FrontR', jamb_r, east-.10, south-.10, south+.10),
-    ]
-    for name,x0,x1,y0,y1 in runs:
+    for name,x0,x1,y0,y1 in [
+        ('Side',front-.10,back,south-.10,south+.10),
+        ('FrontR',front-.10,front+.10,south+.10,jamb_low),
+        ('FrontL',front-.10,front+.10,jamb_high,north),
+    ]:
         bx(walls,x0,x1,y0,y1,base+.013,wall_top,paint)
         collider('BasementPowder'+name,x0,x1,y0,y1,base+.013,wall_top)
-    bx(walls,jamb_l,jamb_r,south-.10,south+.10,head,wall_top,paint)
-    for x in (west+.10,east-.15):
-        bx(walls,x,x+.05,south+.10,north-.10,slab_z,slab_z+.074,trim_white)
-    for y in (north-.15,south+.10):
-        for x0,x1 in ([(west+.10,east-.10)] if y>south+.10 else [(west+.10,jamb_l-.16),(jamb_r+.16,east-.10)]):
-            bx(walls,x0,x1,y,y+.047,slab_z,slab_z+.074,trim_white)
-    for x0,x1 in ((jamb_l-.18,jamb_l),(jamb_r,jamb_r+.18)):
-        bx(walls,x0,x1,south-.137,south+.137,slab_z,head+.061,trim_white)
-    bx(walls,jamb_l,jamb_r,south-.137,south+.137,head,head+.061,trim_white)
-    leaf_l, leaf_r = jamb_l-2.75, jamb_l-.02
-    leaf_front, leaf_back = south-.32, south-.20
-    bx(walls,leaf_l,leaf_r,leaf_front,leaf_back,slab_z+.014,head-.014,trim_white)
-    for x0,x1 in ((leaf_l+.18,leaf_l+1.30),(leaf_l+1.43,leaf_r-.18)):
-        for z0,z1 in ((.17,.80),(.96,1.82)):
-            bx(walls,x0,x1,leaf_front-.013,leaf_front,slab_z+z0,slab_z+z1,paint)
+    bx(walls,front-.10,front+.10,jamb_low,jamb_high,head,wall_top,paint)
+    for edge in (south-.145,south+.10):
+        bx(walls,front-.10,back,edge,edge+.045,slab_z,slab_z+.074,trim_white)
+    for y0,y1 in ((south-.10,jamb_low-.16),(jamb_high+.16,north)):
+        for x0 in (front-.145,front+.10):
+            bx(walls,x0,x0+.045,y0,y1,slab_z,slab_z+.074,trim_white)
+    for y0,y1 in ((jamb_low-.16,jamb_low),(jamb_high,jamb_high+.16)):
+        bx(walls,front-.14,front+.14,y0,y1,slab_z,head+.057,trim_white)
+    bx(walls,front-.14,front+.14,jamb_low,jamb_high,head,head+.057,trim_white)
+    # The white six-panel door projects toward the viewer left of the opening.
+    # Keep the leaf on the approach side of the hinge and out of the WC aisle.
+    hinge_x,hinge_y = front-.14,jamb_high-.04
+    end_x = hinge_x-2.71
+    bx(walls,end_x,hinge_x,hinge_y-.065,hinge_y+.065,slab_z+.018,head-.018,trim_white)
+    for x0,x1 in ((end_x+.20,end_x+1.30),(end_x+1.43,hinge_x-.20)):
+        for z0,z1 in ((.20,.78),(.94,1.52),(1.64,1.83)):
+            for yr in (hinge_y-.073,hinge_y+.065):
+                bx(walls,x0,x1,yr,yr+.008,slab_z+z0,slab_z+z1,paint)
     for z in (.25,.98,1.77):
-        cyl(walls,leaf_r,south-.156,slab_z+z,slab_z+z+.08,.007,chrome,12)
-    for side,sgn in ((leaf_front,-1),(leaf_back,1)):
-        line(walls,(leaf_l+.23,side,slab_z+.93),(leaf_l+.23,side+sgn*.16,slab_z+.93),.013,chrome,14)
-        line(walls,(leaf_l+.23,side+sgn*.16,slab_z+.93),(leaf_l+.53,side+sgn*.16,slab_z+.93),.012,chrome,14)
-    collider('BasementPowderOpenDoor',leaf_l,leaf_r,leaf_front,leaf_back,slab_z,head)
-    light_x,light_y=33.68,18.08
+        cyl(walls,hinge_x,hinge_y+.075,slab_z+z,slab_z+z+.08,.007,chrome,12)
+    for side in (-1,1):
+        line(walls,(end_x+.25,hinge_y+side*.063,slab_z+.93),
+                   (end_x+.25,hinge_y+side*.174,slab_z+.93),.020,chrome,16)
+        line(walls,(end_x+.25,hinge_y+side*.14,slab_z+.93),
+                   (end_x+.25,hinge_y+side*.21,slab_z+.93),.026,chrome,20)
+    collider('BasementPowderOpenDoor',end_x,hinge_x,hinge_y-.065,hinge_y+.065,slab_z,head)
+    light_x,light_y=33.15,22.86
     cyl(walls,light_x,light_y,wall_top-.030,wall_top-.005,.150,brushed,48)
     finish(walls)
-    flat('Basement powder room | wood-look plank floor',west+.10,east-.10,south+.10,north-.10,slab_z+.006,flank,3.8)
-    bath_floor=flat('WalkSurface_BasementBathroomFloor',west+.10,east-.10,south-.10,north-.10,slab_z+.006,empty)
+    # The finished-room boards run straight through the bath doorway.
+    bath_floor=flat('WalkSurface_BasementBathroomFloor',front+.10,back,south+.10,north,slab_z+.004,empty)
     bath_floor.hide_render=True
     bath_floor.display_type='WIRE'
     diffuser=group('BasementLamp_Bathroom',(light_x,light_y,wall_top-.047))
@@ -92,7 +95,7 @@ def build_basement_fixtures():
     finish(diffuser)
 
     # Local metric frame: +X points out from the cistern toward the vanity.
-    wc = group('Basement powder room | dual-flush toilet with raised seat',(31.22,18.65,slab_z+.006))
+    wc = group('Basement powder room | dual-flush toilet with raised seat',(34.27,25.56,slab_z+.001),yaw=-90)
     wc.cube((.097,0,.570),(.190,.379,.368),vitreous,8)
     wc.cube((.099,0,.756),(.199,.39,.034),vitreous,8)
     wc.beam((.102,0,.770),(.102,0,.777),.0255,chrome,32)
@@ -127,12 +130,12 @@ def build_basement_fixtures():
     wc.beam((.013,-.150,.147),(.018,-.150,.147),.026,chrome,16)
     wc.tube([(.055,-.15,.147),(.082,-.157,.137),(.115,-.160,.165),(.118,-.158,.375)],.006,brushed,8)
     finish(wc)
-    collider('BasementPowderToilet',31.22,33.18,18.00,19.30,slab_z,slab_z+.78)
+    collider('BasementPowderToilet',33.62,34.92,23.60,25.56,slab_z,slab_z+.78)
 
     # The top is an annulus around a real recessed basin. The cabinet has
     # only side panels at bowl height, so looking down reveals the drain.
-    vx,vy=35.42,18.41
-    sink=group('Basement powder room | vanity, molded basin and chrome mixer',(vx,vy,slab_z+.006))
+    vx,vy=33.44,20.99
+    sink=group('Basement powder room | vanity, molded basin and chrome mixer',(vx,vy,slab_z+.001),yaw=-90)
     sink.cube((.008,0,.054),(.358,.769,.102),trim_white)
     sink.cube((.006,0,.110),(.397,.796,.024),paint)
     for y in (-.400,.400):
@@ -183,13 +186,12 @@ def build_basement_fixtures():
         for y in (.253,.270):
             sink.cube((.207,y,z),(.004,.002,.012),rubber)
     finish(sink)
-    collider('BasementPowderVanity',34.64,36.16,16.98,19.84,slab_z,slab_z+.858)
+    collider('BasementPowderVanity',32.01,34.87,20.25,21.77,slab_z,slab_z+.858)
 
-    # Washer and rack share a local frame; -Y faces the service aisle.
-    # West of the powder room, the full porthole has clear floor in front
-    # for loading, a door swing, and an unobstructed eye-height approach.
-    wx,wy=29.68,23.92
-    machine=group('Basement laundry | graphite front-loading wash and dry combo',(wx,wy,slab_z))
+    # Recess the graphite machine behind the face of the powder room.
+    # The appliance front looks across the common room towards local -X.
+    wx,wy=34.02,18.55
+    machine=group('Basement laundry | graphite front-loading wash and dry combo',(wx,wy,slab_z),yaw=-90)
     for x in (-.287,.287):
         for y in (-.310,.310):
             machine.beam((x,y,0),(x,y,.031),.029,rubber,12)
@@ -231,57 +233,55 @@ def build_basement_fixtures():
     machine.cube((-.304,-.385,.846),(.020,.002,.010),trim_white)
     finish(machine)
 
-    rack=group('Basement laundry | wire storage rack and supplies',(wx,wy,slab_z))
-    rack_steel=material('Laundry | black wire rack','#373936',metal=.55,rough=.45)
-    for x in (-.374,.374):
-        for y in (-.364,.355):
-            rack.beam((x,y,.017),(x,y,1.835),.011,rack_steel,12)
-            rack.beam((x,y,0),(x,y,.030),.016,rubber,12)
-    for z in (1.069,1.817):
-        for y in (-.365,.355):
-            rack.beam((-.377,y,z),(.377,y,z),.008,rack_steel,10)
-            rack.beam((-.377,y,z-.030),(.377,y,z-.030),.005,rack_steel,8)
-        for j in range(19):
-            x=-.37+j*.041
-            rack.beam((x,-.364,z),(x,.354,z),.0034,rack_steel,6)
-        for y in (-.36,.35):
-            points=[(-.37+j*.037,y,z-(j%2)*.030) for j in range(21)]
-            rack.tube(points,.0027,rack_steel,5)
-    rack.cube((-.030,-.03,1.326),(.361,.301,.485),trim_white,16)
-    rack.cube((-.030,-.183,1.350),(.290,.007,.003),paint)
-    rack.cube((-.024,-.184,1.220),(.010,.008,.089),sinkgrey,6)
-    rack.cube((.221,-.172,1.098),(.174,.121,.045),rubber,5)
-    rack.cube((.221,-.172,1.121),(.162,.113,.043),material('Laundry | yellow plastic','#dcb938'),5)
-    finish(rack)
-    # Detergent sits beside the appliance, clear of the transit strip.
-    bottles=group('Basement laundry | detergent bottles',(wx+1.50,wy-.61,slab_z))
-    for x,y,body in ((.044,.004,blue),(-.062,.071,trim_white)):
-        bottles.cube((x,y,.094),(.107,.078,.181),body,5)
-        bottles.beam((x+.016,y,.169),(x+.016,y,.197),.026,body,16,.021)
-        bottles.beam((x+.016,y,.196),(x+.016,y,.219),.024,trim_white,16)
-        bottles.cube((x,y-.040,.093),(.058,.002,.077),trim_white,4)
-    finish(bottles)
-    collider('BasementLaundryComboAndRack',wx-1.26,wx+1.26,wy-1.44,wy+1.23,slab_z,slab_z+1.84)
-    collider('BasementLaundrySupplies',wx+1.14,wx+1.84,wy-.80,wy-.19,slab_z,slab_z+.22)
+    collider('BasementLaundryCombo',wx-1.44,wx+1.23,wy-1.14,wy+1.14,slab_z,slab_z+1.015)
 
-    # Laundry box, valves, outlet collars, hoses and standpipe. Utility
-    # supply branches from the service wall meet the box at x31.27/y25.18.
-    hookups=group('Basement laundry | washer supply and drain box',(wx+1.59,25.18,slab_z))
+    bottles=group('Basement laundry | detergent on washer',(wx+.42,wy+.60,slab_z+1.012))
+    for x,y,height,body in ((0,0,.22,blue),(.079,-.086,.16,trim_white)):
+        bottles.cube((x,y,height/2),(.084,.065,height),body,6)
+        bottles.beam((x+.012,y,height-.012),(x+.012,y,height+.015),.021,body,16,.016)
+        bottles.beam((x+.012,y,height+.015),(x+.012,y,height+.031),.019,trim_white,16)
+        bottles.cube((x-.042,y,height*.52),(.002,.043,height*.42),trim_white,4)
+    finish(bottles)
+
+    # Separate shelving has four black molded trays and the conspicuous
+    # yellow ends in the finished room photo. Leave its open bays visible.
+    rack_x,rack_y=34.75,15.40
+    rack=group('Basement laundry | black and yellow storage shelves',(rack_x,rack_y,slab_z))
+    rack_black=material('Laundry shelf | charcoal resin','#272a29',rough=.59)
+    rack_yellow=material('Laundry shelf | ochre yellow ends','#e5ad27',rough=.48)
+    for x in (-.192,.192):
+        for y in (-.453,.453):
+            rack.cube((x,y,.825),(.040,.043,1.65),rack_black)
+            rack.cube((x,y,.024),(.058,.061,.048),rack_black)
+    for z in (.10,.60,1.10,1.60):
+        rack.cube((0,0,z+.022),(.447,.967,.044),rack_black)
+        for side in (-1,1):
+            rack.cube((side*.214,0,z-.004),(.022,.971,.049),rack_black)
+            rack.cube((0,side*.478,z+.003),(.451,.025,.060),rack_yellow)
+        for i in range(9):
+            rack.cube((0,-.39+i*.0975,z+.045),(.402,.014,.004),rack_black)
+    finish(rack)
+    collider('BasementLaundryShelf',34.00,35.50,13.78,17.02,slab_z,slab_z+1.65)
+
+    # The plumbing system ends at these three rough-in centers in the new wall.
+    hookups=group('Basement laundry | washer supply and drain box',(35.50,19.30,slab_z),yaw=-90)
     hookups.cube((0,0,1.258),(.221,.035,.189),trim_white)
     hookups.cube((0,-.021,1.254),(.187,.012,.155),sinkgrey)
-    for x,cap in ((-.060,plaidA),(.060,blue)):
+    for x,cap in ((-.060,blue),(.060,plaidA)):
         hookups.beam((x,-.026,1.212),(x,-.026,1.282),.009,brass2,12)
         hookups.beam((x,-.027,1.253),(x,-.065,1.253),.011,brass2,12)
         hookups.cube((x,-.035,1.285),(.038,.011,.007),cap)
         hookups.beam((x,-.065,1.253),(x,-.078,1.251),.014,brushed,8)
-        offset=(x+.06)*.65
-        hookups.tube([(x,-.075,1.251),(x,-.096,1.21),(-.01+offset,-.12,1.09),
-                      (-.22+offset,-.14,.82),(-.31+offset,-.16,.68),
-                      (-.44+offset,-.12,.69),(-.53+offset,-.08,.81)],.008,rubber,9)
+        inlet=.18 if x<0 else .28
+        hookups.tube([(x,-.075,1.251),(x,-.088,1.209),
+                      (x+.02,-.063,1.044),(inlet-.10,-.048,.76),
+                      (inlet-.032,-.046,.71),(inlet,-.060,.73),
+                      (inlet,-.081,.82)],.008,rubber,9)
+        hookups.beam((inlet,-.077,.82),(inlet,-.084,.82),.014,brushed,12)
     hookups.beam((0,-.029,1.191),(0,-.029,1.207),.021,trim_white,16)
-    hookups.tube([(0,-.029,1.202),(0,-.030,1.275),(-.020,-.050,1.307),
-                  (-.053,-.081,1.289),(-.068,-.086,1.240),(-.134,-.110,.994),
-                  (-.234,-.135,.776),(-.348,-.143,.690),(-.46,-.10,.659)],.014,rubber,12)
+    hookups.tube([(0,-.029,1.202),(0,-.030,1.275),(.020,-.050,1.307),
+                  (.053,-.078,1.289),(.09,-.077,1.240),(.216,-.064,1.045),
+                  (.310,-.043,.805),(.347,-.045,.625),(.355,-.081,.61)],.014,rubber,12)
     finish(hookups)
 
 build_basement_fixtures()

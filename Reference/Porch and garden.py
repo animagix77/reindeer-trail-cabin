@@ -6,6 +6,66 @@ Plan coordinates are in appraisal feet and heights in absolute meters.
 # Deck end, as seen facing the landing. The stair opening is on the yard side.
 deck_stair_y0, deck_stair_y1 = 31.65, 35.50
 
+def patio_step(number, xa, xb, ya, yb, top, finish):
+    # Photo 734C4F19, looking up the steps: image-left is +X and image-down
+    # runs toward the patio (+Y). Tread and riser each use their own
+    # perspective-corrected strip of the owner's photo, in a packed atlas.
+    width,run=xb-xa,yb-ya
+    if number==1:
+        outlines=[[(.025,.015),(.974,0),(1,.14),(.991,.81),(.973,.97),
+                   (.65,.987),(.49,1),(.33,.987),(.18,.995),(.017,.963),(0,.81),(.006,.18)]]
+        top_band,nose_band=(4,156),(164,235)
+    else:
+        # Two individual chunks meet at the naturally jagged line through
+        # the coarse aggregate. The joint continues down the front face.
+        seam=[(.665,.006),(.647,.18),(.605,.33),(.587,.48),
+              (.577,.55),(.546,.73),(.548,.79),(.526,.993)]
+        left=[(.029,.024),(.28,.008)]+[(u-.0012,t) for u,t in seam]
+        left.extend([(.436,.983),(.377,.995),(.267,.984),(.059,1),(0,.895),(.009,.56),(.002,.19)])
+        right=[(u+.0017,t) for u,t in reversed(seam)]
+        right.extend([(.855,0),(.942,.016),(.969,.115),(.957,.187),
+                      (1,.318),(.991,.564),(1,.817),(.973,.916),(.940,.990),(.733,.981)])
+        outlines=[left,right]
+        top_band,nose_band=(244,406),(415,502)
+
+    verts=[];faces=[]
+    for piece,outline in enumerate(outlines):
+        start=len(verts);n=len(outline)
+        cu=sum(u for u,t in outline)/n;ct=sum(t for u,t in outline)/n
+        # The lower right fragment sits a few millimetres below the left.
+        surface=top-piece*.003
+        for inset,h in ((.006,surface-.133),(0,surface-.118),(0,surface-.010),(.002,surface)):
+            for u,t in outline:
+                du=(cu-u)*width*ft;dt=(ct-t)*run*ft
+                length=max(.001,math.hypot(du,dt))
+                verts.append(pos(xb-width*u-inset*du/(length*ft),
+                                 ya+run*t+inset*dt/(length*ft),h))
+        faces.append(tuple(start+i for i in reversed(range(n))))
+        for row in range(3):
+            for i in range(n):
+                a=start+row*n+i;b=start+row*n+(i+1)%n
+                faces.append((a,b,b+n,a+n))
+        faces.append(tuple(start+3*n+i for i in range(n)))
+    slab=mesh('Patio steps · aged slab '+str(number),verts,faces,finish,deck,True)
+    uv=slab.data.uv_layers.new(name='Photographed stone treads and risers')
+    for face in slab.data.polygons:
+        points=[local(slab.data.vertices[i].co) for i in face.vertices]
+        span_x=max(x for x,y,h in points)-min(x for x,y,h in points)
+        span_y=max(y for x,y,h in points)-min(y for x,y,h in points)
+        horizontal=abs(face.normal.z)>.72
+        band=top_band if horizontal else nose_band
+        for li,(x,y,h) in zip(face.loop_indices,points):
+            u=(xb-x)/width
+            if horizontal:
+                t=(y-ya)/run
+            else:
+                if span_y>span_x:
+                    # Sample the end grain at the same scale as the front face.
+                    u=.34+(y-ya)/width
+                t=(top-(main+h))/.133
+            u=max(0,min(1,u));t=max(0,min(1,t))
+            uv.data[li].uv=((4.5+503*u)/512,1-(band[0]+.5+(band[1]-band[0])*t)/512)
+
 class Timberwork:
     """Join individual saw-cut members into one mesh with grain along each board."""
     def __init__(self, name, material, collection):

@@ -184,7 +184,11 @@ def build_surrounding_woods():
         # corner-to-corner strips, without overlaps at their four diagonal seams.
         while i+1<len(in_ids) or j+1<len(out_ids):
             if j+1 == len(out_ids) or (i+1 < len(in_ids) and (i+1)/(len(in_ids)-1)<=(j+1)/(len(out_ids)-1)):
-                face([in_ids[i],in_ids[i+1],out_ids[j]]);i+=1
+                # Neighboring clipped cells can contribute the same border
+                # vertex. Advance the stitch without emitting a zero-area face.
+                if in_ids[i] != in_ids[i+1]:
+                    face([in_ids[i],in_ids[i+1],out_ids[j]])
+                i+=1
             else:
                 face([in_ids[i],out_ids[j+1],out_ids[j]]);j+=1
     land = mesh('Backdrop_Woodland terrain',vertices,faces,terrain_material,c)
