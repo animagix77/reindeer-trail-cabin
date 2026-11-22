@@ -1,11 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#1b3336"><link rel="icon" href="data:,"><meta name="description" content="Take a self-guided 3D walkthrough of The Reindeer Trail, a woodland cabin in Smallwood, New York. Explore the rooms and grounds at your own pace."><title>The Reindeer Trail · 3D cabin walkthrough</title>
+%%BRAND_STYLES%%
 <style>
-@font-face{font-family:"Barlow Condensed";font-style:normal;font-weight:600;font-display:swap;src:url(data:font/ttf;base64,%%FIELD_FONT%%) format("truetype")}
-:root{--display:"Barlow Condensed","Avenir Next Condensed","Arial Narrow",sans-serif;--paper:#f6ecd7;--pine:#203b3c;--rust:#9a4327;font-family:"DM Sans","Avenir Next",system-ui,sans-serif;color:#253c34;background:#ecf1ee;color-scheme:light}*{box-sizing:border-box}body{margin:0}main{position:relative;height:100vh;height:100dvh;min-height:300px;overflow:hidden;background:radial-gradient(ellipse at 40% 38%,#fff 0%,#f5f8f6 38%,#dce6e0 100%)}header{position:absolute;top:clamp(18px,4.5vw,58px);left:clamp(18px,4.5vw,70px);pointer-events:none}h1{font-family:"Baskervville","Iowan Old Style",Georgia,serif;font-size:clamp(2rem,4.5vw,4.4rem);font-weight:400;letter-spacing:-.065em;line-height:1.06;margin:0}header p{font-size:1rem;letter-spacing:.012em;margin:.45rem 0 0;color:#40564d}.view{position:absolute;inset:0;width:100%;height:100%;display:block;outline-offset:-4px;touch-action:none}.dock{position:absolute;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 24px);text-align:center}nav{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:3px;padding:5px;border:1px solid #bdc9c0;border-radius:24px;background:#fdfefd;box-shadow:0 7px 23px #1a31291a}button{min-height:42px;min-width:42px;font:inherit;font-size:.9rem;font-weight:550;border:0;border-radius:18px;background:transparent;color:#263d35;padding:7px 13px;cursor:pointer}button[aria-pressed=true]{background:#dce9df;color:#173d29}button:hover{background:#edf1ee}button:focus-visible,.view:focus-visible{outline:2px solid #296743}.zoom{font-size:1.4rem;font-weight:400;padding:0}.hint{color:#40564d;margin:0 0 10px;font-size:.84rem}[hidden]{display:none!important}@media(max-width:520px){header{top:20px}button{padding:6px 10px}.dock{bottom:max(14px,env(safe-area-inset-bottom))}.hint{font-size:.78rem}header p{font-size:.9rem}}@media(max-height:470px){header{top:12px;left:20px}h1{font-size:2rem}.dock{bottom:10px}.hint{display:none}}
+:root{--paper:var(--cabin-paper);--pine:var(--cabin-ink);--rust:#9a4327;font-family:var(--sans);color:var(--pine);background:var(--paper);color-scheme:light}*{box-sizing:border-box}body{margin:0}main{position:relative;height:100vh;height:100dvh;min-height:300px;overflow:hidden;background:radial-gradient(ellipse at 40% 38%,#fff 0%,#f5f8f6 38%,#dce6e0 100%)}header{position:absolute;top:clamp(18px,4.5vw,58px);left:clamp(18px,4.5vw,70px);pointer-events:none}h1{font-family:var(--serif);font-size:clamp(2rem,4.5vw,4.4rem);font-weight:400;letter-spacing:-.065em;line-height:1.06;margin:0}header p{font-size:1rem;letter-spacing:.012em;margin:.45rem 0 0;color:#40564d}.view{position:absolute;inset:0;width:100%;height:100%;display:block;outline-offset:-4px;touch-action:none}.dock{position:absolute;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 24px);text-align:center}nav{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:3px;padding:5px;border:1px solid #bdc9c0;border-radius:24px;background:#fdfefd;box-shadow:0 7px 23px #1a31291a}button{min-height:42px;min-width:42px;font:inherit;font-size:.9rem;font-weight:550;border:0;border-radius:18px;background:transparent;color:#263d35;padding:7px 13px;cursor:pointer}button[aria-pressed=true]{background:#dce9df;color:#173d29}button:hover{background:#edf1ee}button:focus-visible,.view:focus-visible{outline:2px solid #296743}.zoom{font-size:1.4rem;font-weight:400;padding:0}.hint{color:#40564d;margin:0 0 10px;font-size:.84rem}[hidden]{display:none!important}@media(max-width:520px){header{top:20px}button{padding:6px 10px}.dock{bottom:max(14px,env(safe-area-inset-bottom))}.hint{font-size:.78rem}header p{font-size:.9rem}}@media(max-height:470px){header{top:12px;left:20px}h1{font-size:2rem}.dock{bottom:10px}.hint{display:none}}
 
 #activity{position:absolute;z-index:3;bottom:100px;right:clamp(14px,4vw,65px);width:min(310px,calc(100vw - 28px));padding:13px 15px;background:#fafcf9f5;color:#253c34;border:1px solid #c3cbc2;border-radius:16px;box-shadow:0 4px 22px #101b1833;max-height:calc(100dvh - 180px);overflow:auto}
 .activity-title,.activity-actions,.activity-choice{display:flex;align-items:center;justify-content:space-between;gap:5px}
-.activity-title h2{font-family:"Iowan Old Style",Georgia,serif;margin:0;font-size:1.4rem;font-weight:500;line-height:1.1}
+.activity-title h2{font-family:var(--serif);margin:0;font-size:1.4rem;font-weight:500;line-height:1.1}
 #activity button,#activity select{min-height:33px;min-width:32px;border-radius:9px;padding:5px 9px;background:#e9eee7;font:inherit;font-size:.84rem;color:#254932;border:0}
 #activity button:disabled{opacity:.48;cursor:default}#activity button[aria-pressed=true],#activity .primary{background:#315944;color:white}
 #activity .activity-title button{font-size:1.2rem;background:transparent}
@@ -17,7 +17,7 @@
 #property-map{color:#213d32;background:#fbfcf8;border:1px solid #b4c4b7;box-shadow:0 20px 85px #0c211850;border-radius:20px;padding:clamp(15px,2.2vw,26px);width:min(780px,calc(100vw - 32px));max-width:calc(100vw - 16px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;margin:auto}
 #property-map::backdrop{background:#15281f9e}
 .map-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:14px}
-.map-heading p{margin:0 0 3px;color:#54695b;font-size:.78rem}.map-heading h2{font-family:"Baskervville","Iowan Old Style",Georgia,serif;font-weight:400;font-size:clamp(1.8rem,3.3vw,2.35rem);line-height:1.03;letter-spacing:-.035em;margin:0}
+.map-heading p{margin:0 0 3px;color:#54695b;font-size:.78rem}.map-heading h2{font-family:var(--serif);font-weight:400;font-size:clamp(1.8rem,3.3vw,2.35rem);line-height:1.03;letter-spacing:-.035em;margin:0}
 #map-close{border:1px solid #d7dfd5;border-radius:50%;height:38px;width:38px;min-height:38px;min-width:38px;font-size:1.5rem;line-height:1;background:#f0f4ed;padding:0}
 .map-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(167px,197px);gap:clamp(14px,2.2vw,24px);align-items:start}
 .map-figure{margin:0}.map-figure figcaption{display:flex;flex-wrap:wrap;gap:2px 9px;align-items:baseline;margin-top:7px;font-size:.77rem;color:#54695b}.map-figure figcaption strong{color:#244434;font-weight:650}
@@ -46,12 +46,12 @@
 #welcome{width:min(1030px,calc(100vw - 48px));max-width:100vw;max-height:calc(100dvh - 40px);padding:0;margin:auto;overflow:auto;overscroll-behavior:contain;color:#303b37;background:var(--paper);border:1px solid #d3b891;border-radius:6px;box-shadow:0 25px 90px #0b1a1266}
 #welcome::backdrop{background:#16251ce6}
 .welcome-layout{display:grid;grid-template-columns:minmax(340px,45%) 1fr;position:relative}
-.welcome-copy{align-self:center;padding:clamp(28px,3.6vw,51px);font:400 1rem/1.53 "DM Sans","Avenir Next",system-ui,sans-serif}
-.welcome-copy .welcome-location{color:var(--rust);font:600 .83rem/1.2 var(--display);letter-spacing:.12em;text-transform:uppercase;margin:0 0 16px}
-#welcome-title{font:600 clamp(2.8rem,5.2vw,4.7rem)/.94 var(--display);letter-spacing:-.015em;text-transform:uppercase;color:var(--pine);margin:0 0 24px;text-wrap:balance}
+.welcome-copy{align-self:center;padding:clamp(28px,3.6vw,51px);font:400 1rem/1.53 var(--sans)}
+.welcome-copy .welcome-location{color:var(--rust);font:600 .77rem/1.4 var(--sans);letter-spacing:.12em;text-transform:uppercase;margin:0 0 16px}
+#welcome-title{font:400 clamp(2.8rem,5.2vw,4.7rem)/.94 var(--serif);letter-spacing:-.035em;color:var(--pine);margin:0 0 24px;text-wrap:balance}
 .welcome-copy p{margin:0 0 14px}.welcome-photo{display:block;min-height:100%;height:100%;object-fit:cover;object-position:55% 60%;min-width:0;position:absolute;inset:0 0 0 auto;width:55%}
-#welcome-start{margin-top:10px;background:var(--rust);color:#fffaf0;padding:12px 19px;border-radius:4px;display:inline-flex;gap:20px;align-items:center;justify-content:center;min-width:10rem;min-height:45px}
-#welcome-start:enabled:hover{background:#78351f}#welcome-start span+span{font-size:1.15rem;line-height:1}
+#welcome-start{margin-top:10px;background:var(--pine);color:var(--paper);padding:12px 19px;border-radius:100px;display:inline-flex;gap:20px;align-items:center;justify-content:center;min-width:10rem;min-height:45px}
+#welcome-start:enabled:hover{background:#365541}#welcome-start span+span{font-size:1.15rem;line-height:1}
 #welcome-start:disabled{background:#d6d6d3;color:#484846;cursor:default}#welcome-start:disabled span+span{display:none}
 #welcome-close{position:absolute;right:12px;top:12px;width:35px;height:35px;min-width:35px;min-height:35px;display:grid;place-content:center;line-height:1;padding:0;border-radius:50%;background:#f6f3e8ee;color:#293e2d;font-size:1.4rem}
 #welcome [hidden]{display:none}
@@ -70,7 +70,7 @@
 @media(max-width:680px){#welcome{width:min(475px,calc(100vw - 18px));max-height:calc(100dvh - 18px)}.welcome-layout{display:flex;flex-direction:column}.welcome-photo{order:-1;position:relative;width:100%;height:clamp(100px,24dvh,195px);min-height:0;object-position:50% 60%}.welcome-copy{padding:19px 22px 22px;font-size:.93rem;line-height:1.45}.welcome-copy .welcome-location{margin-bottom:7px;font-size:.72rem}#welcome-title{font-size:clamp(2.45rem,10vw,3.35rem);margin-bottom:14px}.welcome-copy p{margin-bottom:10px}#welcome-start{margin-top:4px}}
 @media(min-width:681px) and (max-height:490px){#welcome{max-height:calc(100dvh - 10px)}.welcome-copy{padding:20px 26px;font-size:.88rem;line-height:1.38}.welcome-copy .welcome-location{margin-bottom:7px}#welcome-title{font-size:3rem;margin-bottom:12px}#welcome-start{margin-top:0}}
 #party{width:min(425px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:clamp(15px,4.8vw,24px);overflow:auto;overscroll-behavior:contain;border:1px solid #b9c9b9;color:#243c30;background:#f8faf5;border-radius:18px;box-shadow:0 14px 85px #12231955}
-#party::backdrop{background:#14261e72}#party h2{font:400 clamp(1.7rem,5vw,2.15rem)/1.12 "Baskervville",Georgia,serif;letter-spacing:-.04em;margin:0 30px 12px 0}
+#party::backdrop{background:#14261e72}#party h2{font:400 clamp(1.7rem,5vw,2.15rem)/1.12 var(--serif);letter-spacing:-.04em;margin:0 30px 12px 0}
 #party-close{position:absolute;right:12px;top:10px;min-width:36px;min-height:36px;padding:0;font-size:1.5rem}
 #party p{font-size:.9rem;line-height:1.45}#party-note{margin:0 0 14px}#party-status{margin:12px 0 0}#party-status:empty{display:none}
 #party label,#party legend{display:block;font-size:.85rem;font-weight:650;padding:0;margin:10px 0 5px}
@@ -87,7 +87,7 @@
 #water-notes{width:min(460px,calc(100vw - 24px));max-width:calc(100vw - 16px);max-height:calc(100dvh - 24px);margin:auto;padding:clamp(20px,4vw,32px);overflow:auto;overscroll-behavior:contain;border:1px solid #c6cebd;border-radius:16px;color:#203a2c;background:#faf9f2;box-shadow:0 20px 70px #0b21194d;color-scheme:light}
 #water-notes::backdrop{background:#15281fa3}
 .water-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
-#water-title{margin:0;font:400 clamp(2.25rem,5vw,3rem)/1 "Baskervville","Iowan Old Style",Georgia,serif;letter-spacing:-.045em}
+#water-title{margin:0;font:400 clamp(2.25rem,5vw,3rem)/1 var(--serif);letter-spacing:-.045em}
 #water-close{width:38px;min-width:38px;height:38px;min-height:38px;padding:0;line-height:1;border:1px solid #bccabe;border-radius:50%;background:#edf1e8;color:#274b38;font-size:1.4rem}
 #water-notes h3{font-size:1rem;line-height:1.2;font-weight:650;margin:.9rem 0 .38rem}
 #water-notes p{font-size:.95rem;line-height:1.48;margin:.32rem 0 .68rem}
@@ -97,7 +97,7 @@
 #water-notes .water-reading h3{margin:0 0 .36rem}
 #water-notes .water-source,#water-notes #water-status,#water-notes #water-observed{font-size:.81rem;color:#496052}
 #water-notes #water-level{margin:.7rem 0 0;color:#264634;font-size:.9rem}
-#water-depth{font:500 2rem/1.05 "Baskervville","Iowan Old Style",Georgia,serif;letter-spacing:-.035em;font-variant-numeric:lining-nums tabular-nums;margin-right:.2rem}
+#water-depth{font:500 2rem/1.05 var(--serif);letter-spacing:-.035em;font-variant-numeric:lining-nums tabular-nums;margin-right:.2rem}
 #water-retry{padding:4px 8px;min-height:30px;margin:0 8px 2px 0;border:1px solid #9eb09e;border-radius:5px;color:#345a42;background:transparent;font:inherit}
 #water-notes .water-source{margin:.3rem 0 0}
 #feeding .deer-guide{font-size:.78rem;line-height:1.35;margin:3px 0 8px;color:#405b49}
@@ -125,7 +125,7 @@
 .wood-heading,.split-power{display:flex;align-items:center;gap:7px}
 .wood-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .wood-heading{justify-content:space-between}
-#woodwork h2{font:500 1.15rem/1.1 "Baskervville","Iowan Old Style",Georgia,serif;margin:0}
+#woodwork h2{font:500 1.15rem/1.1 var(--serif);margin:0}
 #split-score{font-size:.71rem;color:#e0d8bc;font-variant-numeric:tabular-nums}
 .wood-goal{margin:5px 0;font-size:.78rem;line-height:1.3}
 #split-message{font-size:.8rem;line-height:1.3;margin:6px 0 8px}
@@ -137,7 +137,7 @@
 #split-strength::-webkit-meter-optimum-value{background:#e2bd83}
 #split-strength::-moz-meter-bar{background:#e2bd83}
 #split-strength-value{min-width:3.2ch;text-align:right;font-variant-numeric:tabular-nums}
-#woodwork button{min-height:32px;border:1px solid #d2ddc74d;border-radius:6px;padding:4px 10px;background:#31443a;color:#fff6e1;font:550 .8rem/1.2 "DM Sans",system-ui,sans-serif}
+#woodwork button{min-height:32px;border:1px solid #d2ddc74d;border-radius:6px;padding:4px 10px;background:#31443a;color:#fff6e1;font:550 .8rem/1.2 var(--sans)}
 #woodwork button:focus-visible{outline:2px solid #f7d89e;outline-offset:2px}
 #woodwork button:disabled{opacity:.52;cursor:default}
 #split-reticle{position:absolute;z-index:2;pointer-events:none;transform:translate(-50%,-50%);width:17px;height:17px;border-radius:50%;border:1.5px solid #ffe4a9;box-shadow:0 0 0 1px #291f17a1,0 1px 5px #160e08aa;display:grid;place-items:center}
@@ -149,14 +149,14 @@
 #status::before{content:"";position:absolute;z-index:-1;inset:0;pointer-events:none;background:linear-gradient(0deg,#0b1712f2 0%,#0b1712b0 30%,#0b17121f 74%),linear-gradient(90deg,#0a171194,transparent 72%)}
 main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activity,#woodwork,#world-tools){visibility:hidden}
 .load-arrival{width:min(100%,44rem);margin-top:auto}
-[data-load-quote]{display:block;font:italic 400 clamp(1.05rem,1.65vw,1.32rem)/1.35 "Baskervville","Iowan Old Style",Georgia,serif;quotes:"“" "”";text-wrap:pretty}
+[data-load-quote]{display:block;font:italic 400 clamp(1.05rem,1.65vw,1.32rem)/1.35 var(--serif);quotes:"“" "”";text-wrap:pretty}
 #status [data-load-quote]{margin-top:1rem;min-block-size:2.7em;color:#f8eddb}
 .welcome-image{display:block;width:100%;height:100%;object-fit:cover;object-position:inherit}
 .welcome-photo [data-load-quote]{position:absolute;inset:auto 0 0;padding:2.5rem clamp(16px,2.8vw,36px) 1.2rem;color:#fff8e9;background:linear-gradient(0deg,#101d15ed,#101d15b8 56%,transparent)}
 @media(max-width:680px){.welcome-photo [data-load-quote]{font-size:1rem;padding:1.3rem 50px .55rem 16px}}
 @media(max-width:375px){#status [data-load-quote]{min-block-size:4.05em}}
-.load-location{margin:0 0 .56rem;font:600 .9rem/1.25 var(--display);text-transform:uppercase;letter-spacing:.15em;color:#ffd297}
-#load-title{margin:0 0 clamp(21px,4vh,40px);font:600 clamp(2.8rem,7.6vw,7rem)/.92 var(--display);letter-spacing:-.012em;text-transform:uppercase;text-wrap:balance}
+.load-location{margin:0 0 .56rem;font:600 .9rem/1.25 var(--sans);text-transform:uppercase;letter-spacing:.15em;color:#ffd297}
+#load-title{margin:0 0 clamp(21px,4vh,40px);font:400 clamp(2.8rem,7.6vw,7rem)/.92 var(--serif);letter-spacing:-.035em;text-wrap:balance}
 .load-progress{--load-track:#f9f3d84d;--load-fill:#ffbd77;--load-secondary:#ece9dc;max-width:100%;width:24.5rem;line-height:1.4}
 .load-line,.load-info{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:2px .8rem;min-width:0}
 .load-line [data-load-stage]{font-weight:600;overflow-wrap:anywhere}
@@ -174,7 +174,7 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
 [data-load-retry]{margin-top:9px;border:1px solid currentColor;border-radius:6px;padding:7px 14px;background:transparent;color:inherit;font-size:.94rem}
 [data-load-retry]:hover{background:#8d917c2e}
 [data-load-retry]:focus-visible{outline:2px solid currentColor;outline-offset:3px}
-#welcome-loading{--load-track:#d8cbb7;--load-fill:var(--rust);--load-secondary:#57574e;width:100%;margin:-4px 0 1.35rem;padding:12px 0;border-block:1px solid #d7d9ce}
+#welcome-loading{--load-track:#d8cbb7;--load-fill:var(--pine);--load-secondary:#57574e;width:100%;margin:-4px 0 1.35rem;padding:12px 0;border-block:1px solid #d7d9ce}
 #welcome-loading .load-line{font-size:.95rem}
 @media(max-width:680px){#status{padding:24px max(22px,env(safe-area-inset-right)) max(7vh,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left))}#load-photo{object-position:58% 58%}#welcome-loading{margin:0 0 12px;padding:8px 0}}
 @media(max-width:680px) and (max-height:720px){
@@ -188,13 +188,13 @@ main:has(>#status:not([hidden]))>:is(header,#tour-controls,#tools,#stick,#activi
 @media(forced-colors:active){[data-load-bar]{appearance:auto}.load-track:has(progress:indeterminate)::after{display:none}}
 /* The top strip stays interactive while its empty space passes through to the scene. */
 main{
-  --hud:#192f32ee;--hud-line:#e8c49247;--ink:#fff2d8;--sub:#e2d9c6;--amber:#ffbc70;
+  --hud:#20382eee;--hud-line:#e8c49247;--ink:#fff2d8;--sub:#e2d9c6;--amber:#ffbc70;
   --inset:clamp(16px,2.25vw,36px);--pad-size:96px;--pad-bottom:max(76px,calc(env(safe-area-inset-bottom) + 66px));
 }
 #tour-controls{position:absolute;z-index:4;inset:max(var(--inset),env(safe-area-inset-top)) max(var(--inset),env(safe-area-inset-right)) auto max(var(--inset),env(safe-area-inset-left));display:grid;grid-template-columns:1fr auto;grid-template-areas:"brand nav" "brand sky";align-items:start;gap:5px 10px;pointer-events:none}
 #tour-controls>.tour-brand{grid-area:brand;position:static;color:var(--ink);text-shadow:0 1px 6px #09150f,0 2px 14px #0a170f}
-.tour-brand h1{font:600 clamp(1.5rem,2.5vw,2.65rem)/.92 var(--display);letter-spacing:.015em;text-transform:uppercase;margin:0;text-wrap:balance}
-.tour-brand p{font:600 .78rem/1.2 var(--display);text-transform:uppercase;letter-spacing:.14em;color:var(--ink);margin:.38rem 0 0}
+.tour-brand h1{font:400 clamp(1.5rem,2.5vw,2.65rem)/.92 var(--serif);letter-spacing:-.035em;margin:0;text-wrap:balance}
+.tour-brand p{font:600 .78rem/1.2 var(--sans);text-transform:uppercase;letter-spacing:.14em;color:var(--ink);margin:.38rem 0 0}
 #views,#scene-panel,.dock nav,#activity,#woodwork{background:var(--hud);border:1px solid var(--hud-line);border-radius:5px;color:var(--ink);box-shadow:0 3px 16px #0a161b38}
 #tour-controls #views{grid-area:nav;justify-self:end;display:flex;flex-wrap:nowrap;gap:1px;padding:1px 3px;pointer-events:auto}
 .view-picker{display:flex;align-items:center;gap:5px;min-width:0;padding-left:6px;color:var(--sub);font-size:.78rem}
@@ -251,7 +251,7 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 #tour-guide{margin:auto;width:min(412px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:clamp(17px,3vw,26px);color:#263e30;background:#f8f7ee;border:1px solid #bec9b7;border-radius:14px;overflow:auto;overscroll-behavior:contain;box-shadow:0 14px 65px #07160f5e}
 #tour-guide::backdrop{background:#10231b88}
 #tour-guide .guide-heading{display:flex;justify-content:space-between;align-items:center;gap:8px}
-#tour-guide h2{margin:0;font:400 2rem/1.05 "Baskervville","Iowan Old Style",Georgia,serif;letter-spacing:-.045em}
+#tour-guide h2{margin:0;font:400 2rem/1.05 var(--serif);letter-spacing:-.045em}
 #tour-guide h3{margin:14px 0 3px;font-size:.86rem}
 #tour-guide p{margin:5px 0 10px;font-size:.85rem;line-height:1.45}
 #tour-guide :is(button,a,input):focus-visible{outline:2px solid #496b43;outline-offset:1px}
@@ -311,13 +311,13 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 @media(max-height:480px){.time-setting label span{display:none}}
 @media(max-width:345px){#scene-panel{gap:4px}.tour-brand h1{font-size:1.15rem}.dock nav button,#views button{padding-inline:7px}}
 #tour-guide,#property-map,#party,#water-notes{background:var(--paper);color:var(--pine);border-color:#c7b590;border-radius:6px}
-#tour-guide h2,#property-map h2,#party h2,#water-notes h2,#woodwork h2,#activity h2{font-family:var(--display);font-weight:600;letter-spacing:.01em}
-.dock nav #stay-open{background:#ffe0aa;color:#283b33;border-radius:3px;font-weight:700}
+#tour-guide h2,#property-map h2,#party h2,#water-notes h2,#woodwork h2,#activity h2{font-family:var(--serif);font-weight:400;letter-spacing:-.025em}
+.dock nav #stay-open{background:#f3ecd9;color:var(--pine);border-radius:100px;font-weight:700}
 .dock nav #stay-open:hover{background:#ffedce}
 #stay-dialog{width:min(390px,calc(100vw - 24px));max-height:calc(100dvh - 24px);margin:auto;padding:clamp(18px,4vw,27px);overflow:auto;overscroll-behavior:contain;color:var(--pine);background:var(--paper);border:1px solid #c7b590;border-radius:6px;box-shadow:0 15px 55px #10201d55}
 #stay-dialog::backdrop{background:#10231b88}
 .stay-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:17px}
-#stay-title{margin:0;font:600 2.15rem/1 var(--display)}
+#stay-title{margin:0;font:400 2.15rem/1 var(--serif)}
 #stay-close{flex:none;width:44px;height:44px;padding:0;border:1px solid #b8b4a5;border-radius:50%;color:var(--pine);font-size:1.45rem}
 .stay-option{display:grid;gap:3px;min-height:54px;margin-top:8px;padding:12px 15px;border:1px solid #b5b5a3;border-radius:4px;background:#fff9ec;color:var(--pine);text-decoration:none}
 .stay-option:hover,.stay-option:focus-visible{background:#fbf1db;border-color:var(--pine)}
@@ -330,8 +330,8 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 %%MOBILE_STYLES%%
 </style></head><body><main><canvas id="view" class="view" tabindex="0" aria-label="Walk the cabin and grounds. Drag to look around."></canvas><section id="status" aria-labelledby="load-title">
     <img id="load-photo" alt="" decoding="async">
-    <div class="load-arrival"><p class="load-location">%%CABIN_NAME%% · Smallwood, NY</p>
-      <h2 id="load-title">3D cabin walkthrough</h2>
+    <div class="load-arrival"><p class="load-location">%%CABIN_NAME%% · Smallwood, New York</p>
+      <h2 id="load-title">Walk the cabin <em>in 3D.</em></h2>
       <div class="load-progress">
       <div class="load-line"><span data-load-stage role="status">Loading the 3D walkthrough…</span><span data-load-percent aria-hidden="true"></span></div>
       <div class="load-track"><progress data-load-bar max="100" aria-label="Walkthrough loading progress"></progress></div>
@@ -405,19 +405,19 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
     <button id="flashlight" type="button" aria-pressed="false" aria-keyshortcuts="L" title="Flashlight (L)" hidden>Flashlight</button>
     <button id="scene-stars" type="button" title="Set a clear night sky and look for stars">Stargaze</button>
     <button id="guide-open" type="button" aria-haspopup="dialog" aria-controls="tour-guide">Guide</button>
-    <button id="stay-open" type="button" aria-haspopup="dialog" aria-controls="stay-dialog">Stay here</button>
+    <button id="stay-open" type="button" aria-haspopup="dialog" aria-controls="stay-dialog">Plan your stay</button>
   </nav>
 </div></main>
 <dialog id="stay-dialog" closedby="any" aria-labelledby="stay-title" aria-describedby="stay-note">
   <div class="stay-heading">
-    <h2 id="stay-title">Stay at the cabin</h2>
+    <h2 id="stay-title">Plan your stay</h2>
     <button id="stay-close" type="button" aria-label="Close rental options">×</button>
   </div>
   <a class="stay-option" href="https://www.airbnb.com/rooms/1124495370358897568" target="_blank" rel="noopener noreferrer">
-    <strong>Check short-stay dates</strong><span>Airbnb</span>
+    <strong>Book on Airbnb</strong><span>Short stays</span>
   </a>
   <a class="stay-option" href="https://www.furnishedfinder.com/property/1070164_1" target="_blank" rel="noopener noreferrer">
-    <strong>Inquire about a longer stay</strong><span>Furnished Finder · 30 days or more</span>
+    <strong>Inquire on Furnished Finder</strong><span>Monthly stays · 30 nights or more</span>
   </a>
   <p id="stay-note">Listings open in a new tab.</p>
   %%CABIN_HOME%%
@@ -449,9 +449,9 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
 <dialog id="welcome" closedby="none" aria-labelledby="welcome-title" aria-describedby="welcome-intro">
   <div class="welcome-layout">
     <div class="welcome-copy">
-      <p class="welcome-location">%%CABIN_NAME%% · Smallwood, NY</p>
-      <h2 id="welcome-title" tabindex="-1">3D cabin walkthrough</h2>
-      <p id="welcome-intro">The Reindeer Trail is our quiet place in the mountains. Take your coffee to the deck and watch the morning light move through the trees. In the evening, linger over dinner with friends, then step outside to see the stars.</p>
+      <p class="welcome-location">%%CABIN_NAME%% · Smallwood, New York</p>
+      <h2 id="welcome-title" tabindex="-1">Walk the cabin <em>in 3D.</em></h2>
+      <p id="welcome-intro">Welcome to our family cabin in Smallwood. Come inside, take a look around, and find your favorite seat by the fire.</p>
       <div id="welcome-loading" class="load-progress">
       <div class="load-line"><span data-load-stage role="status">Loading the 3D walkthrough…</span><span data-load-percent aria-hidden="true"></span></div>
       <div class="load-track"><progress data-load-bar max="100" aria-label="Walkthrough loading progress"></progress></div>
@@ -461,10 +461,10 @@ html.is-seated #tour-controls:is(:hover,:focus-within),html.is-seated .dock nav:
       <p class="welcome-route">Your walk begins on the driveway at golden hour. Explore the rooms at your own pace, or follow the path around back to the swings.</p>
       <form id="welcome-form">
         <div id="welcome-identity" hidden>
-          <label>Your hiker’s name<input id="welcome-name" required maxlength="28" autocomplete="nickname" enterkeyhint="go" placeholder="Name or nickname" aria-describedby="welcome-note"></label>
-          <label>Hiker style<select id="welcome-avatar"><option value="man">Man</option><option value="woman">Woman</option></select></label>
+          <label>Your name<input id="welcome-name" required maxlength="28" autocomplete="nickname" enterkeyhint="go" placeholder="Name or nickname" aria-describedby="welcome-note"></label>
+          <label>Your hiker<select id="welcome-avatar"><option value="man">Man</option><option value="woman">Woman</option></select></label>
         </div>
-        <p id="welcome-note" hidden>Other visitors on the walk can see your hiker’s name.</p>
+        <p id="welcome-note" hidden>Other visitors will see the name you choose.</p>
         <p class="entry-status" id="welcome-feedback" role="status"></p>
         <button type="submit" id="welcome-start" disabled><span>Loading…</span></button>
         <button type="button" id="welcome-solo" hidden>Explore on my own</button>

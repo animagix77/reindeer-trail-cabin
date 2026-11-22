@@ -29,8 +29,8 @@
   }
   .tour-brand h1 {
     color: var(--sub);
-    font: 600 .72rem/1 var(--display);
-    letter-spacing: .065em;
+    font: 400 .92rem/1 var(--serif);
+    letter-spacing: -.02em;
     white-space: nowrap;
   }
   .tour-brand p { display: none; }

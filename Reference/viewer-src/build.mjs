@@ -20,7 +20,10 @@ if([...(manifest.images||[]),...(manifest.buffers||[])].some(item=>item.uri && !
 const js=(await build({entryPoints:[path.join(base,'viewer.js')],bundle:true,format:'iife',minify:true,legalComments:'inline',write:false,target:'es2022'})).outputFiles[0].text;
 const licenseFiles=['three/LICENSE','cannon-es/LICENSE','peerjs/LICENSE','peerjs-js-binarypack/LICENSE','eventemitter3/LICENSE','sdp/LICENSE','webrtc-adapter/LICENSE.md','@msgpack/msgpack/LICENSE'];
 const licenses=await Promise.all(licenseFiles.map(async file=>file.split('/LICENSE')[0]+'\n'+await fs.readFile(path.join(base,'node_modules',file),'utf8')));
-licenses.push(await fs.readFile(path.join(base,'Barlow-OFL.txt'),'utf8'));
+const siteDir=path.resolve(base,'../../Website');
+for(const family of ['Instrument-Sans','Instrument-Serif']){
+  licenses.push(await fs.readFile(path.join(siteDir,'fonts',family+'-OFL.txt'),'utf8'));
+}
 const license=licenses.join('\n\n').replaceAll('*/','* /');
 const refs=referencePath||path.join(base,'..');
 const [aerialPhoto,satellitePhoto,mapVectors]=await Promise.all([
@@ -41,17 +44,25 @@ const mapJSON=JSON.stringify({images:{
   satellite:'data:image/jpeg;base64,'+satellitePhoto.toString('base64')
 },lines}).replaceAll('<','\\u003c');
 const welcomePhoto=(await fs.readFile(path.join(base,'welcome-yard.webp'))).toString('base64');
-const displayFont=await fs.readFile(path.join(base,'BarlowCondensed-SemiBold.ttf'));
+let brandStyles='<link rel="stylesheet" href="../brand.css">';
+if(!website){
+  // Keep the single-file tour usable offline.
+  let css=await fs.readFile(path.join(siteDir,'brand.css'),'utf8');
+  for(const match of [...css.matchAll(/url\("\.\/(fonts\/[^"]+\.woff2)"\)/g)]){
+    const font=await fs.readFile(path.join(siteDir,match[1]));
+    css=css.replace(match[0],'url(data:font/woff2;base64,'+font.toString('base64')+')');
+  }
+  brandStyles='<style>'+css+'</style>';
+}
 const mobileStyles=await Promise.all(['mobile-walk.css','mobile-welcome.css','mobile-panels.css'].map(file=>fs.readFile(path.join(base,file),'utf8')));
 let template=(await fs.readFile(path.join(base,'template.html'),'utf8'))
-  .replace('%%FIELD_FONT%%',displayFont.toString('base64'))
+  .replace('%%BRAND_STYLES%%',()=>brandStyles)
   .replace('%%MOBILE_STYLES%%',()=>mobileStyles.join('\n'));
 const homeAnchor=(label)=>'<a class="cabin-site-link" href="../">'+label+'</a>';
 template=template.replaceAll('%%CABIN_NAME%%',website?homeAnchor('The Reindeer Trail'):'The Reindeer Trail')
   .replace('%%CABIN_HOME%%',website?homeAnchor('Return to the cabin website'):'');
 const modelDir=website?path.dirname(requestedOut):path.dirname(outPath);
 if(website){
-  const siteDir=path.resolve(base,'../../Website');
   await fs.access(path.join(siteDir,'index.html'));
   await fs.cp(siteDir,modelDir,{recursive:true,filter:file=>!path.basename(file).startsWith('.')});
   await fs.copyFile(path.resolve(base,'../../CNAME'),path.join(modelDir,'CNAME'));
