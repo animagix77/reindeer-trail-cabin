@@ -124,12 +124,32 @@
   const title = {from: {opacity: .1, transform: 'translateY(30px)'}, duration: 1350};
   const copy = {from: {opacity: .18, transform: 'translateY(16px)'}, duration: 1050};
   const ink = {from: {opacity: .24}, duration: 850};
-  const backdrop = {from: {opacity: .48}, duration: 1450};
+  const backdrop = {from: {opacity: .48}, duration: 1450, wipe: true};
   // Individual scale composes with the gallery's existing hover transform.
-  const photo = {from: {opacity: .2, scale: '1.06'}, duration: 1450};
-  const thumbnail = {from: {opacity: .28, scale: '.97'}, duration: 900};
+  const photo = {from: {opacity: .2, scale: '1.06'}, duration: 1450, wipe: true};
+  const thumbnail = {from: {opacity: .28}, duration: 900, wipe: true};
   const pending = new WeakMap();
   const playing = new Map();
+  function play(item, effect) {
+    playing.get(item)?.cancel();
+    if (motion.matches || print.matches || item.matches(':focus-within') || item.closest(':focus-visible')) return;
+    const frames = [effect.from, {}];
+    if (effect.wipe) {
+      item.setAttribute('data-photo-wipe', '');
+      frames[0] = {...effect.from, maskPosition: '50% 100%'};
+      frames[1] = {maskPosition: '50% 0%'};
+    }
+    const animation = item.animate(frames, {
+      duration: effect.duration, delay: effect.delay ?? 0, easing: 'cubic-bezier(.3,.08,.24,1)', fill: 'backwards'
+    });
+    playing.set(item, animation);
+    animation.onfinish = animation.oncancel = () => {
+      if (playing.get(item) !== animation) return;
+      playing.delete(item);
+      item.removeAttribute('data-photo-wipe');
+    };
+  }
+
   function reveal(entries, observer) {
     for (const entry of entries) {
       if (!entry.isIntersecting || entry.intersectionRatio < observer.thresholds[0]) continue;
@@ -139,13 +159,7 @@
       pending.delete(item);
       item.style.removeProperty('--reveal-wait');
       item.removeAttribute('data-reveal-wait');
-      if (!effect || motion.matches || print.matches || item.matches(':focus-within') || item.closest(':focus-visible')) continue;
-      // An empty final keyframe restores the author's opacity and transform.
-      const animation = item.animate([effect.from, {}], {
-        duration: effect.duration, delay: effect.delay, easing: 'cubic-bezier(.3,.08,.24,1)', fill: 'backwards'
-      });
-      playing.set(item, animation);
-      animation.onfinish = animation.oncancel = () => playing.delete(item);
+      if (effect) play(item, effect);
     }
   }
 
@@ -157,18 +171,29 @@
 
   function watch(item, effect, delay) {
     const observer = item.closest('footer, #guest-message, #pick-grid') ? scrollEnd
-      : item.matches('.hero-photo, .tour-panel > img, .photo-tile img') ? largeMedia : readingArea;
+      : item.matches('.hero-media, .tour-panel > img, .photo-tile img') ? largeMedia : readingArea;
     item.setAttribute('data-reveal-wait', '');
-    item.style.setProperty('--reveal-wait', effect.from.opacity);
+    item.style.setProperty('--reveal-wait', effect.wipe ? 0 : effect.from.opacity);
     pending.set(item, {...effect, delay});
-    observer.observe(item);
+    // A lazy photo should still get its full wipe on a slow connection.
+    if (effect.wipe && item instanceof HTMLImageElement && !item.complete) {
+      const ready = () => {
+        item.removeEventListener('load', ready);
+        item.removeEventListener('error', ready);
+        if (item.isConnected) observer.observe(item);
+      };
+      item.addEventListener('load', ready);
+      item.addEventListener('error', ready);
+    } else {
+      observer.observe(item);
+    }
   }
 
   function watchAll(selector, effect, delay = 0) {
     document.querySelectorAll(selector).forEach(item => watch(item, effect, delay));
   }
 
-  watchAll('.hero-photo, .tour-panel > img', backdrop);
+  watchAll('.hero-media, .tour-panel > img', backdrop);
   watchAll('.masthead .wordmark, .wide-nav a, .nav-stay, .mobile-nav summary, .mobile-nav a', ink);
   watchAll('.hero-location, .intro-aside > .eyebrow, .section-top .eyebrow, #reviews-heading, .tour-inner > .eyebrow', ink);
   watchAll('.heading-line:first-child, .section-top h2, .reviews-score, #review-stays-title, .contact-intro h2', title, 40);
@@ -185,6 +210,11 @@
   watchAll('.review-lane p', copy, 75);
   watchAll('#guest-message label:not(.contact-trap), #guest-email, #guest-note, #message-hint, #message-submit, #open-host-inbox', ink, 45);
   watchAll('.footer-inner > *', ink);
+
+  const fullPhoto = document.querySelector('#viewer-img');
+  fullPhoto.addEventListener('load', () => {
+    if (fullPhoto.getClientRects().length) play(fullPhoto, thumbnail);
+  });
 
   // Each category rebuilds these tiles. Their buttons and focus rings stay put.
   const picker = document.querySelector('#pick-grid');
