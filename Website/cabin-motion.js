@@ -4,9 +4,10 @@
   const print = matchMedia('print');
   const clamp = value => Math.max(0, Math.min(1, value));
   const between = (value, from, to) => clamp((value - from) / (to - from));
+  const buildDuration = 5000;
   let drawing;
   let frame = 0;
-  let nearby = true;
+  let startedAt;
   let lastProgress = -1;
 
   function prepareDrawing(svg) {
@@ -56,12 +57,7 @@
     }
   }
 
-  function render() {
-    frame = 0;
-    if (!drawing) return;
-    const top = art.getBoundingClientRect().top;
-    const screen = document.documentElement.clientHeight;
-    const p = motion.matches || print.matches ? 1 : between(screen - top, screen * .04, screen * .66);
+  function render(p) {
     if (p === lastProgress) return;
     lastProgress = p;
     const [survey, plan, studs] = drawing.lines;
@@ -72,8 +68,27 @@
     for (const coat of drawing.coats) paint(coat, between(p, ...spans[coat.group.dataset.build]));
   }
 
-  function schedule() {
-    if (!frame && nearby && drawing) frame = requestAnimationFrame(render);
+  function animate(now) {
+    const progress = clamp((now - startedAt) / buildDuration);
+    render(progress);
+    frame = progress < 1 ? requestAnimationFrame(animate) : 0;
+  }
+
+  const entryThreshold = .2;
+  const entryObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+    if (startedAt !== undefined || lastProgress === 1) return;
+    if (!entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= entryThreshold)) return;
+    entryObserver.disconnect();
+    startedAt = performance.now();
+    frame = requestAnimationFrame(animate);
+  }, {threshold: entryThreshold}) : null;
+
+  function finish() {
+    if (!drawing) return;
+    entryObserver?.disconnect();
+    cancelAnimationFrame(frame);
+    frame = 0;
+    render(1);
   }
 
   function loadArt() {
@@ -82,24 +97,20 @@
     // For file previews and unavailable SVG scripting the object keeps its static finish.
     if (svg?.localName !== 'svg' || !svg.querySelector('.frame') || svg === drawing?.svg) return;
     drawing = {...prepareDrawing(svg), svg};
+    const progress = Math.max(0, lastProgress);
     lastProgress = -1;
-    render();
+    if (motion.matches || print.matches || !entryObserver || progress === 1) {
+      finish();
+    } else {
+      render(progress);
+      if (startedAt === undefined) entryObserver.observe(art);
+    }
   }
 
   art.addEventListener('load', loadArt);
   loadArt();
-  window.addEventListener('scroll', schedule, {passive: true});
-  window.addEventListener('resize', schedule);
-  window.addEventListener('pageshow', render);
-  motion.addEventListener('change', render);
-  print.addEventListener('change', render);
-  if ('IntersectionObserver' in window) {
-    const proximity = new IntersectionObserver(([entry]) => {
-      nearby = entry.isIntersecting;
-      if (nearby) schedule();
-    }, {rootMargin: '120px 0px'});
-    proximity.observe(art);
-  }
+  motion.addEventListener('change', event => { if (event.matches) finish(); });
+  print.addEventListener('change', event => { if (event.matches) finish(); });
 
   // Reveal each row once. The document is fully readable without scripting.
   if (!('IntersectionObserver' in window) || !Element.prototype.animate) return;
