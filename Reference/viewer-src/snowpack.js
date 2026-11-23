@@ -12,6 +12,7 @@ export function installSnowpack(scene,model,space,roof){
   const mask=new Uint8Array(depths.length),texture=new T.DataTexture(mask,width,height,T.RedFormat);
   texture.needsUpdate=true;
   const uv=new T.Vector4(x0-spacing/2,z0-spacing/2,1/(width*spacing),1/(height*spacing));
+  const material=new T.MeshStandardMaterial({vertexColors:true,transparent:true,alphaTest:.015,depthWrite:false,roughness:.92});
   let mesh,level=0,last=null,elapsed=0,maximum=0;
   function covered(x,y,z){
     const map=roof.coverMap.value.image,transform=roof.coverUV.value;
@@ -43,7 +44,7 @@ export function installSnowpack(scene,model,space,roof){
     geometry.setAttribute('position',new T.Float32BufferAttribute(points,3).setUsage(T.DynamicDrawUsage));
     geometry.setAttribute('color',new T.Float32BufferAttribute(colors,4).setUsage(T.DynamicDrawUsage));
     geometry.setIndex(indices);geometry.computeVertexNormals();
-    mesh=new T.Mesh(geometry,new T.MeshStandardMaterial({vertexColors:true,transparent:true,alphaTest:.015,depthWrite:false,roughness:.92}));
+    mesh=new T.Mesh(geometry,material);
     mesh.name='Settled snow';mesh.receiveShadow=true;mesh.frustumCulled=false;scene.add(mesh);texture.needsUpdate=true;
   }
   function refresh(){
@@ -62,7 +63,7 @@ export function installSnowpack(scene,model,space,roof){
     return c>=0&&c<width&&r>=0&&r<height?r*width+c:-1;
   }
   return {
-    mask:texture,uv,
+    material,mask:texture,uv,
     get coverage(){return Math.min(1,level/.085);},
     get melting(){return maximum>.0005;},
     update(weather,seconds){

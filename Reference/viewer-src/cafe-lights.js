@@ -107,13 +107,16 @@ export function installCafeLights(scene,model,fromPlan,reducedMotion){
     if(!marker)continue;
     const lamp=new THREE.PointLight(0xffce91,0,reach,2);
     lamp.name='Light beneath the '+name.toLowerCase();marker.getWorldPosition(lamp.position);
-    lamp.position.y-=.27;scene.add(lamp);pools.push({lamp,power});
+    lamp.position.y-=.27;scene.add(lamp);pools.push({lamp,power,reach});
   }
-  return {set(daylight,weather){
+  return {set(daylight,weather,afterDusk=1-daylight){
     const night=Math.pow(1-daylight,1.4);
     wind=weather==='rain'?1:weather==='snow'?.84:.74;
     uniforms.gain.value=.10+1.18*night;
-    for(const {lamp,power} of pools)lamp.intensity=.33+power*night;
+    for(const {lamp,power,reach} of pools){
+      lamp.intensity=.33+power*night;
+      lamp.distance=reach+3.4*afterDusk;
+    }
   },update(walking,height,camera,seconds,outdoors){
     glow.visible=walking;uniforms.height.value=height;
     if(!pins.length)return false;

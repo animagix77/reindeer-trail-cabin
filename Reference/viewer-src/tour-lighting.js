@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {installCafeLights} from './cafe-lights.js';
+import {installExteriorPracticals} from './exterior-practicals.js';
 import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
 
 import {atmosphere,createSky,validWeather} from './tour-sky.js';
@@ -251,16 +252,12 @@ export function installTourLighting(scene,renderer,model,arrival,walkSpace,reduc
     [16,7,1.92,0xffe7c8,10,3.5],[26.25,5.65,2.02,0xffedda,6,2.7],
     [30,2.8,1.96,0xffe2b8,8,3],[30,32,2.0,0xffd5a2,6,3.4]
   ].map(([x,y,z,color,power,range])=>({p:fromPlan(x,y,z),color,power,range}));
-  // The four low, frosted path lights run between the two stair flights.
-  // Model their soft pooled light on the risers and rails in existing nearby
-  // lamp slots to keep the steps readable at night.
+  // Preserve the late-afternoon bounce on the lower approach.
   const middleStep=model.getObjectByName('WalkSurface_RetainerTread04');
   const stepBounce={p:new THREE.Box3().setFromObject(middleStep).getCenter(new THREE.Vector3())
     .add(new THREE.Vector3(1.1,1.25,.65)),color:0xffc88e,power:0,range:3.7,approach:true};
-  const frontStep=model.getObjectByName('WalkSurface_FrontStep01');
-  const porchBounce={p:new THREE.Box3().setFromObject(frontStep).getCenter(new THREE.Vector3())
-    .add(new THREE.Vector3(.75,1.08,-.90)),color:0xffdaac,power:0,range:5.2,approach:true};
-  zones.push(stepBounce,porchBounce);
+  zones.push(stepBounce);
+  const setExteriorLamps=installExteriorPracticals(model,fromPlan,weatherFX.pack.material);
   // A practical light follows its modeled diffuser if the basement layout changes.
   model.traverse(fixture=>{
     if(!fixture.name.startsWith('BasementLamp_') || fixture.parent?.name.startsWith('BasementLamp_'))return;
@@ -322,9 +319,8 @@ export function installTourLighting(scene,renderer,model,arrival,walkSpace,reduc
     const nightFill=1-a.day;
     daylight=a.direction.y>0?availableLight:0;
     const pathNight=1-THREE.MathUtils.smoothstep(a.day,.06,.42);
-    stepBounce.power=4.8*lowSun*daylight+16*pathNight;
-    stepBounce.range=3.7+2.1*pathNight;
-    porchBounce.power=13*pathNight;
+    stepBounce.power=4.8*lowSun*daylight;
+    setExteriorLamps(pathNight);
     for(const m of pathLenses)m.emissiveIntensity=1.8*pathNight;
     roomGain=.105+.36*availableLight;
     skyGain=.065+.070*nightFill+.78*availableLight+.13*a.blueHour*(1-a.clouds);
@@ -346,7 +342,7 @@ export function installTourLighting(scene,renderer,model,arrival,walkSpace,reduc
       : (2.60+1.28*lowSun)*a.day*(1-.91*a.clouds)*THREE.MathUtils.smoothstep(a.direction.y,-.06,.16);
     for(const [m,base] of daylightMaterials)m.emissiveIntensity=base*(.04+.96*availableLight);
     for(const [m,base] of lampMaterials)m.emissiveIntensity=base*(1+1.65*(1-availableLight));
-    cafeLights.set(availableLight,weather);
+    cafeLights.set(availableLight,weather,pathNight);
     lampGain=1+.55*(1-availableLight);
     weatherFX.set(weather,.08+.92*availableLight);
     zoneKey=null;

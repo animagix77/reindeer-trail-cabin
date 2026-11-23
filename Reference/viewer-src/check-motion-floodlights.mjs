@@ -23,12 +23,16 @@ test('café lights cast steady pools on the deck, pergola and picnic area after 
   }
   const lighting=installCafeLights(scene,model), lamps=scene.children.filter(x=>x.isPointLight);
   assert.equal(lamps.length,3);
+  lighting.set(1);
+  const dayReach=lamps.map(lamp=>lamp.distance);
   lighting.set(0);
   for(const lamp of lamps){
     assert(lamp.intensity>=28 && lamp.distance>=8);
     assert(lamp.position.y>0 && lamp.position.y<3);
     assert.equal(lamp.castShadow,false);
   }
+  assert(lamps.every((lamp,i)=>lamp.distance>=dayReach[i]+3),'Night lighting should reach the edge of the clearing');
   lighting.set(1);
+  assert.deepEqual(lamps.map(lamp=>lamp.distance),dayReach);
   assert(lamps.every(lamp=>lamp.intensity<.5));
 });
