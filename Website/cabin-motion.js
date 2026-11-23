@@ -112,24 +112,91 @@
   motion.addEventListener('change', event => { if (event.matches) finish(); });
   print.addEventListener('change', event => { if (event.matches) finish(); });
 
-  // Reveal each row once. The document is fully readable without scripting.
+  // Animate the first visible encounter. All content starts in its natural,
+  // readable state, including on a direct link into the middle of the page.
   if (!('IntersectionObserver' in window) || !Element.prototype.animate) return;
-  const rows = document.querySelectorAll('.photo-layout, .cabin-details, .stay-options');
+
+  const title = {from: {opacity: .24, transform: 'translateY(20px)'}, duration: 720};
+  const copy = {from: {opacity: .46, transform: 'translateY(9px)'}, duration: 540};
+  const ink = {from: {opacity: .55}, duration: 430};
+  const backdrop = {from: {opacity: .72}, duration: 850};
+  // Individual scale composes with the gallery's existing hover transform.
+  const photo = {from: {opacity: .5, scale: '1.045'}, duration: 840};
+  const thumbnail = {from: {opacity: .52, scale: '.98'}, duration: 510};
+  const pending = new WeakMap();
+  const playing = new Map();
+  const threshold = .12;
+
   const reveals = new IntersectionObserver(entries => {
     for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      reveals.unobserve(entry.target);
-      if (motion.matches || print.matches) continue;
-      [...entry.target.children].forEach((item, i) => {
-        const animation = item.animate([
-          {opacity: .65, transform: 'translateY(10px)'},
-          {opacity: 1, transform: 'translateY(0)'}
-        ], {duration: 550, delay: i * 65, easing: 'cubic-bezier(.18,.65,.25,1)', fill: 'backwards'});
-        const cancel = () => animation.cancel();
-        motion.addEventListener('change', cancel, {once: true});
-        animation.finished.catch(() => {}).finally(() => motion.removeEventListener('change', cancel));
+      if (!entry.isIntersecting || entry.intersectionRatio < threshold) continue;
+      const item = entry.target;
+      reveals.unobserve(item);
+      const effect = pending.get(item);
+      pending.delete(item);
+      if (!effect || motion.matches || print.matches || item.matches(':focus-within') || item.closest(':focus-visible')) continue;
+      // An empty final keyframe restores the author's opacity and transform.
+      const animation = item.animate([effect.from, {}], {
+        duration: effect.duration, delay: effect.delay, easing: 'cubic-bezier(.18,.68,.23,1)', fill: 'backwards'
       });
+      playing.set(item, animation);
+      animation.onfinish = animation.oncancel = () => playing.delete(item);
     }
-  }, {threshold: .08});
-  rows.forEach(row => reveals.observe(row));
+  }, {threshold});
+
+  function watch(item, effect, delay) {
+    pending.set(item, {...effect, delay});
+    reveals.observe(item);
+  }
+
+  function watchAll(selector, effect, delay = 0) {
+    document.querySelectorAll(selector).forEach(item => watch(item, effect, delay));
+  }
+
+  watchAll('.hero-photo, .tour-panel > img', backdrop);
+  watchAll('.masthead .wordmark, .wide-nav a, .nav-stay, .mobile-nav summary, .mobile-nav a', ink);
+  watchAll('.hero-location, .intro-aside > .eyebrow, .section-top .eyebrow, #reviews-heading, .tour-inner > .eyebrow', ink);
+  watchAll('.heading-line:first-child, .section-top h2, .reviews-score, #review-stays-title, .contact-intro h2', title, 40);
+  watchAll('.heading-line:last-child', title, 150);
+  watchAll('.aside-byline, .intro-main > p, .cabin-details p, .reviews-credit, .tour-inner > p:not(.eyebrow), .stay-options p, .contact-intro p', copy, 85);
+  watchAll('.cabin-details h3, .stay-options h3', copy);
+  watchAll('.hero-cta, .blueprint-link, .all-photos, .reviews-source, .reviews-date, .tour-inner .pill, .stay-options .pill', ink, 115);
+  document.querySelectorAll('.facts li').forEach((item, index) => watch(item, copy, Math.min(index, 3) * 45));
+  watchAll('.photo-tile img', photo);
+  watchAll('.photo-tile figcaption', copy, 65);
+  // The viewport observer also respects the review lane's horizontal clip.
+  watchAll('.review-lane time', ink);
+  watchAll('.review-lane h4', copy, 35);
+  watchAll('.review-lane p', copy, 75);
+  watchAll('#guest-message label:not(.contact-trap), #guest-email, #guest-note, #message-hint, #message-submit, #open-host-inbox', ink, 45);
+  watchAll('.footer-inner > *', ink);
+
+  // Each category rebuilds these tiles. Their buttons and focus rings stay put.
+  const picker = document.querySelector('#pick-grid');
+  new MutationObserver(changes => {
+    for (const change of changes) {
+      for (const tile of change.removedNodes) {
+        for (const item of tile.children) {
+          pending.delete(item);
+          reveals.unobserve(item);
+        }
+      }
+      for (const tile of change.addedNodes) {
+        watch(tile.querySelector('img'), thumbnail, 0);
+        watch(tile.querySelector('span'), ink, 55);
+      }
+    }
+  }).observe(picker, {childList: true});
+
+  function stopReveals() {
+    for (const animation of playing.values()) animation.cancel();
+  }
+  motion.addEventListener('change', () => { if (motion.matches) stopReveals(); });
+  print.addEventListener('change', () => { if (print.matches) stopReveals(); });
+  window.addEventListener('beforeprint', stopReveals);
+  document.addEventListener('focusin', ({target}) => {
+    for (const [item, animation] of playing) {
+      if (item.contains(target) || target.contains(item)) animation.cancel();
+    }
+  });
 })();
