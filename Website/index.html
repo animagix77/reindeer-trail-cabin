@@ -14,10 +14,15 @@
   <link rel="preload" href="./fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./brand.css">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./guest-reviews.css">
+  <link rel="stylesheet" href="./cutaway.css">
   <script src="./hero-film.js" defer></script>
+  <script src="./cabin-motion.js" defer></script>
+  <script src="./look-inside.js" defer></script>
   <script src="./photos/gallery.js" defer></script>
   <script src="./gallery.js" defer></script>
   <script src="./guest-message.js" defer></script>
+  <script src="./guest-reviews.js" defer></script>
 </head>
 <body>
   <a class="skip" href="#the-cabin">Skip to cabin details</a>
@@ -42,7 +47,20 @@
   </header>
   <main>
     <section class="intro page-width" id="the-cabin" aria-labelledby="intro-title">
-      <div class="intro-aside"><p class="eyebrow">The cabin</p><p class="aside-byline">A family place<br>by Binh &amp; Rose</p></div>
+      <div class="intro-aside">
+        <p class="eyebrow">The cabin</p>
+        <div class="blueprint-feature">
+          <figure class="cabin-blueprint" role="img" aria-label="An architectural drawing of our cabin from the driveway, with its gabled roof, wooden entry steps and lower garage.">
+            <object class="blueprint-art" data="./media/cabin-blueprint.svg" type="image/svg+xml" tabindex="-1" aria-hidden="true">
+              <img src="./media/cabin-blueprint.svg" alt="">
+            </object>
+          </figure>
+          <button id="cutaway-open" class="blueprint-link" type="button" aria-haspopup="dialog" aria-controls="cutaway" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 8 9-5 9 5-9 5zm0 0v8l9 5 9-5V8m-9 5v8"/></svg>Look inside
+          </button>
+        </div>
+        <p class="aside-byline">A family place<br>by Binh &amp; Rose</p>
+      </div>
       <div class="intro-main">
         <h2 id="intro-title">Come for the woods.<br><em>Stay a little longer.</em></h2>
         <p>Morning coffee tastes better on the covered deck. Head out for a walk in the Smallwood Forest Reserve, catch a show at nearby Bethel Woods, or spend the afternoon right here. When the stars come out, there’s a circle of Adirondack chairs waiting by the fire.</p>
@@ -61,6 +79,50 @@
           <div><h3>Room to settle in</h3><p>A queen bedroom, a double room and a bunk room sleep the family. Upstairs, the open loft has a queen sleeper and a view over the vaulted living room.</p></div>
           <div><h3>Life at the cabin</h3><p>Cook in the full kitchen or grill on the deck. Wi-Fi and driveway parking are included. Steps lead to the entrance on our sloping lot.</p></div>
           <div><h3>Around Smallwood</h3><p>The Forest Reserve is about a five-minute walk away. Bethel Woods Center for the Arts is about ten minutes away by car.</p></div>
+        </div>
+      </div>
+    </section>
+    <section id="guest-reviews" class="guest-reviews" aria-labelledby="reviews-heading">
+      <div class="reviews-inner page-width">
+        <div class="reviews-summary">
+          <h2 class="eyebrow" id="reviews-heading">Guest reviews</h2>
+          <p class="reviews-score" role="img" aria-label="Average rating: 4.98 out of 5">
+            <span aria-hidden="true">4.98 <em>/ 5</em></span>
+          </p>
+          <a class="text-link reviews-source" href="https://www.airbnb.com/rooms/1124495370358897568/reviews">Read all reviews on Airbnb</a>
+          <p class="reviews-date">47 reviews as of <time datetime="2026-11-23">Nov 23, 2026</time></p>
+        </div>
+        <div class="reviews-stays">
+          <div class="reviews-heading-row">
+            <div><h3 id="review-stays-title">Selected <em>guest stays.</em></h3>
+              <p class="reviews-credit">Summarized from Airbnb reviews</p></div>
+            <div class="reviews-controls" hidden>
+              <button type="button" data-review-step="-1" aria-label="Previous guest stay" aria-controls="review-lane"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14 5-7 7 7 7"/></svg></button>
+              <button type="button" data-review-step="1" aria-label="Next guest stay" aria-controls="review-lane"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m10 5 7 7-7 7"/></svg></button>
+            </div>
+          </div>
+          <ul class="review-lane" id="review-lane" aria-labelledby="review-stays-title" tabindex="0">
+            <li>
+              <time datetime="2026-10">October 2026</time>
+              <h4>Deer in the fall</h4>
+              <p>One guest spotted deer each day of their autumn weekend and enjoyed the fire pit surrounded by fall colors.</p>
+            </li>
+            <li>
+              <time datetime="2025-08">August 2025</time>
+              <h4>A concert weekend</h4>
+              <p>Friends in town for a concert spent evenings by the fire pit and on the porch, where the lights made the backyard feel cozy.</p>
+            </li>
+            <li>
+              <time datetime="2024-07">July 2024</time>
+              <h4>The waterfall walk</h4>
+              <p>A family followed Binh’s tip and walked to the nearby Forest Reserve. They found woodland trails, a waterfall and a playground.</p>
+            </li>
+            <li>
+              <time datetime="2025-08">August 2025</time>
+              <h4>S’mores after supper</h4>
+              <p>A couple visiting with two grown sons had every meal on the back deck. In the evenings, the family gathered around the fire for s’mores.</p>
+            </li>
+          </ul>
         </div>
       </div>
     </section>
@@ -100,6 +162,37 @@
     </section>
   </main>
   <footer><div class="footer-inner page-width"><a class="wordmark" href="#top">The Reindeer Trail</a><p>Smallwood, New York</p><a href="#top">Back to top</a></div></footer>
+  <dialog id="cutaway" aria-labelledby="cutaway-title">
+    <div class="cutaway-layout">
+      <header class="cutaway-head">
+        <h2 id="cutaway-title">Inside the <em>cabin.</em></h2>
+        <button class="cutaway-icon" id="cutaway-close" type="button" aria-label="Close interior view" autofocus>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12m0-12L6 18"/></svg>
+        </button>
+      </header>
+      <div class="cutaway-stage">
+        <canvas id="cutaway-canvas" tabindex="0" aria-label="Roof-off model of the cabin. Drag to rotate or use the rotation controls below." aria-describedby="cutaway-help"></canvas>
+        <div class="cutaway-placeholder">
+          <img id="cutaway-poster" alt="A three-quarter view into the cabin with its roof removed">
+          <p id="cutaway-status" role="status">Opening the interior…</p>
+          <a class="text-link" id="cutaway-photos" href="#gallery" hidden>See interior photos</a>
+        </div>
+      </div>
+      <div class="cutaway-toolbar" hidden>
+        <p id="cutaway-help">Drag to rotate <span>·</span> Pinch or scroll to zoom</p>
+        <div class="cutaway-actions">
+          <button class="cutaway-icon" type="button" data-turn="-1" aria-label="Rotate left">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 4-4 4 4 4M4 8h8a6 6 0 0 1 0 12h-2"/></svg>
+          </button>
+          <button class="cutaway-icon" type="button" data-turn="1" aria-label="Rotate right">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m16 4 4 4-4 4m4-4h-8a6 6 0 0 0 0 12h2"/></svg>
+          </button>
+          <button id="cutaway-loft" type="button" aria-pressed="false" hidden>Show loft</button>
+          <button id="cutaway-reset" type="button">Reset view</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
   <dialog id="lightbox" aria-labelledby="lightbox-name">
     <div class="viewer"><div class="viewer-head"><span id="lightbox-name">Cabin photographs</span><button type="button" data-close aria-label="Close photo gallery">Close</button></div>
     <div id="photo-picker" hidden><label for="pick-category">Browse photos</label> <select id="pick-category"><option value="">All spaces</option></select><div id="pick-grid"></div></div>

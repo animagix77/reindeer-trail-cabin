@@ -67,6 +67,10 @@ if(website){
   await fs.access(path.join(siteDir,'index.html'));
   await fs.cp(siteDir,modelDir,{recursive:true,filter:file=>!path.basename(file).startsWith('.')});
   await fs.copyFile(path.resolve(base,'../../CNAME'),path.join(modelDir,'CNAME'));
+  // The overview viewer loads only when a visitor opens the cabin cutaway.
+  await build({entryPoints:[path.join(base,'cabin-cutaway.js')],bundle:true,format:'esm',minify:true,
+    legalComments:'inline',target:'es2022',outfile:path.join(modelDir,'media/cabin-cutaway-viewer.js'),
+    banner:{js:'/* '+licenses[0]+' */'}});
   const aliases=Object.entries(tourAreas).flatMap(([key,area])=>[key,area.slug,...area.aliases]);
   const router=`(() => {
     const [scene, query] = location.hash.slice(1).split('?');
