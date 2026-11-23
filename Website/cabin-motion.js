@@ -21,15 +21,16 @@
     // Each material is painted from the footing up. Normalized clip coordinates
     // follow each layer's bounds, including the pitched roof and porch railings.
     const defs = svg.querySelector('defs');
-    const coats = [...svg.querySelectorAll('.finish > [data-build]')].map(group => {
+    const coats = [...svg.querySelectorAll('.finish > [data-build], .finish > #woodland')].map(group => {
+      const layer = group.dataset.build || group.id;
       const clip = svg.ownerDocument.createElementNS(svg.namespaceURI, 'clipPath');
       const edge = svg.ownerDocument.createElementNS(svg.namespaceURI, 'polygon');
-      clip.id = 'build-reveal-' + group.dataset.build;
+      clip.id = 'build-reveal-' + layer;
       clip.setAttribute('clipPathUnits', 'objectBoundingBox');
       edge.setAttribute('points', '-.1,0 1.1,-.12 1.1,1.3 -.1,1.3');
       clip.append(edge);
       defs.append(clip);
-      return {group, edge, clip, previous: -1};
+      return {group, layer, edge, clip, previous: -1};
     });
     return {lines, coats};
   }
@@ -64,8 +65,8 @@
     drawLines(survey, .45 + .55 * between(p, 0, .15), .8 * (1 - between(p, .58, .96)));
     drawLines(plan, .14 + .86 * between(p, 0, .29), 1 - between(p, .52, .81));
     drawLines(studs, between(p, .18, .59), 1 - between(p, .61, .92));
-    const spans = {base: [.47, .65], walls: [.55, .81], roof: [.68, .89], details: [.76, 1]};
-    for (const coat of drawing.coats) paint(coat, between(p, ...spans[coat.group.dataset.build]));
+    const spans = {base: [.47, .65], walls: [.55, .81], roof: [.68, .89], woodland: [.80, .98], details: [.76, 1]};
+    for (const coat of drawing.coats) paint(coat, between(p, ...spans[coat.layer]));
   }
 
   function animate(now) {
