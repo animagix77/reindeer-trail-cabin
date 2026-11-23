@@ -196,6 +196,7 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>held.delete(e.code));
 window.addEventListener('blur',stopWalking);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stopWalking();else if(sceneCanRender)render();});
+reducedMotion.addEventListener('change',()=>{if(sceneCanRender)schedule();});
 window.addEventListener('focus',()=>{if(sceneCanRender)render();});
 window.addEventListener('pagehide',stopWalking);
 matchMedia('(orientation: portrait)').addEventListener('change',()=>{
@@ -674,7 +675,7 @@ async function show() {
       render();
     }
   });
-  lighting=installTourLighting(world,renderer,gltf.scene,{...arrival,season},walkSpace);
+  lighting=installTourLighting(world,renderer,gltf.scene,{...arrival,season},walkSpace,reducedMotion);
   woodland.conditions(arrival);
   gltf.scene.traverse(object=>{
     if(/^(Tax[ _]parcel|Site[ _]section|Canopy)/i.test(object.name))object.visible=false;

@@ -10,6 +10,7 @@ import {checkRoomZones} from './check-room-zones.mjs';
 import {checkFirewood} from './check-firewood.mjs';
 import {checkThrowColliders} from './check-throw-colliders.mjs';
 import {checkWorldActions} from './check-world-actions.mjs';
+import {checkCafeLightSway} from './check-cafe-light-sway.mjs';
 import {installEggSwings} from './egg-swings.js';
 
 const bytes=await fs.readFile(process.argv[2]);
@@ -169,6 +170,7 @@ for(const x of [34.71,35.29]){
 assert(lampsAlong([40.70,35.84],[34.71,48.325])>=5,'Missing direct pergola-to-deck lights');
 assert.equal(lampsAlong([13.25,54.4],[23.30,35.84]),7,'Expected seven pendants on the flue-side span');
 for(const name of ['Deck','Picnic','Pergola'])assert(scene.getObjectByName('FestoonPool_'+name),'Missing outdoor lamp anchor '+name);
+checkCafeLightSway(scene,at);
 // Each basket needs its own upholstered seat inside the wicker shell.
 const swingPads=[];
 scene.traverse(mesh=>{

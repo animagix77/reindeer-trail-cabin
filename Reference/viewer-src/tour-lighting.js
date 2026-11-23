@@ -181,7 +181,7 @@ function yardReflection(model,renderer,point,season) {
 }
 
 // The room environment supplies close indoor reflections, with a separate outdoor probe.
-export function installTourLighting(scene,renderer,model,arrival,walkSpace) {
+export function installTourLighting(scene,renderer,model,arrival,walkSpace,reducedMotion) {
   const textureGenerator=new THREE.PMREMGenerator(renderer);
   const studio=new RoomEnvironment();
   const environment=textureGenerator.fromScene(studio,.045);
@@ -272,7 +272,8 @@ export function installTourLighting(scene,renderer,model,arrival,walkSpace) {
     zones.push({p,color:threshold?0xffdfb7:0xfff1df,power:threshold?2.8:bathroom?5:11,
       range:threshold||bathroom?3.3:5.4,basement:true,threshold});
   });
-  const cafeLights=installCafeLights(scene,model);
+  const cafeLights=installCafeLights(scene,model,fromPlan,reducedMotion);
+  let cafeLightsMoving=false;
   const lamps=Array.from({length:3},()=>{const l=new THREE.PointLight(0xffffff,0,4,2);scene.add(l);return l;});
   let zoneKey=null,stateKey='',lampGain=1,daylight=1,lowSun=0;
   let {hour,weather,sunDirection,season}=arrival;
@@ -345,7 +346,7 @@ export function installTourLighting(scene,renderer,model,arrival,walkSpace) {
       : (2.60+1.28*lowSun)*a.day*(1-.91*a.clouds)*THREE.MathUtils.smoothstep(a.direction.y,-.06,.16);
     for(const [m,base] of daylightMaterials)m.emissiveIntensity=base*(.04+.96*availableLight);
     for(const [m,base] of lampMaterials)m.emissiveIntensity=base*(1+1.65*(1-availableLight));
-    cafeLights.set(availableLight);
+    cafeLights.set(availableLight,weather);
     lampGain=1+.55*(1-availableLight);
     weatherFX.set(weather,.08+.92*availableLight);
     zoneKey=null;
@@ -356,12 +357,12 @@ export function installTourLighting(scene,renderer,model,arrival,walkSpace) {
     sun,setConditions,captureExterior,snowpack:weatherFX.pack,
     get daylight(){return daylight;},
     get goldenHour(){return lowSun;},
-    get animated(){return weatherFX.animated || stars.animated;},
+    get animated(){return weatherFX.animated || stars.animated || cafeLightsMoving;},
     update(eye,mode,seconds=performance.now()/1000,camera,outdoors=false,floor=''){
       const walking=mode!=='property';
       if((walking && outdoors)!==outdoor){outdoor=walking && outdoors;applyEnvironment();}
       sky.place(eye,walking);
-      cafeLights.update(walking,renderer.domElement.height);
+      cafeLightsMoving=cafeLights.update(walking,renderer.domElement.height,camera,seconds,outdoors);
       if(camera)stars.update(camera,mode,seconds,renderer.getPixelRatio(),outdoors);
       // In the cutaway the eye orbits high above the landscape. Keep plan details legible.
       scene.fog=walking?air:null;
