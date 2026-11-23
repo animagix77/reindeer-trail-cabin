@@ -74,14 +74,20 @@
     frame = progress < 1 ? requestAnimationFrame(animate) : 0;
   }
 
-  const entryThreshold = .2;
+  // Let the visitor see most of the sheet before drawing its first line.
+  const readingMargin = '0px 0px -' + Math.round(Math.min(150, innerHeight * .2)) + 'px 0px';
+  const artThresholds = [.65, .45, .25, .05];
   const entryObserver = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
     if (startedAt !== undefined || lastProgress === 1) return;
-    if (!entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= entryThreshold)) return;
+    if (!entries.some(entry => {
+      const available = (entry.rootBounds?.height ?? innerHeight) / Math.max(1, entry.boundingClientRect.height);
+      const threshold = artThresholds.find(ratio => ratio <= available) ?? .05;
+      return entry.isIntersecting && entry.intersectionRatio >= threshold;
+    })) return;
     entryObserver.disconnect();
     startedAt = performance.now();
     frame = requestAnimationFrame(animate);
-  }, {threshold: entryThreshold}) : null;
+  }, {threshold: artThresholds, rootMargin: readingMargin}) : null;
 
   function finish() {
     if (!drawing) return;
@@ -112,41 +118,50 @@
   motion.addEventListener('change', event => { if (event.matches) finish(); });
   print.addEventListener('change', event => { if (event.matches) finish(); });
 
-  // Animate the first visible encounter. All content starts in its natural,
-  // readable state, including on a direct link into the middle of the page.
+  // The waiting state is applied only when we can actually play the reveal.
   if (!('IntersectionObserver' in window) || !Element.prototype.animate) return;
 
-  const title = {from: {opacity: .24, transform: 'translateY(20px)'}, duration: 720};
-  const copy = {from: {opacity: .46, transform: 'translateY(9px)'}, duration: 540};
-  const ink = {from: {opacity: .55}, duration: 430};
-  const backdrop = {from: {opacity: .72}, duration: 850};
+  const title = {from: {opacity: .1, transform: 'translateY(30px)'}, duration: 1350};
+  const copy = {from: {opacity: .18, transform: 'translateY(16px)'}, duration: 1050};
+  const ink = {from: {opacity: .24}, duration: 850};
+  const backdrop = {from: {opacity: .48}, duration: 1450};
   // Individual scale composes with the gallery's existing hover transform.
-  const photo = {from: {opacity: .5, scale: '1.045'}, duration: 840};
-  const thumbnail = {from: {opacity: .52, scale: '.98'}, duration: 510};
+  const photo = {from: {opacity: .2, scale: '1.06'}, duration: 1450};
+  const thumbnail = {from: {opacity: .28, scale: '.97'}, duration: 900};
   const pending = new WeakMap();
   const playing = new Map();
-  const threshold = .12;
-
-  const reveals = new IntersectionObserver(entries => {
+  function reveal(entries, observer) {
     for (const entry of entries) {
-      if (!entry.isIntersecting || entry.intersectionRatio < threshold) continue;
+      if (!entry.isIntersecting || entry.intersectionRatio < observer.thresholds[0]) continue;
       const item = entry.target;
-      reveals.unobserve(item);
+      observer.unobserve(item);
       const effect = pending.get(item);
       pending.delete(item);
+      item.style.removeProperty('--reveal-wait');
+      item.removeAttribute('data-reveal-wait');
       if (!effect || motion.matches || print.matches || item.matches(':focus-within') || item.closest(':focus-visible')) continue;
       // An empty final keyframe restores the author's opacity and transform.
       const animation = item.animate([effect.from, {}], {
-        duration: effect.duration, delay: effect.delay, easing: 'cubic-bezier(.18,.68,.23,1)', fill: 'backwards'
+        duration: effect.duration, delay: effect.delay, easing: 'cubic-bezier(.3,.08,.24,1)', fill: 'backwards'
       });
       playing.set(item, animation);
       animation.onfinish = animation.oncancel = () => playing.delete(item);
     }
-  }, {threshold});
+  }
+
+  const readingArea = new IntersectionObserver(reveal, {threshold: .35, rootMargin: readingMargin});
+  // Large backdrops can exceed a short landscape viewport. The inset alone
+  // keeps their start in view. Footer and picker items can reach a scroll limit.
+  const largeMedia = new IntersectionObserver(reveal, {threshold: .1, rootMargin: readingMargin});
+  const scrollEnd = new IntersectionObserver(reveal, {threshold: .35});
 
   function watch(item, effect, delay) {
+    const observer = item.closest('footer, #guest-message, #pick-grid') ? scrollEnd
+      : item.matches('.hero-photo, .tour-panel > img, .photo-tile img') ? largeMedia : readingArea;
+    item.setAttribute('data-reveal-wait', '');
+    item.style.setProperty('--reveal-wait', effect.from.opacity);
     pending.set(item, {...effect, delay});
-    reveals.observe(item);
+    observer.observe(item);
   }
 
   function watchAll(selector, effect, delay = 0) {
@@ -157,7 +172,7 @@
   watchAll('.masthead .wordmark, .wide-nav a, .nav-stay, .mobile-nav summary, .mobile-nav a', ink);
   watchAll('.hero-location, .intro-aside > .eyebrow, .section-top .eyebrow, #reviews-heading, .tour-inner > .eyebrow', ink);
   watchAll('.heading-line:first-child, .section-top h2, .reviews-score, #review-stays-title, .contact-intro h2', title, 40);
-  watchAll('.heading-line:last-child', title, 150);
+  watchAll('.heading-line:last-child', title, 280);
   watchAll('.aside-byline, .intro-main > p, .cabin-details p, .reviews-credit, .tour-inner > p:not(.eyebrow), .stay-options p, .contact-intro p', copy, 85);
   watchAll('.cabin-details h3, .stay-options h3', copy);
   watchAll('.hero-cta, .blueprint-link, .all-photos, .reviews-source, .reviews-date, .tour-inner .pill, .stay-options .pill', ink, 115);
@@ -178,7 +193,7 @@
       for (const tile of change.removedNodes) {
         for (const item of tile.children) {
           pending.delete(item);
-          reveals.unobserve(item);
+          scrollEnd.unobserve(item);
         }
       }
       for (const tile of change.addedNodes) {

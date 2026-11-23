@@ -9,6 +9,9 @@ a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #dd
 figure,h1,h2,h3,p{margin:0}
 h1,h2,h3,.wordmark{font:400 1em/1 var(--serif);letter-spacing:-.035em}
 .heading-line{display:inline-block;max-width:100%;vertical-align:top}
+@media screen and (prefers-reduced-motion:no-preference){
+  [data-reveal-wait]:not(:focus-within):not(:focus-visible *){opacity:var(--reveal-wait)}
+}
 img{display:block;max-width:100%}
 .page-width{width:min(100%,100rem);margin-inline:auto;padding-inline:var(--pad)}
 .eyebrow{font:600 .77rem/1.4 var(--sans);letter-spacing:.17em;text-transform:uppercase}
