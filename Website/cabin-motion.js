@@ -126,9 +126,6 @@
   const copy = {from: {opacity: .18, transform: 'translateY(16px)'}, duration: 1050};
   const ink = {from: {opacity: .24}, duration: 850};
   const backdrop = {from: {opacity: .48}, duration: 1450, wipe: true};
-  // Individual scale composes with the gallery's existing hover transform.
-  const photo = {from: {opacity: .2, scale: '1.06'}, duration: 1450, wipe: true};
-  const thumbnail = {from: {opacity: .28}, duration: 900, wipe: true};
   const pending = new WeakMap();
   const playing = new Map();
   function play(item, effect) {
@@ -166,13 +163,13 @@
 
   const readingArea = new IntersectionObserver(reveal, {threshold: .35, rootMargin: readingMargin});
   // Large backdrops can exceed a short landscape viewport. The inset alone
-  // keeps their start in view. Footer and picker items can reach a scroll limit.
+  // keeps their start in view. Footer items can reach a scroll limit.
   const largeMedia = new IntersectionObserver(reveal, {threshold: .1, rootMargin: readingMargin});
   const scrollEnd = new IntersectionObserver(reveal, {threshold: .35});
 
   function watch(item, effect, delay) {
-    const observer = item.closest('footer, #guest-message, #pick-grid') ? scrollEnd
-      : item.matches('.hero-media, .tour-panel > img, .photo-tile img') ? largeMedia : readingArea;
+    const observer = item.closest('footer, #guest-message') ? scrollEnd
+      : item.matches('.hero-media, .tour-panel > img') ? largeMedia : readingArea;
     item.setAttribute('data-reveal-wait', '');
     item.style.setProperty('--reveal-wait', effect.wipe ? 0 : effect.from.opacity);
     pending.set(item, {...effect, delay});
@@ -203,8 +200,6 @@
   watchAll('.cabin-details h3, .stay-options h3', copy);
   watchAll('.hero-cta, .blueprint-link, .all-photos, .reviews-source, .reviews-date, .tour-inner .pill, .stay-options .pill', ink, 115);
   document.querySelectorAll('.facts li').forEach((item, index) => watch(item, copy, Math.min(index, 3) * 45));
-  watchAll('.photo-tile img', photo);
-  watchAll('.photo-tile figcaption', copy, 65);
   // The viewport observer also respects the review lane's horizontal clip.
   watchAll('.review-lane time', ink);
   watchAll('.review-lane h4', copy, 35);
@@ -212,27 +207,28 @@
   watchAll('#guest-message label:not(.contact-trap), #guest-email, #guest-note, #message-hint, #message-submit, #open-host-inbox', ink, 45);
   watchAll('.footer-inner > *', ink);
 
-  const fullPhoto = document.querySelector('#viewer-img');
-  fullPhoto.addEventListener('load', () => {
-    if (fullPhoto.getClientRects().length) play(fullPhoto, thumbnail);
-  });
-
-  // Each category rebuilds these tiles. Their buttons and focus rings stay put.
-  const picker = document.querySelector('#pick-grid');
-  new MutationObserver(changes => {
-    for (const change of changes) {
-      for (const tile of change.removedNodes) {
-        for (const item of tile.children) {
-          pending.delete(item);
-          scrollEnd.unobserve(item);
-        }
-      }
-      for (const tile of change.addedNodes) {
-        watch(tile.querySelector('img'), thumbnail, 0);
-        watch(tile.querySelector('span'), ink, 55);
-      }
+  // Observe the stationary tile so clipping its contents cannot retrigger it.
+  const tiles = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) entry.target.dataset.galleryReveal = 'waiting';
+      else if (entry.intersectionRatio >= .2) entry.target.dataset.galleryReveal = 'visible';
     }
-  }).observe(picker, {childList: true});
+  }, {threshold: [0, .2]});
+
+  for (const tile of document.querySelectorAll('.photo-tile')) {
+    tile.dataset.galleryReveal = 'waiting';
+    const image = tile.querySelector('img');
+    if (image.complete) tiles.observe(tile);
+    else {
+      const ready = () => {
+        image.removeEventListener('load', ready);
+        image.removeEventListener('error', ready);
+        tiles.observe(tile);
+      };
+      image.addEventListener('load', ready);
+      image.addEventListener('error', ready);
+    }
+  }
 
   function stopReveals() {
     for (const animation of playing.values()) animation.cancel();
