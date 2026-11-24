@@ -53,8 +53,15 @@ img{display:block;max-width:100%}
   .text-link{transition:text-underline-offset .2s ease-out}
   .text-link:hover{ text-underline-offset:.48em }
 }
-.hero-cta,.tour-inner .pill{background:#f3ecd9;color:#25392e}
-.hero-cta:hover,.tour-inner .pill:hover{background:#fffaf0}
+.hero-cta,.tour-inner .pill{
+  color:var(--cabin-ink);
+  background:#f3ecd9 linear-gradient(#e9b66f,#e9b66f) left center / 0% 100% no-repeat;
+  transition:background-size .42s cubic-bezier(.22,.72,.25,1);
+}
+@media(hover:hover){
+  .hero-cta:hover,.tour-inner .pill:hover{background-size:100% 100%}
+}
+.hero-cta:focus-visible,.tour-inner .pill:focus-visible{background-size:100% 100%}
 .intro{display:grid;grid-template-columns:minmax(10rem,1fr) minmax(0,2.1fr);column-gap:2rem;padding-block:clamp(4.25rem,8vw,9rem)}
 .intro-aside{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;gap:.8rem;min-width:0}
 .blueprint-feature{width:100%;max-width:31rem;align-self:center;text-align:center}
