@@ -13,14 +13,14 @@
   <meta property="og:image" content="https://reindeertrail.com/photos/cabin-in-autumn.webp">
   <link rel="preload" href="./fonts/instrument-serif.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./brand.css">
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=slideshow">
   <link rel="stylesheet" href="./guest-reviews.css">
   <link rel="stylesheet" href="./cutaway.css">
   <script src="./hero-film.js" defer></script>
-  <script src="./cabin-motion.js" defer></script>
+  <script src="./cabin-motion.js?v=slideshow" defer></script>
   <script src="./look-inside.js" defer></script>
-  <script src="./photos/gallery.js" defer></script>
-  <script src="./gallery.js" defer></script>
+  <script src="./photos/gallery.js?v=slideshow" defer></script>
+  <script src="./gallery.js?v=slideshow" defer></script>
   <script src="./guest-message.js" defer></script>
   <script src="./guest-reviews.js" defer></script>
 </head>
@@ -71,11 +71,24 @@
     </section>
     <section class="gallery-section" id="gallery" aria-labelledby="gallery-title">
       <div class="page-width">
-        <div class="section-top"><div><p class="eyebrow">Photo gallery</p><h2 id="gallery-title">Inside <em>&amp;</em> out.</h2></div><a class="text-link all-photos" data-photo="living-room" href="./photos/living-room.webp">View all photos</a></div>
-        <div class="photo-layout">
-          <a class="photo-tile large" data-photo="living-room" href="./photos/living-room.webp"><figure><img loading="lazy" src="./photos/living-room.webp" alt="The living room with its pine walls and open sleeping loft." width="1100" height="733"><figcaption>The living room</figcaption></figure></a>
-          <a class="photo-tile" data-photo="covered-deck" href="./photos/covered-deck.webp"><figure><img loading="lazy" src="./photos/covered-deck.webp" alt="The cabin’s covered wooden deck." width="800" height="533"><figcaption>The covered deck</figcaption></figure></a>
-          <a class="photo-tile" data-photo="backyard-firepit" href="./photos/backyard-firepit.webp"><figure><img loading="lazy" src="./photos/backyard-firepit.webp" alt="Adirondack chairs around the fire pit in the wooded backyard." width="800" height="533"><figcaption>Around the fire</figcaption></figure></a>
+        <div class="section-top"><div><p class="eyebrow">Photo gallery</p><h2 id="gallery-title">Inside <em>&amp;</em> out.</h2></div><button class="text-link expand-slides" type="button" aria-haspopup="dialog" hidden>Expand slideshow</button></div>
+        <div id="slide-home">
+          <div class="cabin-slides" role="region" aria-roledescription="carousel" aria-label="Cabin photographs">
+            <div class="photo-tile">
+              <figure>
+                <img id="slide-image" loading="lazy" src="./photos/living-room.webp" width="1440" height="964" alt="Daylight fills the seating area beneath the open timber loft.">
+                <figcaption id="slide-caption">The living room <small>AI-assisted photo enhancement for brighter exposure and balanced color.</small></figcaption>
+              </figure>
+            </div>
+            <div class="slide-controls" hidden>
+              <button type="button" data-play>Play slideshow</button>
+              <div class="slide-navigation">
+                <button type="button" data-prev aria-label="Previous photograph">←</button>
+                <span id="slide-count"></span>
+                <button type="button" data-next aria-label="Next photograph">→</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="cabin-details">
           <div><h3>Room to settle in</h3><p>A queen bedroom, a double room and a bunk room sleep the family. Upstairs, the open loft has a queen sleeper and a view over the vaulted living room.</p></div>
@@ -231,10 +244,8 @@
     </div>
   </dialog>
   <dialog id="lightbox" aria-labelledby="lightbox-name">
-    <div class="viewer"><div class="viewer-head"><span id="lightbox-name">Cabin photographs</span><button type="button" data-close aria-label="Close photo gallery">Close</button></div>
-    <div id="photo-picker" hidden><label for="pick-category">Browse photos</label> <select id="pick-category"><option value="">All spaces</option></select><div id="pick-grid"></div></div>
-    <div id="photo-single"><figure class="viewer-picture"><img id="viewer-img" alt=""><figcaption aria-live="polite" id="viewer-caption"></figcaption></figure>
-    <div class="viewer-controls"><button type="button" data-prev aria-label="Previous photograph">Previous</button><div class="viewer-middle"><span id="viewer-count"></span><button data-all type="button">All photos</button></div><button type="button" data-next aria-label="Next photograph">Next</button></div></div>
+    <div class="viewer">
+      <div class="viewer-head"><span id="lightbox-name">Cabin photographs</span><button type="button" data-close>Close</button></div>
     </div>
   </dialog>
 </body>

@@ -198,7 +198,7 @@
   watchAll('.heading-line:last-child', title, 280);
   watchAll('.aside-byline, .intro-main > p, .cabin-details p, .reviews-credit, .tour-inner > p:not(.eyebrow), .stay-options p, .contact-intro p', copy, 85);
   watchAll('.cabin-details h3, .stay-options h3', copy);
-  watchAll('.hero-cta, .blueprint-link, .all-photos, .reviews-source, .reviews-date, .tour-inner .pill, .stay-options .pill', ink, 115);
+  watchAll('.hero-cta, .blueprint-link, .expand-slides, .reviews-source, .reviews-date, .tour-inner .pill, .stay-options .pill', ink, 115);
   document.querySelectorAll('.facts li').forEach((item, index) => watch(item, copy, Math.min(index, 3) * 45));
   // The viewport observer also respects the review lane's horizontal clip.
   watchAll('.review-lane time', ink);
@@ -215,7 +215,7 @@
     }
   }, {threshold: [0, .2]});
 
-  for (const tile of document.querySelectorAll('.photo-tile')) {
+  for (const tile of document.querySelectorAll('#slide-home')) {
     tile.dataset.galleryReveal = 'waiting';
     const image = tile.querySelector('img');
     if (image.complete) tiles.observe(tile);
